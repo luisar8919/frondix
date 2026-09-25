@@ -30,8 +30,14 @@ jobs:
           # For more information regarding Static Web App workflow configurations, please visit: https://aka.ms/swaworkflowconfig
           app_location: "/" # App source code path
           api_location: "" # Api source code path - optional
-          output_location: "build" # Built app content directory - optional
+          output_location: "" # Next.js con servidor: vacio (no existe carpeta "build")
           ###### End of Repository/Build Configurations ######
+        env:
+          # Las NEXT_PUBLIC_* se incrustan en el navegador al compilar, por eso van aca.
+          # Las claves secretas (service role, Culqi, WhatsApp) van solo en Azure > Variables de entorno.
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+          NEXT_PUBLIC_CULQI_PUBLIC_KEY: ${{ secrets.NEXT_PUBLIC_CULQI_PUBLIC_KEY }}
 
   close_pull_request_job:
     if: github.event_name == 'pull_request' && github.event.action == 'closed'
