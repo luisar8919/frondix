@@ -1,14 +1,17 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { crearClienteServidor } from "@/lib/supabase/server";
 
 export default async function DashboardPage() {
   const supabase = await crearClienteServidor();
   const { data: { user } } = await supabase.auth.getUser();
+  // El middleware no corre en Azure Static Web Apps: la página misma exige la sesión.
+  if (!user) redirect("/login");
 
   const { data: miembro } = await supabase
     .from("miembros")
     .select("empresa_id, empresas(nombre)")
-    .eq("user_id", user!.id)
+    .eq("user_id", user.id)
     .single();
 
   const { data: datasets } = await supabase
