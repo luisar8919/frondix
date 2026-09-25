@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { crearClienteServidor } from "@/lib/supabase/server";
+import BarraPanel from "@/components/BarraPanel";
 
 // Protege todo /dashboard sin depender del middleware (que Azure Static Web Apps
 // no ejecuta). Las páginas que leen datos del servidor validan la sesión además
@@ -8,5 +9,11 @@ export default async function DashboardLayout({ children }: { children: React.Re
   const supabase = await crearClienteServidor();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/login");
-  return children;
+
+  return (
+    <>
+      <BarraPanel />
+      <main className="contenedor panel">{children}</main>
+    </>
+  );
 }

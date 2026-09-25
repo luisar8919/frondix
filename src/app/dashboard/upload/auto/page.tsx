@@ -45,40 +45,51 @@ export default function UploadAutoPage() {
   }
 
   return (
-    <main style={{ maxWidth: 560, margin: "40px auto" }}>
-      <h1>Generar tablas automáticamente</h1>
-      <p style={{ color: "#666" }}>
-        Si tu Excel tiene varias hojas (meses, caja, stock, etc.), agrupamos las que se parecen
-        entre sí y creamos hasta 3 tablas de una — la que tenga más columnas de cada grupo define
-        la estructura, el resto de las hojas del mismo grupo completan lo que les falte.
-      </p>
+    <>
+      <div className="panel-cabecera">
+        <div>
+          <h1>Generar tablas automáticamente</h1>
+          <p className="suave" style={{ maxWidth: "62ch" }}>
+            Si tu Excel tiene varias hojas (meses, caja, stock...), agrupamos las que se parecen y creamos
+            hasta 3 tablas de una vez. En cada grupo manda la hoja con más columnas y las demás completan
+            lo que les falte.
+          </p>
+        </div>
+      </div>
 
-      <form onSubmit={onSubmit} style={{ display: "grid", gap: 12, marginTop: 24 }}>
-        <input type="file" accept=".xlsx,.xls,.csv" onChange={(e) => setArchivo(e.target.files?.[0] ?? null)} required />
-        <button type="submit" disabled={cargando}>{cargando ? "Procesando..." : "Generar tablas"}</button>
-        {error && <p style={{ color: "crimson" }}>{error}</p>}
+      <form onSubmit={onSubmit} className="tarjeta" style={{ maxWidth: 760 }}>
+        <label htmlFor="archivo-auto">Tu archivo de Excel</label>
+        <input id="archivo-auto" type="file" accept=".xlsx,.xls,.csv" onChange={(e) => setArchivo(e.target.files?.[0] ?? null)} required />
+        {error && <p className="alerta alerta-error" role="alert" style={{ marginTop: 14 }}>{error}</p>}
+        <button type="submit" className="btn btn-primario btn-grande" style={{ marginTop: 16 }} disabled={cargando || !archivo}>
+          {cargando ? "Procesando..." : "Generar tablas"}
+        </button>
       </form>
 
       {resultado && (
-        <div style={{ marginTop: 32 }}>
-          <h2 style={{ fontSize: 18 }}>Se crearon {resultado.tablas.length} tabla(s)</h2>
-          <ul>
+        <div className="tarjeta tarjeta-elevada" style={{ maxWidth: 760, marginTop: 20 }}>
+          <h2 style={{ fontSize: 22 }}>
+            Listo: se {resultado.tablas.length === 1 ? "creó 1 tabla" : `crearon ${resultado.tablas.length} tablas`}
+          </h2>
+          <div className="grilla-tablas" style={{ marginTop: 14 }}>
             {resultado.tablas.map((t) => (
-              <li key={t.datasetId} style={{ marginBottom: 8 }}>
-                <Link href={`/dashboard/${t.datasetId}`}><strong>{t.nombre}</strong></Link>
-                {" — "}{t.filasImportadas} filas, de la(s) hoja(s): {t.hojas.join(", ")}
-              </li>
+              <Link key={t.datasetId} href={`/dashboard/${t.datasetId}`} className="tarjeta tarjeta-tabla">
+                <h3>{t.nombre}</h3>
+                <p className="suave pequeno" style={{ margin: 0 }}>
+                  {t.filasImportadas} filas, de: {t.hojas.join(", ")}
+                </p>
+              </Link>
             ))}
-          </ul>
+          </div>
           {resultado.hojasOmitidas.length > 0 && (
-            <p style={{ color: "#a66", fontSize: 14 }}>
-              No se importaron (más de 3 estructuras distintas en el archivo, quedaron afuera las con
-              menos datos): {resultado.hojasOmitidas.join(", ")}. Podés importarlas a mano desde{" "}
+            <p className="alerta alerta-aviso" style={{ marginTop: 16, marginBottom: 0 }}>
+              No se importaron (había más de 3 estructuras distintas y quedaron afuera las de menos datos):{" "}
+              {resultado.hojasOmitidas.join(", ")}. Podés importarlas a mano desde{" "}
               <Link href="/dashboard/upload">Subir Excel</Link>.
             </p>
           )}
         </div>
       )}
-    </main>
+    </>
   );
 }

@@ -111,76 +111,89 @@ export default function UploadPage() {
   const sinEncabezado = forzarSinEncabezado ?? detectadoSinEncabezado;
 
   return (
-    <main style={{ maxWidth: 560, margin: "40px auto" }}>
-      <h1>Subir Excel</h1>
-      <form onSubmit={onSubmit} style={{ display: "grid", gap: 12 }}>
-        <input type="file" accept=".xlsx,.xls,.csv" onChange={(e) => onArchivoElegido(e.target.files?.[0] ?? null)} required />
+    <>
+      <div className="panel-cabecera">
+        <div>
+          <h1>Subir Excel</h1>
+          <p className="suave">Elegí tu archivo, revisá las columnas y listo.</p>
+        </div>
+      </div>
 
-        {hojas && hojas.length > 1 && (
-          <label>
-            Tu archivo tiene {hojas.length} hojas. ¿Cuál querés importar?
-            <select
-              value={hojaElegida}
-              onChange={(e) => {
-                setHojaElegida(e.target.value);
-                setForzarSinEncabezado(null);
-              }}
-              style={{ display: "block", width: "100%", marginTop: 4 }}
-            >
-              {hojas.map((h) => (
-                <option key={h} value={h}>{h}</option>
-              ))}
-            </select>
-          </label>
-        )}
+      <form onSubmit={onSubmit} style={{ maxWidth: 760 }}>
+        <div className="tarjeta" style={{ marginBottom: 16 }}>
+          <label htmlFor="archivo">1. Tu archivo de Excel</label>
+          <input id="archivo" type="file" accept=".xlsx,.xls,.csv" onChange={(e) => onArchivoElegido(e.target.files?.[0] ?? null)} required />
+          <p className="ayuda">Formatos: .xlsx, .xls o .csv</p>
+
+          {hojas && hojas.length > 1 && (
+            <div style={{ marginTop: 18 }}>
+              <label htmlFor="hoja">Tu archivo tiene {hojas.length} hojas. ¿Cuál querés importar?</label>
+              <select
+                id="hoja"
+                value={hojaElegida}
+                onChange={(e) => {
+                  setHojaElegida(e.target.value);
+                  setForzarSinEncabezado(null);
+                }}
+              >
+                {hojas.map((h) => (
+                  <option key={h} value={h}>{h}</option>
+                ))}
+              </select>
+              <p className="ayuda">Importás una hoja por vez. Si querés varias, repetí el proceso o usá &quot;Generar tablas&quot;.</p>
+            </div>
+          )}
+        </div>
 
         {columnas && columnas.length > 0 && (
-          <div style={{ border: "1px solid #eee", borderRadius: 6, padding: 12 }}>
-            <p style={{ margin: "0 0 8px", fontWeight: "bold" }}>Columnas detectadas</p>
-            <label style={{ display: "flex", gap: 6, fontSize: 13, margin: "0 0 8px" }}>
+          <div className="tarjeta" style={{ marginBottom: 16 }}>
+            <h3>2. Revisá las columnas</h3>
+            <p className="suave pequeno">Esto es lo que encontramos en la hoja &quot;{hojaElegida}&quot;.</p>
+
+            <label className="campo-check" style={{ margin: "14px 0" }}>
               <input
                 type="checkbox"
                 checked={sinEncabezado}
                 onChange={(e) => setForzarSinEncabezado(e.target.checked)}
               />
-              La primera fila no es un encabezado: es un dato (por ejemplo, una lista de productos).
+              <span>La primera fila no es un encabezado: es un dato (por ejemplo, una lista de productos).</span>
             </label>
+
             {sinEncabezado && (
-              <p style={{ color: "#666", fontSize: 13, margin: "0 0 8px" }}>
+              <p className="alerta alerta-ok">
                 Se importan todas las filas y las columnas se nombran solas. Cambiales el nombre abajo.
               </p>
             )}
             {haySospechosas && !sinEncabezado && (
-              <p style={{ color: "#a66", fontSize: 13, margin: "0 0 8px" }}>
-                Esta hoja no parece tener un encabezado claro en algunas columnas (el título
-                encontrado en realidad parece un dato, no un nombre). Revisá y corregí los
-                nombres marcados antes de importar. Si toda la primera fila es un dato,
-                marcá la casilla de arriba.
+              <p className="alerta alerta-aviso">
+                Esta hoja no parece tener un encabezado claro en algunas columnas (el título encontrado
+                en realidad parece un dato, no un nombre). Revisá y corregí los nombres marcados. Si toda
+                la primera fila es un dato, marcá la casilla de arriba.
               </p>
             )}
-            <div style={{ display: "grid", gap: 6 }}>
+
+            <div>
               {columnas.map((c) => (
-                <div key={c.key} style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  {c.sospechosa ? (
-                    <>
-                      <span title="Nombre de columna sospechoso, revisalo" style={{ color: "#a66" }}>⚠</span>
+                <div key={c.key} className="fila-columna">
+                  <div>
+                    {c.sospechosa ? (
                       <input
+                        aria-label={`Nombre de la columna ${c.label}`}
                         defaultValue={c.label}
                         placeholder="Nombre de esta columna"
                         onChange={(e) => setRenombres((r) => ({ ...r, [c.key]: e.target.value }))}
-                        style={{ flex: 1 }}
                       />
-                    </>
-                  ) : (
-                    <span>{c.label}</span>
-                  )}
-                  <span style={{ color: "#999", fontSize: 12 }}>({c.tipo})</span>
+                    ) : (
+                      <strong>{c.label}</strong>
+                    )}
+                  </div>
+                  <span className="insignia">{c.tipo}</span>
                   <select
+                    aria-label={`Qué representa la columna ${c.label}`}
                     value={roles[c.key] ?? ""}
                     onChange={(e) => elegirRol(c.key, (e.target.value || null) as RolColumna | null)}
-                    title="¿Qué representa esta columna?"
                   >
-                    <option value="">- sin rol -</option>
+                    <option value="">Sin rol especial</option>
                     {ROLES.map((r) => (
                       <option key={r.valor} value={r.valor}>{r.etiqueta}</option>
                     ))}
@@ -188,29 +201,32 @@ export default function UploadPage() {
                 </div>
               ))}
             </div>
-            <p style={{ color: "#999", fontSize: 12, margin: "8px 0 0" }}>
-              Indicá qué significa cada columna (monto, fecha, cliente...) para que el
-              asistente pueda armarte resúmenes y avisos. Podés dejarlas sin rol.
+            <p className="ayuda">
+              Indicá qué significa cada columna (monto, fecha, cliente...) para que el asistente pueda
+              armarte resúmenes y avisos. Podés dejarlas sin rol.
             </p>
           </div>
         )}
 
         {columnas && (
-          <input
-            placeholder="Nombre de la tabla (ej. Clientes)"
-            value={nombre}
-            onChange={(e) => setNombre(e.target.value)}
-            required
-          />
+          <div className="tarjeta">
+            <label htmlFor="nombre-tabla">3. Nombre de la tabla</label>
+            <input
+              id="nombre-tabla"
+              placeholder="Nombre de la tabla (ej. Clientes)"
+              value={nombre}
+              onChange={(e) => setNombre(e.target.value)}
+              required
+            />
+            {error && <p className="alerta alerta-error" role="alert" style={{ marginTop: 14 }}>{error}</p>}
+            <button type="submit" className="btn btn-primario btn-grande" style={{ marginTop: 16 }} disabled={cargando}>
+              {cargando ? "Procesando..." : `Crear tabla desde "${hojaElegida}"`}
+            </button>
+          </div>
         )}
 
-        {error && <p style={{ color: "crimson" }}>{error}</p>}
-        {columnas && (
-          <button type="submit" disabled={cargando}>
-            {cargando ? "Procesando..." : `Crear tabla desde "${hojaElegida}"`}
-          </button>
-        )}
+        {!columnas && error && <p className="alerta alerta-error" role="alert">{error}</p>}
       </form>
-    </main>
+    </>
   );
 }

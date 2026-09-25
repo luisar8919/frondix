@@ -37,17 +37,25 @@ export default function DynamicForm({
   }
 
   return (
-    <form onSubmit={handleSubmit} style={{ display: "grid", gap: 8, marginBottom: 24 }}>
-      {columnas.map((c) => (
-        <input
-          key={c.key}
-          type={inputType[c.tipo]}
-          placeholder={c.label}
-          value={valores[c.key] ?? ""}
-          onChange={(e) => setValores({ ...valores, [c.key]: e.target.value })}
-        />
-      ))}
-      <button type="submit" disabled={enviando}>{enviando ? "Guardando..." : "Agregar registro"}</button>
+    <form onSubmit={handleSubmit}>
+      <div className="grilla-form">
+        {columnas.map((c) => (
+          <div key={c.key}>
+            <label htmlFor={`campo-${c.key}`}>{c.label}</label>
+            <input
+              id={`campo-${c.key}`}
+              type={inputType[c.tipo]}
+              step={c.tipo === "numero" ? "any" : undefined}
+              inputMode={c.tipo === "numero" ? "decimal" : undefined}
+              value={valores[c.key] ?? ""}
+              onChange={(e) => setValores({ ...valores, [c.key]: e.target.value })}
+            />
+          </div>
+        ))}
+      </div>
+      <button type="submit" className="btn btn-primario" style={{ marginTop: 18 }} disabled={enviando}>
+        {enviando ? "Guardando..." : "Agregar registro"}
+      </button>
     </form>
   );
 }

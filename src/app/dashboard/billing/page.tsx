@@ -50,16 +50,37 @@ export default function BillingPage() {
   }
 
   return (
-    <main style={{ maxWidth: 420, margin: "40px auto" }}>
+    <>
       <Script src="https://checkout.culqi.com/js/v4" onLoad={() => setScriptListo(true)} />
-      <h1>Facturación</h1>
-      <p>Plan único: S/ 35/mes.</p>
-      <button onClick={cobrar} disabled={!scriptListo}>Pagar con tarjeta</button>
-      {mensaje && <p>{mensaje}</p>}
-      <p style={{ fontSize: 13, color: "#666", marginTop: 24 }}>
-        ¿Preferís pagar con Yape? Escribinos y te mandamos el link de cobro manual
-        (con Yape, Culqi todavía no soporta cobro recurrente automático).
+      <div className="panel-cabecera">
+        <div>
+          <h1>Plan y pagos</h1>
+          <p className="suave">Un solo plan, sin contrato.</p>
+        </div>
+      </div>
+
+      <div className="tarjeta tarjeta-elevada precio precio-destacado" style={{ maxWidth: 460 }}>
+        <h3>Plan Completo</h3>
+        <div className="precio-monto">S/ 35<small> /mes</small></div>
+        <ul>
+          <li>Invitá a tu equipo con accesos por rol</li>
+          <li>Todas las tablas y registros que necesites</li>
+          <li>Avisos y recordatorios por WhatsApp <span className="insignia insignia-sol">Próximamente</span></li>
+        </ul>
+        <button type="button" className="btn btn-primario btn-grande btn-bloque" onClick={cobrar} disabled={!scriptListo}>
+          {scriptListo ? "Pagar con tarjeta" : "Cargando pagos..."}
+        </button>
+        {mensaje && (
+          <p className={`alerta ${mensaje.startsWith("Suscripción") ? "alerta-ok" : "alerta-error"}`} role="status" style={{ marginTop: 14, marginBottom: 0 }}>
+            {mensaje}
+          </p>
+        )}
+      </div>
+
+      <p className="suave pequeno" style={{ maxWidth: 460, marginTop: 16 }}>
+        ¿Preferís pagar con Yape? Escribinos y te mandamos el link de cobro manual. Con Yape el cobro
+        no es automático todos los meses: hay que aprobarlo cada vez.
       </p>
-    </main>
+    </>
   );
 }
