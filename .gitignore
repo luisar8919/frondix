@@ -1,0 +1,14 @@
+node_modules/
+.next/
+next-env.d.ts
+*.tsbuildinfo
+
+# secretos: nunca subir las llaves reales (el ejemplo .env.example sí va)
+.env
+.env.local
+.env.*.local
+
+# Excels reales de terceros usados para probar el parser
+excels-de-prueba/
+
+scratch-*
