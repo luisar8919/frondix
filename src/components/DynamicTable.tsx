@@ -23,7 +23,9 @@ export default function DynamicTable({
           <tr key={r.id}>
             {columnas.map((c) => (
               <td key={c.key} style={{ borderBottom: "1px solid #eee", padding: 8 }}>
-                {String(r.data[c.key] ?? "")}
+                {c.tipo === "fecha" && r.data[c.key]
+                  ? String(r.data[c.key]).slice(0, 10)
+                  : String(r.data[c.key] ?? "")}
               </td>
             ))}
           </tr>

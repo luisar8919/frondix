@@ -22,7 +22,16 @@ export default function DynamicForm({
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setEnviando(true);
-    await onSubmit(valores);
+    // Guardar con el mismo tipo que los datos importados (numero, fecha ISO), no como texto.
+    const datos: Record<string, unknown> = {};
+    for (const c of columnas) {
+      const v = valores[c.key];
+      if (v === undefined || v === "") datos[c.key] = null;
+      else if (c.tipo === "numero") datos[c.key] = Number(v);
+      else if (c.tipo === "fecha") datos[c.key] = `${v}T00:00:00.000Z`;
+      else datos[c.key] = v;
+    }
+    await onSubmit(datos);
     setValores({});
     setEnviando(false);
   }
