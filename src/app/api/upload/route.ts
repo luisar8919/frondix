@@ -17,6 +17,7 @@ export async function POST(request: NextRequest) {
   const hoja = form.get("hoja");
   const renombresRaw = form.get("renombres"); // JSON opcional: { [key]: nuevoLabel }
   const rolesRaw = form.get("roles"); // JSON opcional: { [key]: rol | null } confirmado por el usuario
+  const sinEncabezadoRaw = form.get("sinEncabezado"); // "true" | "false"; ausente = detectarlo solo
 
   if (
     !(archivo instanceof File) ||
@@ -39,7 +40,9 @@ export async function POST(request: NextRequest) {
   let parseado;
   try {
     const buffer = await archivo.arrayBuffer();
-    parseado = parsearExcel(buffer, hoja, renombres);
+    parseado = parsearExcel(buffer, hoja, renombres, {
+      sinEncabezado: sinEncabezadoRaw === null ? undefined : sinEncabezadoRaw === "true",
+    });
   } catch (e) {
     return NextResponse.json(
       { error: e instanceof Error ? e.message : "No se pudo leer el Excel" },

@@ -13,6 +13,7 @@ export async function POST(request: NextRequest) {
   const form = await request.formData();
   const archivo = form.get("archivo");
   const hoja = form.get("hoja");
+  const sinEncabezadoRaw = form.get("sinEncabezado"); // "true" | "false"; ausente = detectarlo solo
 
   if (!(archivo instanceof File) || typeof hoja !== "string") {
     return NextResponse.json({ error: "Faltan datos: archivo o hoja" }, { status: 400 });
@@ -20,8 +21,10 @@ export async function POST(request: NextRequest) {
 
   try {
     const buffer = await archivo.arrayBuffer();
-    const { columnas } = parsearExcel(buffer, hoja);
-    return NextResponse.json({ columnas });
+    const { columnas, sinEncabezado } = parsearExcel(buffer, hoja, undefined, {
+      sinEncabezado: sinEncabezadoRaw === null ? undefined : sinEncabezadoRaw === "true",
+    });
+    return NextResponse.json({ columnas, sinEncabezado });
   } catch (e) {
     return NextResponse.json(
       { error: e instanceof Error ? e.message : "No se pudo leer el Excel" },

@@ -14,6 +14,9 @@ export default function UploadPage() {
   const [columnas, setColumnas] = useState<Columna[] | null>(null);
   const [renombres, setRenombres] = useState<Record<string, string>>({});
   const [roles, setRoles] = useState<Record<string, RolColumna | null>>({});
+  // decisión del usuario sobre "la primera fila no es encabezado" (null = lo decide el parser)
+  const [forzarSinEncabezado, setForzarSinEncabezado] = useState<boolean | null>(null);
+  const [detectadoSinEncabezado, setDetectadoSinEncabezado] = useState(false);
   const [cargando, setCargando] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
@@ -26,6 +29,7 @@ export default function UploadPage() {
     setHojas(null);
     setHojaElegida("");
     setColumnas(null);
+    setForzarSinEncabezado(null);
     setError(null);
     if (!file) return;
 
@@ -50,15 +54,17 @@ export default function UploadPage() {
     const form = new FormData();
     form.append("archivo", archivo);
     form.append("hoja", hojaElegida);
+    if (forzarSinEncabezado !== null) form.append("sinEncabezado", String(forzarSinEncabezado));
     fetch("/api/upload/preview", { method: "POST", body: form })
       .then((res) => res.json())
       .then((body) => {
         const cols: Columna[] = body.columnas ?? [];
         setColumnas(cols);
+        setDetectadoSinEncabezado(Boolean(body.sinEncabezado));
         // arranca con lo que sugirió el parser; el usuario lo confirma o lo cambia
         setRoles(Object.fromEntries(cols.map((c) => [c.key, c.rol])));
       });
-  }, [archivo, hojaElegida]);
+  }, [archivo, hojaElegida, forzarSinEncabezado]);
 
   // Un rol solo puede tener una columna: al elegirlo en una, se libera de las demás.
   function elegirRol(key: string, rol: RolColumna | null) {
@@ -91,6 +97,7 @@ export default function UploadPage() {
     form.append("hoja", hojaElegida);
     if (Object.keys(renombres).length > 0) form.append("renombres", JSON.stringify(renombres));
     form.append("roles", JSON.stringify(roles));
+    form.append("sinEncabezado", String(sinEncabezado));
 
     const res = await fetch("/api/upload", { method: "POST", body: form });
     const body = await res.json();
@@ -101,6 +108,7 @@ export default function UploadPage() {
   }
 
   const haySospechosas = columnas?.some((c) => c.sospechosa) ?? false;
+  const sinEncabezado = forzarSinEncabezado ?? detectadoSinEncabezado;
 
   return (
     <main style={{ maxWidth: 560, margin: "40px auto" }}>
@@ -111,7 +119,14 @@ export default function UploadPage() {
         {hojas && hojas.length > 1 && (
           <label>
             Tu archivo tiene {hojas.length} hojas. ¿Cuál querés importar?
-            <select value={hojaElegida} onChange={(e) => setHojaElegida(e.target.value)} style={{ display: "block", width: "100%", marginTop: 4 }}>
+            <select
+              value={hojaElegida}
+              onChange={(e) => {
+                setHojaElegida(e.target.value);
+                setForzarSinEncabezado(null);
+              }}
+              style={{ display: "block", width: "100%", marginTop: 4 }}
+            >
               {hojas.map((h) => (
                 <option key={h} value={h}>{h}</option>
               ))}
@@ -122,11 +137,25 @@ export default function UploadPage() {
         {columnas && columnas.length > 0 && (
           <div style={{ border: "1px solid #eee", borderRadius: 6, padding: 12 }}>
             <p style={{ margin: "0 0 8px", fontWeight: "bold" }}>Columnas detectadas</p>
-            {haySospechosas && (
+            <label style={{ display: "flex", gap: 6, fontSize: 13, margin: "0 0 8px" }}>
+              <input
+                type="checkbox"
+                checked={sinEncabezado}
+                onChange={(e) => setForzarSinEncabezado(e.target.checked)}
+              />
+              La primera fila no es un encabezado: es un dato (por ejemplo, una lista de productos).
+            </label>
+            {sinEncabezado && (
+              <p style={{ color: "#666", fontSize: 13, margin: "0 0 8px" }}>
+                Se importan todas las filas y las columnas se nombran solas. Cambiales el nombre abajo.
+              </p>
+            )}
+            {haySospechosas && !sinEncabezado && (
               <p style={{ color: "#a66", fontSize: 13, margin: "0 0 8px" }}>
                 Esta hoja no parece tener un encabezado claro en algunas columnas (el título
                 encontrado en realidad parece un dato, no un nombre). Revisá y corregí los
-                nombres marcados antes de importar.
+                nombres marcados antes de importar. Si toda la primera fila es un dato,
+                marcá la casilla de arriba.
               </p>
             )}
             <div style={{ display: "grid", gap: 6 }}>

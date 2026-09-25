@@ -1,5 +1,5 @@
 import * as XLSX from "xlsx";
-import { sugerirRoles, type RolColumna } from "./roles";
+import { sugerirRoles, type RolColumna } from "./roles.ts";
 
 export type TipoColumna = "texto" | "numero" | "fecha";
 
@@ -17,6 +17,13 @@ export interface Columna {
 export interface ExcelParseado {
   columnas: Columna[];
   filas: Record<string, unknown>[];
+  // true si la primera fila se trató como dato (la hoja no tenía encabezado)
+  sinEncabezado: boolean;
+}
+
+export interface OpcionesParseo {
+  // undefined = detectarlo solo; true/false = decisión del usuario
+  sinEncabezado?: boolean;
 }
 
 function aKey(label: string, usados: Set<string>): string {
@@ -48,6 +55,19 @@ function pareceValorDeDato(v: unknown): boolean {
   return typeof v === "number" || v instanceof Date;
 }
 
+const hayValor = (v: unknown) => v !== null && v !== undefined && v !== "";
+
+// Dos casos donde la primera fila casi seguro NO es un encabezado:
+// - la mayoría de sus celdas son números o fechas (son datos, no títulos);
+// - la hoja es una lista de una sola columna (ej. "Stock" con solo productos).
+// Si se equivoca, el usuario lo corrige con la opción de la pantalla de importación;
+// perder en silencio la primera fila es peor que mostrarla de más.
+function pareceSinEncabezado(primeraFila: unknown[], columnasConDatos: number): boolean {
+  if (columnasConDatos === 1) return true;
+  const celdas = primeraFila.filter(hayValor);
+  return celdas.length > 0 && celdas.filter(pareceValorDeDato).length / celdas.length > 0.5;
+}
+
 function inferirTipo(valores: unknown[]): TipoColumna {
   const conValor = valores.filter((v) => v !== null && v !== undefined && v !== "");
   if (conValor.length === 0) return "texto";
@@ -73,7 +93,8 @@ export function listarHojas(buffer: ArrayBuffer): string[] {
 export function parsearExcel(
   buffer: ArrayBuffer,
   nombreHoja?: string,
-  renombres?: Record<string, string>
+  renombres?: Record<string, string>,
+  opciones?: OpcionesParseo
 ): ExcelParseado {
   const workbook = XLSX.read(buffer, { type: "array", cellDates: true });
   const hojaElegida = nombreHoja ?? workbook.SheetNames[0];
@@ -90,9 +111,22 @@ export function parsearExcel(
     throw new Error("El archivo está vacío.");
   }
 
-  const filaEncabezados = filasCrudas[0];
+  const columnasConDatos = new Set<number>();
+  filasCrudas.forEach((fila) => fila.forEach((v, i) => hayValor(v) && columnasConDatos.add(i)));
+
+  const sinEncabezado =
+    opciones?.sinEncabezado ?? pareceSinEncabezado(filasCrudas[0], columnasConDatos.size);
+
+  // Sin encabezado: todas las filas son datos y las columnas se nombran solas
+  // (una lista de una columna toma el nombre de la hoja; si no, "Columna N").
+  const ancho = Math.max(...filasCrudas.map((f) => f.length));
+  const filaEncabezados: unknown[] = sinEncabezado
+    ? Array.from({ length: ancho }, (_, i) =>
+        !columnasConDatos.has(i) ? "" : columnasConDatos.size === 1 ? hojaElegida : `Columna ${i + 1}`
+      )
+    : filasCrudas[0];
   const encabezados = filaEncabezados.map((h) => (h === null ? "" : String(h)));
-  const filasDatos = filasCrudas.slice(1);
+  const filasDatos = sinEncabezado ? filasCrudas : filasCrudas.slice(1);
 
   const usados = new Set<string>();
   const columnasConIndice = encabezados
@@ -115,8 +149,9 @@ export function parsearExcel(
 
   // Una sola columna detectada es otra señal de alarma común (listas sin
   // encabezado, como vimos en la hoja "Stock" real): no hay con qué comparar,
-  // pero vale la pena que el usuario la confirme igual.
-  if (columnas.length === 1) columnas[0].sospechosa = true;
+  // pero vale la pena que el usuario la confirme igual. Si los nombres los
+  // inventamos nosotros (sin encabezado), también se piden confirmar.
+  if (columnas.length === 1 || sinEncabezado) columnas.forEach((c) => (c.sospechosa = true));
 
   const filas = filasDatos
     .filter((fila) => fila.some((v) => v !== null && v !== undefined && v !== ""))
@@ -139,6 +174,7 @@ export function parsearExcel(
       rol: roles[key] ?? null,
     })),
     filas,
+    sinEncabezado,
   };
 }
 
