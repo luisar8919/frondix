@@ -42,7 +42,7 @@ export default async function DashboardPage() {
         <div className="tarjeta tarjeta-elevada vacio">
           <h2 style={{ fontSize: 24 }}>Todavía no hay tablas</h2>
           <p style={{ maxWidth: 46 + "ch", margin: "0 auto 20px" }}>
-            Subí el Excel que ya usás y en un minuto tenés una tabla con formulario de carga y buscador.
+            Sube el Excel que ya usas y en un minuto tienes una tabla con formulario de carga y buscador.
           </p>
           <Link href="/dashboard/upload" className="btn btn-primario btn-grande">Subir mi primer Excel</Link>
         </div>

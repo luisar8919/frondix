@@ -6,7 +6,7 @@ const fuente = Plus_Jakarta_Sans({ subsets: ["latin"], variable: "--font-sans", 
 
 export const metadata: Metadata = {
   title: "Frondix",
-  description: "Cultivá tu cartera de clientes. Convertí tu Excel en una herramienta que no se rompe.",
+  description: "Cultiva tu cartera de clientes. Convierte tu Excel en una herramienta que no se rompe.",
 };
 
 export const viewport: Viewport = { themeColor: "#237a50" };

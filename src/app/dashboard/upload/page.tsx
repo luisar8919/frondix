@@ -115,7 +115,7 @@ export default function UploadPage() {
       <div className="panel-cabecera">
         <div>
           <h1>Subir Excel</h1>
-          <p className="suave">Elegí tu archivo, revisá las columnas y listo.</p>
+          <p className="suave">Elige tu archivo, revisa las columnas y listo.</p>
         </div>
       </div>
 
@@ -127,7 +127,7 @@ export default function UploadPage() {
 
           {hojas && hojas.length > 1 && (
             <div style={{ marginTop: 18 }}>
-              <label htmlFor="hoja">Tu archivo tiene {hojas.length} hojas. ¿Cuál querés importar?</label>
+              <label htmlFor="hoja">Tu archivo tiene {hojas.length} hojas. ¿Cuál quieres importar?</label>
               <select
                 id="hoja"
                 value={hojaElegida}
@@ -140,14 +140,14 @@ export default function UploadPage() {
                   <option key={h} value={h}>{h}</option>
                 ))}
               </select>
-              <p className="ayuda">Importás una hoja por vez. Si querés varias, repetí el proceso o usá &quot;Generar tablas&quot;.</p>
+              <p className="ayuda">Importas una hoja a la vez. Si quieres varias, repite el proceso o usa &quot;Generar tablas&quot;.</p>
             </div>
           )}
         </div>
 
         {columnas && columnas.length > 0 && (
           <div className="tarjeta" style={{ marginBottom: 16 }}>
-            <h3>2. Revisá las columnas</h3>
+            <h3>2. Revisa las columnas</h3>
             <p className="suave pequeno">Esto es lo que encontramos en la hoja &quot;{hojaElegida}&quot;.</p>
 
             <label className="campo-check" style={{ margin: "14px 0" }}>
@@ -161,14 +161,14 @@ export default function UploadPage() {
 
             {sinEncabezado && (
               <p className="alerta alerta-ok">
-                Se importan todas las filas y las columnas se nombran solas. Cambiales el nombre abajo.
+                Se importan todas las filas y las columnas se nombran solas. Cámbiales el nombre abajo.
               </p>
             )}
             {haySospechosas && !sinEncabezado && (
               <p className="alerta alerta-aviso">
                 Esta hoja no parece tener un encabezado claro en algunas columnas (el título encontrado
-                en realidad parece un dato, no un nombre). Revisá y corregí los nombres marcados. Si toda
-                la primera fila es un dato, marcá la casilla de arriba.
+                en realidad parece un dato, no un nombre). Revisa y corrige los nombres marcados. Si toda
+                la primera fila es un dato, marca la casilla de arriba.
               </p>
             )}
 
@@ -202,8 +202,8 @@ export default function UploadPage() {
               ))}
             </div>
             <p className="ayuda">
-              Indicá qué significa cada columna (monto, fecha, cliente...) para que el asistente pueda
-              armarte resúmenes y avisos. Podés dejarlas sin rol.
+              Indica qué significa cada columna (monto, fecha, cliente...) para que el asistente pueda
+              armarte resúmenes y avisos. Puedes dejarlas sin rol.
             </p>
           </div>
         )}

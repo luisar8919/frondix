@@ -2,16 +2,16 @@ import Link from "next/link";
 import Logo from "@/components/Logo";
 
 const dolores = [
-  { titulo: "Alguien más carga datos", texto: "y no sabés cómo evitar que te rompa una hoja o te pise lo que ya estaba." },
+  { titulo: "Alguien más carga datos", texto: "y no sabes cómo evitar que te rompa una hoja o borre lo que ya estaba." },
   { titulo: "Se te pasó un seguimiento", texto: "porque nadie te avisó a tiempo de volver a escribirle a ese cliente." },
   { titulo: "Se rompió el archivo", texto: "la laptop falló o alguien lo sobrescribió, y meses de información desaparecieron." },
-  { titulo: "Ya no encontrás nada", texto: "el Excel creció tanto que buscar un dato es scrollear y rezar." },
+  { titulo: "Ya no encuentras nada", texto: "el Excel creció tanto que buscar un dato es recorrer la hoja sin fin." },
 ];
 
 const pasos = [
-  { titulo: "Subí tu Excel", texto: "El que ya usás, aunque esté desordenado. Si tiene varias hojas, las ordenamos por vos." },
-  { titulo: "Revisá las columnas", texto: "Confirmás qué es cada dato: producto, cliente, monto, fecha. Toma un minuto." },
-  { titulo: "Cargá y buscá", texto: "Tenés tu tabla, un formulario para agregar registros y un buscador. Sin configurar nada." },
+  { titulo: "Sube tu Excel", texto: "El que ya usas, aunque esté desordenado. Si tiene varias hojas, las ordenamos por ti." },
+  { titulo: "Revisa las columnas", texto: "Confirmas qué es cada dato: producto, cliente, monto, fecha. Toma un minuto." },
+  { titulo: "Carga y busca", texto: "Tienes tu tabla, un formulario para agregar registros y un buscador. Sin configurar nada." },
 ];
 
 export default function Portada() {
@@ -33,11 +33,11 @@ export default function Portada() {
             <span className="eyebrow">Para negocios que llevan todo en Excel</span>
             <h1>¿Alguna vez perdiste una venta, un cliente o datos por culpa de tu Excel?</h1>
             <p className="entrada">
-              Si nunca te pasó, tu Excel está bien como está. Si te pasó, Frondix convierte esa misma planilla
+              Si nunca te pasó, tu Excel está bien como está. Si te pasó, Frondix convierte esa misma hoja de cálculo
               en una herramienta que no se rompe, donde cada persona ve solo lo que le corresponde.
             </p>
             <div className="hero-cta">
-              <Link href="/signup" className="btn btn-primario btn-grande">Probalo con tu propio Excel</Link>
+              <Link href="/signup" className="btn btn-primario btn-grande">Pruébalo con tu propio Excel</Link>
               <a href="#como-funciona" className="btn btn-secundario btn-grande">Cómo funciona</a>
             </div>
             <p className="ayuda" style={{ marginTop: 14 }}>Gratis para empezar. Sin tarjeta.</p>
@@ -65,7 +65,7 @@ export default function Portada() {
         <section className="seccion contenedor">
           <div className="seccion-titulo">
             <h2>Tu Excel funciona perfecto, hasta el día que…</h2>
-            <p>Si alguna de estas te suena, esto es para vos.</p>
+            <p>Si alguna de estas te suena, esto es para ti.</p>
           </div>
           <div className="grilla-4">
             {dolores.map((d) => (
@@ -97,14 +97,14 @@ export default function Portada() {
 
         <section id="precios" className="seccion contenedor">
           <div className="seccion-titulo">
-            <h2>Empezá gratis, crecé cuando lo necesites</h2>
-            <p>Sin contrato ni letra chica.</p>
+            <h2>Empieza gratis, crece cuando lo necesites</h2>
+            <p>Sin contrato ni letra pequeña.</p>
           </div>
           <div className="precios">
             <div className="tarjeta precio">
               <h3>Gratis</h3>
               <div className="precio-monto">S/ 0</div>
-              <p className="suave pequeno">Para ordenar tus datos vos solo.</p>
+              <p className="suave pequeno">Para ordenar tus datos tú solo.</p>
               <ul>
                 <li>Un usuario</li>
                 <li>Todas las tablas que quieras</li>
@@ -118,7 +118,7 @@ export default function Portada() {
               <p className="suave pequeno">Para trabajar en equipo.</p>
               <ul>
                 <li>Todo lo del plan gratis</li>
-                <li>Invitá a tu equipo con accesos por rol</li>
+                <li>Invita a tu equipo con accesos por rol</li>
                 <li>
                   Avisos y recordatorios por WhatsApp <span className="insignia insignia-sol">Próximamente</span>
                 </li>
@@ -130,8 +130,8 @@ export default function Portada() {
 
         <section className="contenedor" style={{ paddingBottom: 56 }}>
           <div className="banda-cta">
-            <h2>Cultivá tu cartera de clientes</h2>
-            <p>Subí tu Excel y mirá cómo queda. Toma menos de lo que tarda en enfriarse un café.</p>
+            <h2>Cultiva tu cartera de clientes</h2>
+            <p>Sube tu Excel y mira cómo queda. Toma menos de lo que tarda en enfriarse un café.</p>
             <Link href="/signup" className="btn btn-claro btn-grande">Probar Frondix gratis</Link>
           </div>
         </section>
@@ -140,7 +140,7 @@ export default function Portada() {
       <footer className="pie">
         <div className="contenedor pie-fila">
           <Logo />
-          <span>Cultivá tu cartera de clientes.</span>
+          <span>Cultiva tu cartera de clientes.</span>
         </div>
       </footer>
     </>

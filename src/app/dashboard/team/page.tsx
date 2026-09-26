@@ -38,7 +38,7 @@ export default function TeamPage() {
       <div className="panel-cabecera">
         <div>
           <h1>Equipo</h1>
-          <p className="suave">Sumá a quienes cargan datos con vos y elegí qué puede hacer cada uno.</p>
+          <p className="suave">Suma a quienes cargan datos contigo y elige qué puede hacer cada uno.</p>
         </div>
       </div>
 

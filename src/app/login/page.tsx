@@ -35,7 +35,7 @@ export default function LoginPage() {
       <main className="auth-centro">
         <div className="tarjeta tarjeta-elevada auth-tarjeta">
           <h1>Ingresar</h1>
-          <p className="suave">Volvé a tu panel para seguir cultivando tu cartera.</p>
+          <p className="suave">Vuelve a tu panel para seguir cultivando tu cartera.</p>
           <form onSubmit={onSubmit}>
             <div className="campo">
               <label htmlFor="email">Email</label>
@@ -51,7 +51,7 @@ export default function LoginPage() {
             </button>
           </form>
           <p className="centrado suave pequeno" style={{ marginTop: 20, marginBottom: 0 }}>
-            ¿Todavía no tenés cuenta? <Link href="/signup">Crear cuenta gratis</Link>
+            ¿Todavía no tienes cuenta? <Link href="/signup">Crear cuenta gratis</Link>
           </p>
         </div>
       </main>

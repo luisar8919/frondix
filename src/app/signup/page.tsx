@@ -50,7 +50,7 @@ export default function SignupPage() {
       </header>
       <main className="auth-centro">
         <div className="tarjeta tarjeta-elevada auth-tarjeta">
-          <h1>Creá tu cuenta</h1>
+          <h1>Crea tu cuenta</h1>
           <p className="suave">Gratis, sin tarjeta. En un minuto estás subiendo tu Excel.</p>
           <form onSubmit={onSubmit}>
             <div className="campo">
@@ -72,7 +72,7 @@ export default function SignupPage() {
             </button>
           </form>
           <p className="centrado suave pequeno" style={{ marginTop: 20, marginBottom: 0 }}>
-            ¿Ya tenés cuenta? <Link href="/login">Ingresar</Link>
+            ¿Ya tienes cuenta? <Link href="/login">Ingresar</Link>
           </p>
         </div>
       </main>

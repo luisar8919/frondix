@@ -63,7 +63,7 @@ export default function BillingPage() {
         <h3>Plan Completo</h3>
         <div className="precio-monto">S/ 35<small> /mes</small></div>
         <ul>
-          <li>Invitá a tu equipo con accesos por rol</li>
+          <li>Invita a tu equipo con accesos por rol</li>
           <li>Todas las tablas y registros que necesites</li>
           <li>Avisos y recordatorios por WhatsApp <span className="insignia insignia-sol">Próximamente</span></li>
         </ul>
@@ -78,7 +78,7 @@ export default function BillingPage() {
       </div>
 
       <p className="suave pequeno" style={{ maxWidth: 460, marginTop: 16 }}>
-        ¿Preferís pagar con Yape? Escribinos y te mandamos el link de cobro manual. Con Yape el cobro
+        ¿Prefieres pagar con Yape? Escríbenos y te mandamos el enlace de cobro manual. Con Yape el cobro
         no es automático todos los meses: hay que aprobarlo cada vez.
       </p>
     </>

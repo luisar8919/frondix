@@ -1,7 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 // Gratis: tablas y filas ilimitadas, un solo usuario, sin WhatsApp.
-// Pago: lo que agregamos acá — invitar gente y mandar WhatsApp.
+// Pago: lo que agregamos aquí — invitar gente y mandar WhatsApp.
 export async function tieneSuscripcionActiva(
   supabase: SupabaseClient,
   empresaId: string

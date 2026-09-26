@@ -24,13 +24,13 @@ export async function POST(req: NextRequest) {
     .single();
 
   if (!miMembresia || !["dueno", "admin"].includes(miMembresia.rol)) {
-    return NextResponse.json({ error: "No tenés permiso para invitar en esta empresa" }, { status: 403 });
+    return NextResponse.json({ error: "No tienes permiso para invitar en esta empresa" }, { status: 403 });
   }
 
   // Invitar más gente es una feature de pago (el plan gratis es 1 solo usuario).
   if (!(await tieneSuscripcionActiva(supabase, empresaId))) {
     return NextResponse.json(
-      { error: "Invitar miembros es parte del plan pago. Activá tu suscripción para agregar gente al equipo." },
+      { error: "Invitar miembros es parte del plan pago. Activa tu suscripción para agregar gente al equipo." },
       { status: 402 }
     );
   }

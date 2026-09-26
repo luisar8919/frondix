@@ -84,7 +84,7 @@ export default function UploadAutoPage() {
           {resultado.hojasOmitidas.length > 0 && (
             <p className="alerta alerta-aviso" style={{ marginTop: 16, marginBottom: 0 }}>
               No se importaron (había más de 3 estructuras distintas y quedaron afuera las de menos datos):{" "}
-              {resultado.hojasOmitidas.join(", ")}. Podés importarlas a mano desde{" "}
+              {resultado.hojasOmitidas.join(", ")}. Puedes importarlas a mano desde{" "}
               <Link href="/dashboard/upload">Subir Excel</Link>.
             </p>
           )}

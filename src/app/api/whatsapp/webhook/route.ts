@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
 // Meta llama a este GET una sola vez, al configurar el webhook en su panel,
-// para confirmar que el dueño del endpoint sos vos.
+// para confirmar que el dueño del endpoint eres tú.
 export async function GET(req: NextRequest) {
   const params = req.nextUrl.searchParams;
   const modo = params.get("hub.mode");
@@ -14,7 +14,7 @@ export async function GET(req: NextRequest) {
   return NextResponse.json({ error: "Token de verificación inválido" }, { status: 403 });
 }
 
-// Acá llegan los mensajes entrantes de clientes. MVP: solo los logueamos;
+// Aquí llegan los mensajes entrantes de clientes. MVP: solo los logueamos;
 // el siguiente paso natural es guardarlos como nota en el record del cliente.
 export async function POST(req: NextRequest) {
   const body = await req.json();

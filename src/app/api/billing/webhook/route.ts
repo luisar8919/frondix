@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { crearClienteAdmin } from "@/lib/supabase/admin";
 
-// Culqi manda eventos acá cuando cambia el estado de una suscripción
+// Culqi manda eventos aquí cuando cambia el estado de una suscripción
 // (cobro exitoso, tarjeta rechazada, cancelación). Ver:
 // https://docs.culqi.com/es/documentacion/pagos-online/recurrencia/suscripciones/
 export async function POST(req: NextRequest) {
