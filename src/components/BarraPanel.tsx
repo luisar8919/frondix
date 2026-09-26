@@ -9,6 +9,7 @@ const enlaces = [
   { href: "/dashboard", texto: "Mis tablas" },
   { href: "/dashboard/upload", texto: "Subir Excel" },
   { href: "/dashboard/upload/auto", texto: "Generar tablas" },
+  { href: "/dashboard/seguimiento", texto: "Seguimiento" },
   { href: "/dashboard/team", texto: "Equipo" },
   { href: "/dashboard/billing", texto: "Plan y pagos" },
 ];

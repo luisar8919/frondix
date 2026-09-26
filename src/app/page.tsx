@@ -120,7 +120,7 @@ export default function Portada() {
                 <li>Todo lo del plan gratis</li>
                 <li>Invita a tu equipo con accesos por rol</li>
                 <li>
-                  Avisos y recordatorios por WhatsApp <span className="insignia insignia-sol">Próximamente</span>
+                  Seguimiento de clientes por WhatsApp: te avisamos a quién escribirle y el mensaje sale listo <span className="insignia insignia-sol">Envío automático: próximamente</span>
                 </li>
               </ul>
               <Link href="/signup" className="btn btn-primario btn-bloque">Empezar ahora</Link>

@@ -46,7 +46,21 @@ create table suscripciones (
   updated_at timestamptz not null default now()
 );
 
+-- A quien ya se le escribio por WhatsApp desde Seguimiento (para no insistir).
+create table contactos (
+  id uuid primary key default gen_random_uuid(),
+  empresa_id uuid not null references empresas(id) on delete cascade,
+  dataset_id uuid not null references datasets(id) on delete cascade,
+  cliente text not null,
+  canal text not null default 'whatsapp',
+  mensaje text,
+  created_by uuid references auth.users(id) on delete set null,
+  created_at timestamptz not null default now()
+);
+create index contactos_busqueda_idx on contactos (empresa_id, dataset_id, created_at desc);
+
 -- Row Level Security: un usuario solo ve/edita datos de las empresas donde es miembro.
+alter table contactos enable row level security;
 alter table empresas enable row level security;
 alter table miembros enable row level security;
 alter table datasets enable row level security;
@@ -104,3 +118,9 @@ create policy "editar records de mi empresa" on records for update
 
 create policy "ver suscripcion de mi empresa" on suscripciones for select
   using (empresa_id in (select public.mis_empresas()));
+
+create policy "ver contactos de mi empresa" on contactos for select
+  using (empresa_id in (select public.mis_empresas()));
+
+create policy "registrar contactos en mi empresa" on contactos for insert
+  with check (empresa_id in (select public.mis_empresas()) and created_by = auth.uid());
