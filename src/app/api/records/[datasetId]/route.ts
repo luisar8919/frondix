@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { crearClienteServidor } from "@/lib/supabase/server";
-import { claveValida } from "@/lib/enlaces";
+import { validarEnlaces } from "@/lib/dependientes";
 import type { Columna } from "@/lib/excel-parser";
 
 // RLS ya garantiza que un usuario solo ve/crea records de datasets
@@ -67,25 +67,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ dat
   if (errorDataset?.code === "42501") return respuestaError(errorDataset);
   if (!dataset) return NextResponse.json({ error: "Dataset no encontrado" }, { status: 404 });
 
-  for (const c of dataset.columnas as Columna[]) {
-    if (!c.enlace) continue;
-    const valor = body[c.key];
-    if (valor === null || valor === undefined || valor === "") continue;
-    if (!claveValida(c.enlace.columnaKey)) continue;
-
-    const { count } = await supabase
-      .from("records")
-      .select("id", { count: "exact", head: true })
-      .eq("dataset_id", c.enlace.datasetId)
-      .eq(`data->>${c.enlace.columnaKey}`, String(valor));
-
-    if (!count) {
-      return NextResponse.json(
-        { error: `"${valor}" no existe en la tabla enlazada a "${c.label}". Agrégalo primero en esa tabla.` },
-        { status: 422 }
-      );
-    }
-  }
+  const fallo = await validarEnlaces(supabase, dataset.columnas as Columna[], body);
+  if (fallo) return NextResponse.json({ error: fallo }, { status: 422 });
 
   const { data, error } = await supabase
     .from("records")

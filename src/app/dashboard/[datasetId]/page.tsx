@@ -5,6 +5,8 @@ import Link from "next/link";
 import DynamicTable from "@/components/DynamicTable";
 import DynamicForm from "@/components/DynamicForm";
 import EnlacesTabla from "@/components/EnlacesTabla";
+import EditarTabla from "@/components/EditarTabla";
+import { enviarConfirmando } from "@/lib/confirmar";
 import type { Columna } from "@/lib/excel-parser";
 import { filtrarRegistros } from "@/lib/buscar";
 import { filtrarPorColumna, relacionesEntrantes, type DatasetResumen } from "@/lib/enlaces";
@@ -37,6 +39,8 @@ export default function DatasetPage({
   const [opciones, setOpciones] = useState<Record<string, string[]>>({});
   const [error, setError] = useState(false);
   const [busqueda, setBusqueda] = useState("");
+  const [editando, setEditando] = useState<Registro | null>(null);
+  const [errorAccion, setErrorAccion] = useState("");
 
   async function cargar() {
     let acumulados: Registro[] = [];
@@ -103,6 +107,26 @@ export default function DatasetPage({
     return null;
   }
 
+  async function guardarEdicion(valores: Record<string, unknown>): Promise<string | null> {
+    const r = await enviarConfirmando(`/api/records/${datasetId}/${editando!.id}`, "PATCH", { data: valores });
+    if (r.cancelado) return null;
+    if (!r.ok) return r.body.error ?? "No se pudo guardar el registro";
+    setRegistros((rs) => rs.map((x) => (x.id === r.body.record.id ? { id: x.id, data: r.body.record.data } : x)));
+    setEditando(null);
+    return null;
+  }
+
+  async function eliminarRegistro(r: Registro) {
+    if (!window.confirm("¿Eliminar este registro? No se puede deshacer.")) return;
+    setErrorAccion("");
+    const res = await enviarConfirmando(`/api/records/${datasetId}/${r.id}`, "DELETE");
+    if (res.cancelado) return;
+    if (!res.ok) return setErrorAccion(res.body.error ?? "No se pudo eliminar el registro");
+    setRegistros((rs) => rs.filter((x) => x.id !== r.id));
+    setTotal((t) => t - 1);
+    if (editando?.id === r.id) setEditando(null);
+  }
+
   const etiquetasEnlace = Object.fromEntries(
     dataset.columnas
       .filter((c) => c.enlace)
@@ -150,6 +174,23 @@ export default function DatasetPage({
         </div>
       </details>
 
+      {editando && (
+        <div className="tarjeta" style={{ marginBottom: 20 }}>
+          <h3>Editar registro</h3>
+          <DynamicForm
+            key={editando.id}
+            columnas={dataset.columnas}
+            opciones={opciones}
+            etiquetasEnlace={etiquetasEnlace}
+            inicial={editando.data}
+            textoBoton="Guardar cambios"
+            onSubmit={guardarEdicion}
+            onCancelar={() => setEditando(null)}
+          />
+        </div>
+      )}
+
+      <EditarTabla key={dataset.columnas.map((c) => c.key + c.label).join("|") + dataset.nombre} datasetId={datasetId} nombre={dataset.nombre} columnas={dataset.columnas} onGuardado={cargar} />
       <EnlacesTabla datasetId={datasetId} columnas={dataset.columnas} otras={otras} onGuardado={cargar} />
 
       {filtrarCol && filtrarVal !== undefined && (
@@ -173,7 +214,10 @@ export default function DatasetPage({
         </span>
       </div>
 
+      {errorAccion && <p className="alerta alerta-error" role="alert">{errorAccion}</p>}
       <DynamicTable
+        onEditar={(r) => { setEditando(r); window.scrollTo({ top: 0, behavior: "smooth" }); }}
+        onEliminar={eliminarRegistro}
         columnas={dataset.columnas}
         registros={registrosFiltrados}
         relacionadas={relacionesEntrantes(otras, datasetId)}

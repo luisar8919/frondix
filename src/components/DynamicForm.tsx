@@ -14,6 +14,9 @@ export default function DynamicForm({
   opciones,
   etiquetasEnlace,
   onSubmit,
+  inicial,
+  textoBoton = "Agregar registro",
+  onCancelar,
 }: {
   columnas: Columna[];
   // valores permitidos por columna enlazada (autocompletado)
@@ -22,8 +25,19 @@ export default function DynamicForm({
   etiquetasEnlace?: Record<string, string>;
   // devuelve un mensaje de error si el servidor rechazó el registro, o null si se guardó
   onSubmit: (data: Record<string, unknown>) => Promise<string | null>;
+  // al editar: datos actuales del registro; el formulario no se vacía al guardar
+  inicial?: Record<string, unknown>;
+  textoBoton?: string;
+  onCancelar?: () => void;
 }) {
-  const [valores, setValores] = useState<Record<string, string>>({});
+  const [valores, setValores] = useState<Record<string, string>>(() =>
+    Object.fromEntries(
+      columnas.map((c) => {
+        const v = inicial?.[c.key];
+        return [c.key, v === null || v === undefined ? "" : c.tipo === "fecha" ? String(v).slice(0, 10) : String(v)];
+      })
+    )
+  );
   const [enviando, setEnviando] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -43,7 +57,7 @@ export default function DynamicForm({
     setEnviando(false);
     if (fallo) return setError(fallo);
     setError(null);
-    setValores({});
+    if (!inicial) setValores({});
   }
 
   return (
@@ -80,8 +94,11 @@ export default function DynamicForm({
       </div>
       {error && <p className="alerta alerta-error" role="alert" style={{ marginTop: 14, marginBottom: 0 }}>{error}</p>}
       <button type="submit" className="btn btn-primario" style={{ marginTop: 18 }} disabled={enviando}>
-        {enviando ? "Guardando..." : "Agregar registro"}
+        {enviando ? "Guardando..." : textoBoton}
       </button>
+      {onCancelar && (
+        <button type="button" className="btn btn-fantasma" style={{ marginTop: 18, marginLeft: 8 }} onClick={onCancelar}>Cancelar</button>
+      )}
     </form>
   );
 }

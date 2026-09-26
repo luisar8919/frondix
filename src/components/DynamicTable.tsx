@@ -12,11 +12,15 @@ export default function DynamicTable({
   columnas,
   registros,
   relacionadas = [],
+  onEditar,
+  onEliminar,
 }: {
   columnas: Columna[];
   registros: { id: string; data: Record<string, unknown> }[];
   // otras tablas con una columna enlazada a esta (para ir "hacia atrás")
   relacionadas?: RelacionEntrante[];
+  onEditar?: (r: { id: string; data: Record<string, unknown> }) => void;
+  onEliminar?: (r: { id: string; data: Record<string, unknown> }) => void;
 }) {
   const [visibles, setVisibles] = useState(TRAMO);
 
@@ -37,6 +41,7 @@ export default function DynamicTable({
                 <th key={c.key} className={c.tipo === "numero" ? "num" : undefined}>{c.label}</th>
               ))}
               {relacionadas.length > 0 && <th>Relacionado</th>}
+              {(onEditar || onEliminar) && <th>Acciones</th>}
             </tr>
           </thead>
           <tbody>
@@ -67,6 +72,12 @@ export default function DynamicTable({
                         </span>
                       );
                     })}
+                  </td>
+                )}
+                {(onEditar || onEliminar) && (
+                  <td style={{ whiteSpace: "nowrap" }}>
+                    {onEditar && <button type="button" className="btn btn-fantasma" onClick={() => onEditar(r)}>Editar</button>}
+                    {onEliminar && <button type="button" className="btn btn-fantasma" onClick={() => onEliminar(r)}>Eliminar</button>}
                   </td>
                 )}
               </tr>
