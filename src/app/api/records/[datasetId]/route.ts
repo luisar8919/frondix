@@ -10,6 +10,14 @@ import type { Columna } from "@/lib/excel-parser";
 // pedirlas por páginas. Aquí se pide de a `limite` (máx. 1000) y se devuelve el total.
 const MAX_PAGINA = 1000;
 
+// Sin sesión, la base niega la ejecución de las funciones de acceso (código 42501):
+// eso es "no autenticado", no un error interno del servidor.
+function respuestaError(error: { code?: string; message: string }) {
+  return error.code === "42501"
+    ? NextResponse.json({ error: "No autenticado" }, { status: 401 })
+    : NextResponse.json({ error: error.message }, { status: 500 });
+}
+
 export async function GET(req: NextRequest, { params }: { params: Promise<{ datasetId: string }> }) {
   const { datasetId } = await params;
   const supabase = await crearClienteServidor();
@@ -27,7 +35,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ data
     .order("created_at", { ascending: false })
     .order("id")
     .range(desde, desde + limite - 1);
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return respuestaError(error);
 
   // La primera página trae además los datos de la tabla y las demás tablas de la empresa
   // (para poder mostrar y editar los enlaces entre tablas).
@@ -37,7 +45,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ data
     .from("datasets")
     .select("id, nombre, columnas")
     .order("created_at", { ascending: false });
-  if (errorDatasets) return NextResponse.json({ error: errorDatasets.message }, { status: 500 });
+  if (errorDatasets) return respuestaError(errorDatasets);
 
   const dataset = datasets?.find((d) => d.id === datasetId);
   if (!dataset) return NextResponse.json({ error: "Dataset no encontrado" }, { status: 404 });
@@ -55,7 +63,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ dat
   }
 
   // Si una columna está enlazada a otra tabla, el valor debe existir allí.
-  const { data: dataset } = await supabase.from("datasets").select("columnas").eq("id", datasetId).single();
+  const { data: dataset, error: errorDataset } = await supabase.from("datasets").select("columnas").eq("id", datasetId).single();
+  if (errorDataset?.code === "42501") return respuestaError(errorDataset);
   if (!dataset) return NextResponse.json({ error: "Dataset no encontrado" }, { status: 404 });
 
   for (const c of dataset.columnas as Columna[]) {
@@ -84,6 +93,6 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ dat
     .select()
     .single();
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return respuestaError(error);
   return NextResponse.json({ record: data });
 }
