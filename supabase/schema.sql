@@ -33,8 +33,8 @@ create table records (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
-create index records_dataset_idx on records (dataset_id);
-create index records_data_gin on records using gin (data);
+create index records_dataset_creado_idx on records (dataset_id, created_at desc);
+create index datasets_empresa_idx on datasets (empresa_id);
 
 create table suscripciones (
   id uuid primary key default gen_random_uuid(),
@@ -85,6 +85,13 @@ create policy "ver datasets de mi empresa" on datasets for select
 
 create policy "crear datasets en mi empresa" on datasets for insert
   with check (empresa_id in (select public.mis_empresas()));
+
+create policy "dueno/admin edita datasets" on datasets for update
+  using (empresa_id in (select public.mis_empresas_admin()))
+  with check (empresa_id in (select public.mis_empresas_admin()));
+
+create policy "dueno/admin borra datasets" on datasets for delete
+  using (empresa_id in (select public.mis_empresas_admin()));
 
 create policy "ver records de mi empresa" on records for select
   using (dataset_id in (select id from datasets where empresa_id in (select public.mis_empresas())));

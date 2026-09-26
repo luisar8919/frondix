@@ -12,6 +12,13 @@ export interface Columna {
   // true cuando conviene que el usuario confirme el nombre antes de importar
   // (ver `pareceValorDeDato` y el caso "una sola columna" más abajo).
   sospechosa: boolean;
+  // enlace a otra tabla: los valores de esta columna deben existir en esa otra columna
+  enlace?: EnlaceColumna | null;
+}
+
+export interface EnlaceColumna {
+  datasetId: string;
+  columnaKey: string;
 }
 
 export interface ExcelParseado {

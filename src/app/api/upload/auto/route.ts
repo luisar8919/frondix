@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { crearClienteServidor } from "@/lib/supabase/server";
 import { agruparHojas } from "@/lib/excel-parser";
+import { insertarRegistros, deshacerTabla, MAX_FILAS_IMPORTACION } from "@/lib/insertar";
 
 // Alternativa a elegir una hoja a mano: agrupa las hojas del Excel por
 // estructura parecida y crea hasta 3 tablas de una, usando en cada grupo
@@ -33,6 +34,14 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "No se encontraron hojas con datos para importar" }, { status: 422 });
   }
 
+  const totalFilas = grupos.reduce((suma, g) => suma + g.filas.length, 0);
+  if (totalFilas > MAX_FILAS_IMPORTACION) {
+    return NextResponse.json(
+      { error: `El archivo tiene ${totalFilas.toLocaleString("es-PE")} filas en total y el máximo por importación es ${MAX_FILAS_IMPORTACION.toLocaleString("es-PE")}. Divide el archivo en partes.` },
+      { status: 422 }
+    );
+  }
+
   const creados: { datasetId: string; nombre: string; hojas: string[]; filasImportadas: number }[] = [];
 
   for (const grupo of grupos) {
@@ -50,15 +59,13 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (grupo.filas.length > 0) {
-      const registros = grupo.filas.map((data) => ({ dataset_id: dataset.id, data }));
-      const { error: errorRecords } = await supabase.from("records").insert(registros);
-      if (errorRecords) {
-        return NextResponse.json(
-          { error: errorRecords.message, creadosHastaAhora: creados },
-          { status: 500 }
-        );
-      }
+    const errorInsertar = await insertarRegistros(supabase, dataset.id, grupo.filas);
+    if (errorInsertar) {
+      await deshacerTabla(supabase, dataset.id);
+      return NextResponse.json(
+        { error: `No se pudo importar "${nombreDataset}": ${errorInsertar}`, creadosHastaAhora: creados },
+        { status: 500 }
+      );
     }
 
     creados.push({

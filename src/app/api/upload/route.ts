@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { crearClienteServidor } from "@/lib/supabase/server";
 import { parsearExcel } from "@/lib/excel-parser";
 import { ROLES, type RolColumna } from "@/lib/roles";
+import { insertarRegistros, deshacerTabla, MAX_FILAS_IMPORTACION } from "@/lib/insertar";
 
 // Recibe el Excel + nombre del dataset, lo parsea, y crea el dataset
 // (definición de columnas) + todos los registros en un solo paso.
@@ -54,6 +55,13 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "No se encontraron columnas con encabezado" }, { status: 422 });
   }
 
+  if (parseado.filas.length > MAX_FILAS_IMPORTACION) {
+    return NextResponse.json(
+      { error: `La hoja tiene ${parseado.filas.length.toLocaleString("es-PE")} filas y el máximo por importación es ${MAX_FILAS_IMPORTACION.toLocaleString("es-PE")}. Divide el archivo en partes.` },
+      { status: 422 }
+    );
+  }
+
   if (typeof rolesRaw === "string" && rolesRaw) {
     let roles: Record<string, RolColumna | null>;
     try {
@@ -82,12 +90,10 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: errorDataset?.message ?? "No se pudo crear el dataset" }, { status: 500 });
   }
 
-  if (parseado.filas.length > 0) {
-    const registros = parseado.filas.map((data) => ({ dataset_id: dataset.id, data }));
-    const { error: errorRecords } = await supabase.from("records").insert(registros);
-    if (errorRecords) {
-      return NextResponse.json({ error: errorRecords.message }, { status: 500 });
-    }
+  const errorInsertar = await insertarRegistros(supabase, dataset.id, parseado.filas);
+  if (errorInsertar) {
+    await deshacerTabla(supabase, dataset.id);
+    return NextResponse.json({ error: `No se pudo importar el archivo: ${errorInsertar}` }, { status: 500 });
   }
 
   return NextResponse.json({
