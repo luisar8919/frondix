@@ -78,7 +78,16 @@ export default function EditarTabla({
             <input aria-label={`Nombre del campo ${i + 1}`} value={f.label} maxLength={60} onChange={(e) => cambiar(i, { label: e.target.value })} />
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
               {!f.key && (
-                <select aria-label="Tipo del campo nuevo" value={f.tipo} onChange={(e) => cambiar(i, { tipo: e.target.value as TipoColumna })}>
+                <select
+                  aria-label="Tipo del campo nuevo"
+                  value={f.tipo}
+                  onChange={(e) => {
+                    const tipo = e.target.value as TipoColumna;
+                    // Si el campo nuevo es de tipo Fecha y no eligió otro significado, se lo sugerimos:
+                    // es la causa más común de que Seguimiento no reconozca una tabla.
+                    cambiar(i, { tipo, rol: tipo === "fecha" && !f.rol ? "fecha" : f.rol });
+                  }}
+                >
                   <option value="texto">Texto</option>
                   <option value="numero">Número</option>
                   <option value="fecha">Fecha</option>

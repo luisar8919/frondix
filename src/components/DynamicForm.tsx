@@ -34,7 +34,11 @@ export default function DynamicForm({
     Object.fromEntries(
       columnas.map((c) => {
         const v = inicial?.[c.key];
-        return [c.key, v === null || v === undefined ? "" : c.tipo === "fecha" ? String(v).slice(0, 10) : String(v)];
+        if (v !== null && v !== undefined) return [c.key, c.tipo === "fecha" ? String(v).slice(0, 10) : String(v)];
+        // Un registro nuevo (no al editar) arranca con la fecha de hoy: es el dato que más se
+        // olvida cargar, y sin fecha una tabla no puede aparecer en Seguimiento.
+        if (!inicial && c.tipo === "fecha" && !c.enlace) return [c.key, new Date().toISOString().slice(0, 10)];
+        return [c.key, ""];
       })
     )
   );

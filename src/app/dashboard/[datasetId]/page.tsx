@@ -116,6 +116,20 @@ export default function DatasetPage({
     return null;
   }
 
+  const vacios = registros.filter((r) => Object.values(r.data).every((v) => v === null || v === undefined || v === ""));
+
+  async function eliminarVacios() {
+    if (!window.confirm(`¿Eliminar ${vacios.length} registro(s) sin ningún dato cargado? No se puede deshacer.`)) return;
+    setErrorAccion("");
+    for (const r of vacios) {
+      const res = await enviarConfirmando(`/api/records/${datasetId}/${r.id}`, "DELETE");
+      if (!res.ok && !res.cancelado) return setErrorAccion(res.body.error ?? "No se pudieron eliminar todos los registros vacíos");
+    }
+    const idsVacios = new Set(vacios.map((r) => r.id));
+    setRegistros((rs) => rs.filter((x) => !idsVacios.has(x.id)));
+    setTotal((t) => t - vacios.length);
+  }
+
   async function eliminarRegistro(r: Registro) {
     if (!window.confirm("¿Eliminar este registro? No se puede deshacer.")) return;
     setErrorAccion("");
@@ -213,6 +227,15 @@ export default function DatasetPage({
           {registrosFiltrados.length.toLocaleString("es-PE")} de {registros.length.toLocaleString("es-PE")}
         </span>
       </div>
+
+      {vacios.length > 0 && (
+        <p className="alerta alerta-aviso">
+          {vacios.length} {vacios.length === 1 ? "registro está" : "registros están"} completamente vacíos.{" "}
+          <button type="button" className="btn btn-fantasma" style={{ padding: "2px 10px" }} onClick={eliminarVacios}>
+            Eliminar vacíos
+          </button>
+        </p>
+      )}
 
       {errorAccion && <p className="alerta alerta-error" role="alert">{errorAccion}</p>}
       <DynamicTable

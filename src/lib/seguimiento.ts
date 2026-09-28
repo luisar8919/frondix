@@ -139,6 +139,27 @@ export function normalizarTelefonoPE(raw: unknown): string | null {
 export const PLANTILLA_POR_DEFECTO =
   "Hola {nombre}, soy de {negocio}. Hace {dias} días que no te vemos por aquí y quería saber cómo te fue. ¿Te ayudamos con algo?";
 
+// Puntos de partida para el mensaje; el dueño puede editar libremente el que elija.
+export const PLANTILLAS: { nombre: string; texto: string }[] = [
+  { nombre: "Seguimiento (recomendada)", texto: PLANTILLA_POR_DEFECTO },
+  {
+    nombre: "Oferta o promoción",
+    texto: "Hola {nombre}, soy de {negocio}. Tenemos una promoción esta semana y pensé en ti porque hace {dias} días no te vemos. ¿Te cuento?",
+  },
+  {
+    nombre: "Producto o servicio nuevo",
+    texto: "Hola {nombre}, soy de {negocio}. Justo llegó algo nuevo que te puede interesar. ¿Te paso los detalles?",
+  },
+  {
+    nombre: "Recordatorio de mantenimiento",
+    texto: "Hola {nombre}, soy de {negocio}. Ya pasaron {dias} días desde tu última visita, puede que ya toque un mantenimiento. ¿Coordinamos una fecha?",
+  },
+  {
+    nombre: "Directo y corto",
+    texto: "Hola {nombre}, hace tiempo no te veo por {negocio}. ¿Todo bien? Cualquier cosa que necesites, aquí estoy.",
+  },
+];
+
 export function primerNombre(nombreCompleto: string): string {
   const p = nombreCompleto.trim().split(/\s+/)[0] ?? "";
   return p ? p[0].toUpperCase() + p.slice(1).toLowerCase() : "";

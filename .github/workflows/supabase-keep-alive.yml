@@ -1,0 +1,22 @@
+name: Mantener activo Supabase
+
+# Supabase Free pausa el proyecto tras ~1 semana sin actividad. Esto hace una
+# lectura mínima cada 3 días para que nunca se cumpla ese plazo.
+on:
+  schedule:
+    - cron: "0 12 */3 * *"
+  workflow_dispatch: {}
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Hacer una consulta minima (alcanza con que llegue a la base, aunque RLS la rechace)
+        run: |
+          curl -s -o /dev/null -w "HTTP %{http_code}\n" \
+            "$NEXT_PUBLIC_SUPABASE_URL/rest/v1/empresas?select=id&limit=1" \
+            -H "apikey: $NEXT_PUBLIC_SUPABASE_ANON_KEY" \
+            -H "Authorization: Bearer $NEXT_PUBLIC_SUPABASE_ANON_KEY"
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}

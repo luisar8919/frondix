@@ -1,6 +1,13 @@
 import Link from "next/link";
 import Logo from "@/components/Logo";
 
+// Piloto gratis por WhatsApp directo con el fundador (ver campaña "Primeros 10 talleres").
+// TODO: reemplazar por el número real (9 dígitos, sin +51) antes de compartir la landing.
+const WHATSAPP_FUNDADOR = "TU_NUMERO_AQUI";
+const enlaceWhatsappFundador = `https://wa.me/51${WHATSAPP_FUNDADOR}?text=${encodeURIComponent(
+  "Hola, vi Frondix y quiero probarlo gratis con mi propio Excel."
+)}`;
+
 const dolores = [
   { titulo: "Alguien más carga datos", texto: "y no sabes cómo evitar que te rompa una hoja o borre lo que ya estaba." },
   { titulo: "Se te pasó un seguimiento", texto: "porque nadie te avisó a tiempo de volver a escribirle a ese cliente." },
@@ -38,7 +45,9 @@ export default function Portada() {
             </p>
             <div className="hero-cta">
               <Link href="/signup" className="btn btn-primario btn-grande">Pruébalo con tu propio Excel</Link>
-              <a href="#como-funciona" className="btn btn-secundario btn-grande">Cómo funciona</a>
+              <a href={enlaceWhatsappFundador} target="_blank" rel="noopener noreferrer" className="btn btn-secundario btn-grande">
+                Pide tu piloto gratis por WhatsApp
+              </a>
             </div>
             <p className="ayuda" style={{ marginTop: 14 }}>Gratis para empezar. Sin tarjeta.</p>
           </div>

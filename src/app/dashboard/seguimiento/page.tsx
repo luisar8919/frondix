@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { PLANTILLA_POR_DEFECTO, armarMensaje, enlaceWhatsApp } from "@/lib/seguimiento";
+import { PLANTILLA_POR_DEFECTO, PLANTILLAS, armarMensaje, enlaceWhatsApp } from "@/lib/seguimiento";
 
 interface ClienteApi {
   clave: string; nombre: string; ultimaFecha: string; dias: number; visitas: number;
@@ -79,6 +79,21 @@ export default function SeguimientoPage() {
         <div className="campo">
           <label htmlFor="dias">Considerar que un cliente no volvió después de (días)</label>
           <input id="dias" type="number" min={1} max={365} value={dias} onChange={(e) => setDias(Math.max(1, Number(e.target.value) || 1))} style={{ maxWidth: 140 }} />
+        </div>
+        <div className="campo">
+          <label htmlFor="plantilla-preset">Plantilla de mensaje</label>
+          <select
+            id="plantilla-preset"
+            value={PLANTILLAS.find((p) => p.texto === plantilla)?.nombre ?? "Personalizada"}
+            onChange={(e) => {
+              const p = PLANTILLAS.find((x) => x.nombre === e.target.value);
+              if (p) guardarPlantilla(p.texto);
+            }}
+            style={{ maxWidth: 320 }}
+          >
+            {PLANTILLAS.map((p) => <option key={p.nombre} value={p.nombre}>{p.nombre}</option>)}
+            {!PLANTILLAS.some((p) => p.texto === plantilla) && <option value="Personalizada">Personalizada (editada por ti)</option>}
+          </select>
         </div>
         <div className="campo">
           <label htmlFor="plantilla">Mensaje. Puedes usar {"{nombre}"}, {"{negocio}"} y {"{dias}"}</label>
