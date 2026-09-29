@@ -49,7 +49,9 @@ export async function sugerirEstructuraConIA(
         content: `Columnas (clave interna: nombre actual):\n${columnas.map((c) => `- ${c.key}: "${c.labelActual}"`).join("\n")}\n\nMuestra de filas:\n${JSON.stringify(muestra, null, 1)}`,
       },
     ],
-    output_config: { format: zodOutputFormat(SugerenciaEstructura) },
+    // Etiquetar columnas a partir de una muestra es una tarea simple de clasificación,
+    // no necesita razonamiento profundo: "low" evita que piense de más y encarezca la llamada.
+    output_config: { effort: "low", format: zodOutputFormat(SugerenciaEstructura) },
   });
 
   const sugeridas = response.parsed_output?.columnas ?? [];

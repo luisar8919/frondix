@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { crearClienteBrowser } from "@/lib/supabase/client";
+import { tieneSuscripcionActiva } from "@/lib/suscripcion";
 import { ROLES, type RolColumna } from "@/lib/roles";
 import type { Columna } from "@/lib/excel-parser";
 
@@ -43,6 +44,19 @@ export default function UploadAutoPage() {
   const [ediciones, setEdiciones] = useState<EdicionGrupo[]>([]);
   const [sugiriendoIA, setSugiriendoIA] = useState<number | null>(null);
   const [resultado, setResultado] = useState<{ tablas: TablaCreada[]; hojasOmitidas: string[] } | null>(null);
+  const [empresaId, setEmpresaId] = useState<string | null>(null);
+  const [planActivo, setPlanActivo] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    const supabase = crearClienteBrowser();
+    (async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      const { data: miembro } = await supabase.from("miembros").select("empresa_id").eq("user_id", user!.id).single();
+      if (!miembro) return;
+      setEmpresaId(miembro.empresa_id);
+      setPlanActivo(await tieneSuscripcionActiva(supabase, miembro.empresa_id));
+    })();
+  }, []);
 
   async function onArchivoElegido(file: File | null) {
     setArchivo(file);
@@ -73,12 +87,13 @@ export default function UploadAutoPage() {
   }
 
   async function sugerirConIA(gi: number) {
-    if (!archivo) return;
+    if (!archivo || !empresaId) return;
     setSugiriendoIA(gi);
     setError(null);
     const form = new FormData();
     form.append("archivo", archivo);
     form.append("grupoIndex", String(gi));
+    form.append("empresaId", empresaId);
     const res = await fetch("/api/upload/sugerir-ia", { method: "POST", body: form });
     const body = await res.json();
     setSugiriendoIA(null);
@@ -182,9 +197,16 @@ export default function UploadAutoPage() {
                 {g.confuso && ed.incluir && (
                   <p className="alerta alerta-aviso" style={{ marginTop: 14 }}>
                     No reconocimos bien esta estructura.{" "}
-                    <button type="button" className="btn btn-fantasma" style={{ padding: "2px 10px" }} onClick={() => sugerirConIA(gi)} disabled={sugiriendoIA === gi}>
-                      {sugiriendoIA === gi ? "Pensando..." : "Sugerir con IA"}
-                    </button>
+                    {planActivo ? (
+                      <button type="button" className="btn btn-fantasma" style={{ padding: "2px 10px" }} onClick={() => sugerirConIA(gi)} disabled={sugiriendoIA === gi}>
+                        {sugiriendoIA === gi ? "Pensando..." : "Sugerir con IA"}
+                      </button>
+                    ) : (
+                      <>
+                        Puedes revisar y elegir las columnas a mano abajo, o{" "}
+                        <Link href="/dashboard/billing">activa el plan pago</Link> para que la IA te la sugiera.
+                      </>
+                    )}
                   </p>
                 )}
 
