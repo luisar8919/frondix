@@ -26,6 +26,7 @@ export async function POST(request: NextRequest) {
       columnas: g.columnas,
       filasCount: g.filas.length,
       confuso: estructuraConfusa(g.columnas),
+      muestra: g.filas.slice(0, 5),
     })),
     hojasOmitidas,
   });

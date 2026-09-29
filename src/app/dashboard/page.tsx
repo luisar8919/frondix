@@ -33,8 +33,7 @@ export default async function DashboardPage() {
           </p>
         </div>
         <div className="acciones">
-          <Link href="/dashboard/upload/auto" className="btn btn-primario">Crear módulos</Link>
-          <Link href="/dashboard/upload" className="btn btn-fantasma">Subir 1 hoja (avanzado)</Link>
+          <Link href="/dashboard/upload" className="btn btn-primario">Subir Excel</Link>
         </div>
       </div>
 
@@ -44,7 +43,7 @@ export default async function DashboardPage() {
           <p style={{ maxWidth: 46 + "ch", margin: "0 auto 20px" }}>
             Sube el Excel que ya usas: detectamos tus datos y armamos un módulo por cada tipo de información, con formulario de carga y buscador.
           </p>
-          <Link href="/dashboard/upload/auto" className="btn btn-primario btn-grande">Subir mi primer Excel</Link>
+          <Link href="/dashboard/upload" className="btn btn-primario btn-grande">Subir mi primer Excel</Link>
         </div>
       )}
 

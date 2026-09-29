@@ -1,232 +1,331 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { crearClienteBrowser } from "@/lib/supabase/client";
-import type { Columna } from "@/lib/excel-parser";
+import { tieneSuscripcionActiva } from "@/lib/suscripcion";
 import { ROLES, type RolColumna } from "@/lib/roles";
+import type { Columna } from "@/lib/excel-parser";
+
+interface GrupoDetectado {
+  hojas: string[];
+  nombreSugerido: string;
+  columnas: Columna[];
+  filasCount: number;
+  confuso: boolean;
+  muestra: Record<string, unknown>[];
+}
+
+// Estado editable de cada grupo/pestaña: si se incluye, su nombre y el label/rol de cada columna.
+interface EdicionGrupo {
+  incluir: boolean;
+  nombre: string;
+  columnas: { key: string; label: string; rol: RolColumna | "" }[];
+}
+
+interface ModuloCreado {
+  datasetId: string;
+  nombre: string;
+  hojas: string[];
+  filasImportadas: number;
+}
+
+const aEdicion = (g: GrupoDetectado): EdicionGrupo => ({
+  incluir: true,
+  nombre: g.nombreSugerido,
+  columnas: g.columnas.map((c) => ({ key: c.key, label: c.label, rol: (c.rol ?? "") as RolColumna | "" })),
+});
 
 export default function UploadPage() {
-  const [nombre, setNombre] = useState("");
   const [archivo, setArchivo] = useState<File | null>(null);
-  const [hojas, setHojas] = useState<string[] | null>(null);
-  const [hojaElegida, setHojaElegida] = useState("");
-  const [columnas, setColumnas] = useState<Columna[] | null>(null);
-  const [renombres, setRenombres] = useState<Record<string, string>>({});
-  const [roles, setRoles] = useState<Record<string, RolColumna | null>>({});
-  // decisión del usuario sobre "la primera fila no es encabezado" (null = lo decide el parser)
-  const [forzarSinEncabezado, setForzarSinEncabezado] = useState<boolean | null>(null);
-  const [detectadoSinEncabezado, setDetectadoSinEncabezado] = useState(false);
   const [cargando, setCargando] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const router = useRouter();
+  const [grupos, setGrupos] = useState<GrupoDetectado[] | null>(null);
+  const [hojasOmitidas, setHojasOmitidas] = useState<string[]>([]);
+  const [ediciones, setEdiciones] = useState<EdicionGrupo[]>([]);
+  const [pestanaActiva, setPestanaActiva] = useState(0);
+  const [sugiriendoIA, setSugiriendoIA] = useState<number | null>(null);
+  const [resultado, setResultado] = useState<{ tablas: ModuloCreado[] } | null>(null);
+  const [empresaId, setEmpresaId] = useState<string | null>(null);
+  const [planActivo, setPlanActivo] = useState<boolean | null>(null);
 
-  // Paso 1: al elegir el archivo, leemos qué hojas tiene (un Excel real de
-  // negocio casi nunca es una sola tabla — meses, caja, stock, etc.) y
-  // dejamos que el usuario elija cuál importar, en vez de adivinar.
+  useEffect(() => {
+    const supabase = crearClienteBrowser();
+    (async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      const { data: miembro } = await supabase.from("miembros").select("empresa_id").eq("user_id", user!.id).single();
+      if (!miembro) return;
+      setEmpresaId(miembro.empresa_id);
+      setPlanActivo(await tieneSuscripcionActiva(supabase, miembro.empresa_id));
+    })();
+  }, []);
+
   async function onArchivoElegido(file: File | null) {
     setArchivo(file);
-    setHojas(null);
-    setHojaElegida("");
-    setColumnas(null);
-    setForzarSinEncabezado(null);
+    setGrupos(null);
+    setResultado(null);
     setError(null);
+    setPestanaActiva(0);
     if (!file) return;
 
     const form = new FormData();
     form.append("archivo", file);
-    const res = await fetch("/api/upload/hojas", { method: "POST", body: form });
+    const res = await fetch("/api/upload/grupos", { method: "POST", body: form });
     const body = await res.json();
     if (!res.ok) return setError(body.error ?? "No se pudo leer el archivo");
 
-    setHojas(body.hojas);
-    setHojaElegida(body.hojas[0] ?? "");
+    setGrupos(body.grupos);
+    setHojasOmitidas(body.hojasOmitidas ?? []);
+    setEdiciones((body.grupos as GrupoDetectado[]).map(aEdicion));
   }
 
-  // Paso 2: por cada hoja elegida, mostramos las columnas detectadas antes de
-  // importar nada — así el usuario puede corregir las que el parser marca
-  // como sospechosas (el título de la columna en realidad era un dato).
-  useEffect(() => {
-    if (!archivo || !hojaElegida) return;
-    setColumnas(null);
-    setRenombres({});
+  function cambiarGrupo(i: number, parche: Partial<EdicionGrupo>) {
+    setEdiciones((eds) => eds.map((e, j) => (j === i ? { ...e, ...parche } : e)));
+  }
 
+  function cambiarColumna(gi: number, key: string, parche: Partial<EdicionGrupo["columnas"][number]>) {
+    setEdiciones((eds) =>
+      eds.map((e, j) => (j !== gi ? e : { ...e, columnas: e.columnas.map((c) => (c.key === key ? { ...c, ...parche } : c)) }))
+    );
+  }
+
+  async function sugerirConIA(gi: number) {
+    if (!archivo || !empresaId) return;
+    setSugiriendoIA(gi);
+    setError(null);
     const form = new FormData();
     form.append("archivo", archivo);
-    form.append("hoja", hojaElegida);
-    if (forzarSinEncabezado !== null) form.append("sinEncabezado", String(forzarSinEncabezado));
-    fetch("/api/upload/preview", { method: "POST", body: form })
-      .then((res) => res.json())
-      .then((body) => {
-        const cols: Columna[] = body.columnas ?? [];
-        setColumnas(cols);
-        setDetectadoSinEncabezado(Boolean(body.sinEncabezado));
-        // arranca con lo que sugirió el parser; el usuario lo confirma o lo cambia
-        setRoles(Object.fromEntries(cols.map((c) => [c.key, c.rol])));
-      });
-  }, [archivo, hojaElegida, forzarSinEncabezado]);
-
-  // Un rol solo puede tener una columna: al elegirlo en una, se libera de las demás.
-  function elegirRol(key: string, rol: RolColumna | null) {
-    setRoles((r) => {
-      const siguiente = { ...r };
-      if (rol) for (const k of Object.keys(siguiente)) if (siguiente[k] === rol) siguiente[k] = null;
-      siguiente[key] = rol;
-      return siguiente;
+    form.append("grupoIndex", String(gi));
+    form.append("empresaId", empresaId);
+    const res = await fetch("/api/upload/sugerir-ia", { method: "POST", body: form });
+    const body = await res.json();
+    setSugiriendoIA(null);
+    if (!res.ok) return setError(body.error ?? "No se pudo obtener la sugerencia de IA");
+    const sugeridas: { key: string; label: string; rol: string | null }[] = body.columnas;
+    cambiarGrupo(gi, {
+      columnas: ediciones[gi].columnas.map((c) => {
+        const s = sugeridas.find((x) => x.key === c.key);
+        return s ? { ...c, label: s.label, rol: (s.rol ?? "") as RolColumna | "" } : c;
+      }),
     });
   }
 
-  async function onSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    if (!archivo || !hojaElegida) return;
+  async function onConfirmar() {
+    if (!archivo) return;
     setCargando(true);
     setError(null);
 
     const supabase = crearClienteBrowser();
     const { data: { user } } = await supabase.auth.getUser();
-    const { data: miembro } = await supabase
-      .from("miembros")
-      .select("empresa_id")
-      .eq("user_id", user!.id)
-      .single();
+    const { data: miembro } = await supabase.from("miembros").select("empresa_id").eq("user_id", user!.id).single();
 
     const form = new FormData();
     form.append("archivo", archivo);
-    form.append("nombre", nombre);
     form.append("empresaId", miembro!.empresa_id);
-    form.append("hoja", hojaElegida);
-    if (Object.keys(renombres).length > 0) form.append("renombres", JSON.stringify(renombres));
-    form.append("roles", JSON.stringify(roles));
-    form.append("sinEncabezado", String(sinEncabezado));
+    form.append(
+      "seleccion",
+      JSON.stringify(
+        ediciones.map((e) => ({
+          incluir: e.incluir,
+          nombre: e.nombre,
+          columnas: e.columnas.map((c) => ({ key: c.key, label: c.label, rol: c.rol || null })),
+        }))
+      )
+    );
 
-    const res = await fetch("/api/upload", { method: "POST", body: form });
+    const res = await fetch("/api/upload/auto", { method: "POST", body: form });
     const body = await res.json();
     setCargando(false);
 
-    if (!res.ok) return setError(body.error ?? "Error subiendo el archivo");
-    router.push(`/dashboard/${body.datasetId}`);
+    if (!res.ok) return setError(body.error ?? "Error procesando el archivo");
+    setResultado(body);
+    setGrupos(null);
   }
 
-  const haySospechosas = columnas?.some((c) => c.sospechosa) ?? false;
-  const sinEncabezado = forzarSinEncabezado ?? detectadoSinEncabezado;
+  const hayIncluidos = ediciones.some((e) => e.incluir);
+  const g = grupos?.[pestanaActiva];
+  const ed = ediciones[pestanaActiva];
 
   return (
     <>
       <div className="panel-cabecera">
         <div>
           <h1>Subir Excel</h1>
-          <p className="suave">Elige tu archivo, revisa las columnas y listo.</p>
+          <p className="suave" style={{ maxWidth: "62ch" }}>
+            Sube tu archivo: detectamos las hojas que se parecen y te proponemos un módulo por cada una. Revisa
+            cada pestaña, elige cuáles quieres cargar y confirma qué significa cada columna antes de crear nada.
+          </p>
         </div>
       </div>
 
-      <form onSubmit={onSubmit} style={{ maxWidth: 760 }}>
-        <div className="tarjeta" style={{ marginBottom: 16 }}>
-          <label htmlFor="archivo">1. Tu archivo de Excel</label>
-          <input id="archivo" type="file" accept=".xlsx,.xls,.csv" onChange={(e) => onArchivoElegido(e.target.files?.[0] ?? null)} required />
+      {!grupos && !resultado && (
+        <div className="tarjeta" style={{ maxWidth: 760 }}>
+          <label htmlFor="archivo">Tu archivo de Excel</label>
+          <input
+            id="archivo"
+            type="file"
+            accept=".xlsx,.xls,.csv"
+            onChange={(e) => onArchivoElegido(e.target.files?.[0] ?? null)}
+          />
           <p className="ayuda">Formatos: .xlsx, .xls o .csv</p>
+          {error && <p className="alerta alerta-error" role="alert" style={{ marginTop: 14 }}>{error}</p>}
+        </div>
+      )}
 
-          {hojas && hojas.length > 1 && (
-            <div style={{ marginTop: 18 }}>
-              <label htmlFor="hoja">Tu archivo tiene {hojas.length} hojas. ¿Cuál quieres importar?</label>
-              <select
-                id="hoja"
-                value={hojaElegida}
-                onChange={(e) => {
-                  setHojaElegida(e.target.value);
-                  setForzarSinEncabezado(null);
-                }}
+      {grupos && g && ed && (
+        <>
+          {error && <p className="alerta alerta-error" role="alert">{error}</p>}
+          {hojasOmitidas.length > 0 && (
+            <p className="alerta alerta-aviso">
+              No se pudieron agrupar (había más de 3 estructuras distintas): {hojasOmitidas.join(", ")}.
+            </p>
+          )}
+
+          <div role="tablist" aria-label="Módulos detectados" style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 16 }}>
+            {grupos.map((grupo, gi) => (
+              <button
+                key={gi}
+                type="button"
+                role="tab"
+                aria-selected={gi === pestanaActiva}
+                onClick={() => setPestanaActiva(gi)}
+                className={`btn ${gi === pestanaActiva ? "btn-primario" : "btn-secundario"}`}
+                style={{ opacity: ediciones[gi].incluir ? 1 : 0.5, display: "flex", alignItems: "center", gap: 8 }}
               >
-                {hojas.map((h) => (
-                  <option key={h} value={h}>{h}</option>
+                <input
+                  type="checkbox"
+                  checked={ediciones[gi].incluir}
+                  onChange={(e) => {
+                    e.stopPropagation();
+                    cambiarGrupo(gi, { incluir: e.target.checked });
+                  }}
+                  onClick={(e) => e.stopPropagation()}
+                  aria-label={`Incluir ${ediciones[gi].nombre}`}
+                />
+                {ediciones[gi].nombre || `Módulo ${gi + 1}`}
+              </button>
+            ))}
+          </div>
+
+          <div className="tarjeta" style={{ marginBottom: 16, opacity: ed.incluir ? 1 : 0.6 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 10 }}>
+              <div className="campo" style={{ margin: 0, maxWidth: 320 }}>
+                <label htmlFor="nombre-modulo">Nombre del módulo</label>
+                <input
+                  id="nombre-modulo"
+                  value={ed.nombre}
+                  onChange={(e) => cambiarGrupo(pestanaActiva, { nombre: e.target.value })}
+                  maxLength={120}
+                />
+              </div>
+              <label style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <input type="checkbox" checked={ed.incluir} onChange={(e) => cambiarGrupo(pestanaActiva, { incluir: e.target.checked })} />
+                Cargar este módulo
+              </label>
+              <span className="suave pequeno">{g.filasCount} filas, de: {g.hojas.join(", ")}</span>
+            </div>
+
+            {g.confuso && ed.incluir && (
+              <p className="alerta alerta-aviso" style={{ marginTop: 14 }}>
+                No reconocimos bien esta estructura.{" "}
+                {planActivo ? (
+                  <button type="button" className="btn btn-fantasma" style={{ padding: "2px 10px" }} onClick={() => sugerirConIA(pestanaActiva)} disabled={sugiriendoIA === pestanaActiva}>
+                    {sugiriendoIA === pestanaActiva ? "Pensando..." : "Sugerir con IA"}
+                  </button>
+                ) : (
+                  <>
+                    Puedes revisar y elegir las columnas a mano abajo, o{" "}
+                    <Link href="/dashboard/billing">activa el plan pago</Link> para que la IA te la sugiera.
+                  </>
+                )}
+              </p>
+            )}
+
+            {ed.incluir && (
+              <div style={{ marginTop: 14 }}>
+                <h3 style={{ fontSize: 16, marginBottom: 10 }}>Revisa las columnas</h3>
+                {ed.columnas.map((c) => (
+                  <div key={c.key} className="fila-columna" style={{ gridTemplateColumns: "minmax(0,1.4fr) minmax(0,1.4fr)" }}>
+                    <input
+                      value={c.label}
+                      maxLength={60}
+                      onChange={(e) => cambiarColumna(pestanaActiva, c.key, { label: e.target.value })}
+                      aria-label={`Nombre de la columna ${c.key}`}
+                    />
+                    <select
+                      value={c.rol}
+                      onChange={(e) => cambiarColumna(pestanaActiva, c.key, { rol: e.target.value as RolColumna | "" })}
+                      aria-label={`Qué significa ${c.label || c.key}`}
+                    >
+                      <option value="">Sin significado especial</option>
+                      {ROLES.map((r) => <option key={r.valor} value={r.valor}>{r.etiqueta}</option>)}
+                    </select>
+                  </div>
                 ))}
-              </select>
-              <p className="ayuda">Importas una hoja a la vez. Si quieres varias, repite el proceso o usa &quot;Crear módulos&quot;.</p>
+                <p className="ayuda">
+                  Indica qué significa cada columna (monto, fecha, cliente...) para que el asistente pueda
+                  armarte resúmenes y avisos. Puedes dejarlas sin significado especial.
+                </p>
+              </div>
+            )}
+          </div>
+
+          {ed.incluir && g.muestra.length > 0 && (
+            <div style={{ marginBottom: 20 }}>
+              <h3 style={{ fontSize: 16, marginBottom: 10 }}>Así se ve lo que se va a cargar</h3>
+              <div className="tabla-envoltura" style={{ maxHeight: 260 }}>
+                <table>
+                  <thead>
+                    <tr>
+                      {ed.columnas.map((c) => <th key={c.key}>{c.label || c.key}</th>)}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {g.muestra.map((fila, i) => (
+                      <tr key={i}>
+                        {ed.columnas.map((c) => {
+                          const v = fila[c.key];
+                          const texto = v && typeof v === "string" && /^\d{4}-\d{2}-\d{2}/.test(v) ? v.slice(0, 10) : String(v ?? "");
+                          return <td key={c.key}>{texto}</td>;
+                        })}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              {g.filasCount > g.muestra.length && (
+                <p className="suave pequeno" style={{ marginTop: 8 }}>
+                  Mostrando {g.muestra.length} de {g.filasCount} filas.
+                </p>
+              )}
             </div>
           )}
-        </div>
 
-        {columnas && columnas.length > 0 && (
-          <div className="tarjeta" style={{ marginBottom: 16 }}>
-            <h3>2. Revisa las columnas</h3>
-            <p className="suave pequeno">Esto es lo que encontramos en la hoja &quot;{hojaElegida}&quot;.</p>
-
-            <label className="campo-check" style={{ margin: "14px 0" }}>
-              <input
-                type="checkbox"
-                checked={sinEncabezado}
-                onChange={(e) => setForzarSinEncabezado(e.target.checked)}
-              />
-              <span>La primera fila no es un encabezado: es un dato (por ejemplo, una lista de productos).</span>
-            </label>
-
-            {sinEncabezado && (
-              <p className="alerta alerta-ok">
-                Se importan todas las filas y las columnas se nombran solas. Cámbiales el nombre abajo.
-              </p>
-            )}
-            {haySospechosas && !sinEncabezado && (
-              <p className="alerta alerta-aviso">
-                Esta hoja no parece tener un encabezado claro en algunas columnas (el título encontrado
-                en realidad parece un dato, no un nombre). Revisa y corrige los nombres marcados. Si toda
-                la primera fila es un dato, marca la casilla de arriba.
-              </p>
-            )}
-
-            <div>
-              {columnas.map((c) => (
-                <div key={c.key} className="fila-columna">
-                  <div>
-                    {c.sospechosa ? (
-                      <input
-                        aria-label={`Nombre de la columna ${c.label}`}
-                        defaultValue={c.label}
-                        placeholder="Nombre de esta columna"
-                        onChange={(e) => setRenombres((r) => ({ ...r, [c.key]: e.target.value }))}
-                      />
-                    ) : (
-                      <strong>{c.label}</strong>
-                    )}
-                  </div>
-                  <span className="insignia">{c.tipo}</span>
-                  <select
-                    aria-label={`Qué representa la columna ${c.label}`}
-                    value={roles[c.key] ?? ""}
-                    onChange={(e) => elegirRol(c.key, (e.target.value || null) as RolColumna | null)}
-                  >
-                    <option value="">Sin rol especial</option>
-                    {ROLES.map((r) => (
-                      <option key={r.valor} value={r.valor}>{r.etiqueta}</option>
-                    ))}
-                  </select>
-                </div>
-              ))}
-            </div>
-            <p className="ayuda">
-              Indica qué significa cada columna (monto, fecha, cliente...) para que el asistente pueda
-              armarte resúmenes y avisos. Puedes dejarlas sin rol.
-            </p>
-          </div>
-        )}
-
-        {columnas && (
-          <div className="tarjeta">
-            <label htmlFor="nombre-tabla">3. Nombre del módulo</label>
-            <input
-              id="nombre-tabla"
-              placeholder="Nombre del módulo (ej. Clientes)"
-              value={nombre}
-              onChange={(e) => setNombre(e.target.value)}
-              required
-            />
-            {error && <p className="alerta alerta-error" role="alert" style={{ marginTop: 14 }}>{error}</p>}
-            <button type="submit" className="btn btn-primario btn-grande" style={{ marginTop: 16 }} disabled={cargando}>
-              {cargando ? "Procesando..." : `Crear módulo desde "${hojaElegida}"`}
+          <div className="centrado" style={{ marginTop: 10 }}>
+            <button type="button" className="btn btn-primario btn-grande" onClick={onConfirmar} disabled={cargando || !hayIncluidos}>
+              {cargando ? "Creando..." : `Crear ${ediciones.filter((e) => e.incluir).length} módulo(s)`}
             </button>
           </div>
-        )}
+        </>
+      )}
 
-        {!columnas && error && <p className="alerta alerta-error" role="alert">{error}</p>}
-      </form>
+      {resultado && (
+        <div className="tarjeta tarjeta-elevada" style={{ maxWidth: 760, marginTop: 20 }}>
+          <h2 style={{ fontSize: 22 }}>
+            Listo: se {resultado.tablas.length === 1 ? "creó 1 módulo" : `crearon ${resultado.tablas.length} módulos`}
+          </h2>
+          <div className="grilla-tablas" style={{ marginTop: 14 }}>
+            {resultado.tablas.map((t) => (
+              <Link key={t.datasetId} href={`/dashboard/${t.datasetId}`} className="tarjeta tarjeta-tabla">
+                <h3>{t.nombre}</h3>
+                <p className="suave pequeno" style={{ margin: 0 }}>
+                  {t.filasImportadas} filas, de: {t.hojas.join(", ")}
+                </p>
+              </Link>
+            ))}
+          </div>
+        </div>
+      )}
     </>
   );
 }

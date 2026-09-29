@@ -8,7 +8,6 @@ import { crearClienteBrowser } from "@/lib/supabase/client";
 const enlaces = [
   { href: "/dashboard", texto: "Mis módulos" },
   { href: "/dashboard/upload", texto: "Subir Excel" },
-  { href: "/dashboard/upload/auto", texto: "Crear módulos" },
   { href: "/dashboard/seguimiento", texto: "Seguimiento" },
   { href: "/dashboard/team", texto: "Equipo" },
   { href: "/dashboard/billing", texto: "Plan y pagos" },
