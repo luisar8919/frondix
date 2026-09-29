@@ -1,17 +1,35 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { crearClienteBrowser } from "@/lib/supabase/client";
 import Logo from "@/components/Logo";
 
+// useSearchParams exige un límite de Suspense alrededor (requisito de Next.js).
 export default function LoginPage() {
+  return (
+    <Suspense fallback={null}>
+      <LoginForm />
+    </Suspense>
+  );
+}
+
+function LoginForm() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [enviando, setEnviando] = useState(false);
   const router = useRouter();
+  const searchParams = useSearchParams();
+
+  // TEMPORAL: mientras depuramos el login con Google, muestra el motivo real
+  // del error en vez de fallar en silencio. Quitar junto con el bloque
+  // equivalente en src/app/auth/callback/route.ts una vez que funcione.
+  useEffect(() => {
+    const googleError = searchParams.get("google_error");
+    if (googleError) setError(`Google: ${googleError}`);
+  }, [searchParams]);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();

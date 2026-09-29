@@ -34,7 +34,15 @@ export async function GET(req: NextRequest) {
         },
       }
     );
-    await supabase.auth.exchangeCodeForSession(code);
+    try {
+      const { error } = await supabase.auth.exchangeCodeForSession(code);
+      // TEMPORAL: mientras depuramos el login con Google, mandamos el motivo real del
+      // error a /login en vez de tragárnoslo. Quitar este bloque una vez que funcione.
+      if (error) return NextResponse.redirect(`${proto}://${host}/login?google_error=${encodeURIComponent(error.message)}`);
+    } catch (e) {
+      const mensaje = e instanceof Error ? e.message : "desconocido";
+      return NextResponse.redirect(`${proto}://${host}/login?google_error=${encodeURIComponent(mensaje)}`);
+    }
   }
 
   return response;
