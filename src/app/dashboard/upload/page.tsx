@@ -144,13 +144,24 @@ export default function UploadPage() {
         )
       );
 
-      const res = await fetch("/api/upload/auto", { method: "POST", body: form });
+      // Sin esto, un servidor que nunca contesta (cuelgue, timeout silencioso) deja el
+      // botón en "Creando..." para siempre: a los 30 s se cancela sola y avisa.
+      const controlador = new AbortController();
+      const limite = setTimeout(() => controlador.abort(), 30000);
+      let res: Response;
+      try {
+        res = await fetch("/api/upload/auto", { method: "POST", body: form, signal: controlador.signal });
+      } finally {
+        clearTimeout(limite);
+      }
       const body = await res.json().catch(() => ({}));
       if (!res.ok) return setError(body.error ?? `El servidor no pudo procesar el archivo (código ${res.status}). Si es un archivo grande, prueba dividirlo en partes.`);
       setResultado(body);
       setGrupos(null);
-    } catch {
-      setError("No se pudo conectar con el servidor. Revisa tu conexión e intenta de nuevo.");
+    } catch (e) {
+      setError(e instanceof DOMException && e.name === "AbortError"
+        ? "El servidor tardó demasiado en responder (más de 30 s) y se canceló. Intenta de nuevo o avisa si sigue pasando."
+        : "No se pudo conectar con el servidor. Revisa tu conexión e intenta de nuevo.");
     } finally {
       setCargando(false);
     }
