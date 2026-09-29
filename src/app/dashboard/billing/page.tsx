@@ -64,7 +64,7 @@ export default function BillingPage() {
         <div className="precio-monto">S/ 35<small> /mes</small></div>
         <ul>
           <li>Invita a tu equipo con accesos por rol</li>
-          <li>Todas las tablas y registros que necesites</li>
+          <li>Todos los módulos y registros que necesites</li>
           <li>Seguimiento de clientes por WhatsApp (mensaje listo, lo envías con un toque) <span className="insignia insignia-sol">Envío automático: próximamente</span></li>
         </ul>
         <button type="button" className="btn btn-primario btn-grande btn-bloque" onClick={cobrar} disabled={!scriptListo}>

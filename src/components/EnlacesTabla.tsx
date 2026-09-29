@@ -42,18 +42,18 @@ export default function EnlacesTabla({
 
   return (
     <details className="tarjeta plegable">
-      <summary>Enlazar con otras tablas</summary>
+      <summary>Enlazar con otros módulos</summary>
       <div className="plegable-cuerpo">
         {opciones.length === 0 ? (
           <p className="suave" style={{ margin: 0 }}>
-            Para enlazar necesitas al menos otra tabla. Sube otro Excel y vuelve aquí.
+            Para enlazar necesitas al menos otro módulo. Sube otro Excel y vuelve aquí.
           </p>
         ) : (
           <>
             <p className="suave pequeno">
-              Si enlazas una columna (por ejemplo <strong>Cliente</strong>) con otra tabla (por ejemplo{" "}
+              Si enlazas una columna (por ejemplo <strong>Cliente</strong>) con otro módulo (por ejemplo{" "}
               <strong>Clientes &gt; Nombre</strong>), al agregar registros solo se aceptan valores que existan
-              allí, y podrás saltar de una tabla a la otra.
+              allí, y podrás saltar de un módulo a otro.
             </p>
             <div>
               {columnas.map((c) => (

@@ -140,7 +140,7 @@ export default function UploadPage() {
                   <option key={h} value={h}>{h}</option>
                 ))}
               </select>
-              <p className="ayuda">Importas una hoja a la vez. Si quieres varias, repite el proceso o usa &quot;Generar tablas&quot;.</p>
+              <p className="ayuda">Importas una hoja a la vez. Si quieres varias, repite el proceso o usa &quot;Crear módulos&quot;.</p>
             </div>
           )}
         </div>
@@ -210,17 +210,17 @@ export default function UploadPage() {
 
         {columnas && (
           <div className="tarjeta">
-            <label htmlFor="nombre-tabla">3. Nombre de la tabla</label>
+            <label htmlFor="nombre-tabla">3. Nombre del módulo</label>
             <input
               id="nombre-tabla"
-              placeholder="Nombre de la tabla (ej. Clientes)"
+              placeholder="Nombre del módulo (ej. Clientes)"
               value={nombre}
               onChange={(e) => setNombre(e.target.value)}
               required
             />
             {error && <p className="alerta alerta-error" role="alert" style={{ marginTop: 14 }}>{error}</p>}
             <button type="submit" className="btn btn-primario btn-grande" style={{ marginTop: 16 }} disabled={cargando}>
-              {cargando ? "Procesando..." : `Crear tabla desde "${hojaElegida}"`}
+              {cargando ? "Procesando..." : `Crear módulo desde "${hojaElegida}"`}
             </button>
           </div>
         )}

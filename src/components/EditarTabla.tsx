@@ -56,21 +56,21 @@ export default function EditarTabla({
     const r = await enviarConfirmando(`/api/datasets/${datasetId}`, "DELETE");
     if (r.ok) return router.push("/dashboard");
     setOcupado(false);
-    if (!r.cancelado) setMensaje({ tipo: "error", texto: r.body.error ?? "No se pudo eliminar la tabla" });
+    if (!r.cancelado) setMensaje({ tipo: "error", texto: r.body.error ?? "No se pudo eliminar el módulo" });
   }
 
   return (
     <details className="tarjeta plegable">
-      <summary>Editar tabla y campos</summary>
+      <summary>Editar módulo y campos</summary>
       <div className="plegable-cuerpo">
         <div className="campo">
-          <label htmlFor="nombre-tabla">Nombre de la tabla</label>
+          <label htmlFor="nombre-tabla">Nombre del módulo</label>
           <input id="nombre-tabla" value={nombreTabla} onChange={(e) => setNombreTabla(e.target.value)} maxLength={120} />
         </div>
 
         <p className="suave pequeno">
           Puedes renombrar campos, cambiar qué significan, agregar campos nuevos o quitar los que no uses. Si un campo está
-          enlazado con otra tabla, te avisamos antes de tocarlo.
+          enlazado con otro módulo, te avisamos antes de tocarlo.
         </p>
 
         {filas.map((f, i) => (
@@ -119,10 +119,10 @@ export default function EditarTabla({
             {ocupado ? "Guardando..." : "Guardar cambios"}
           </button>
           <button type="button" className="btn btn-fantasma" onClick={eliminar} disabled={ocupado} style={{ color: "var(--error)" }}>
-            Eliminar tabla
+            Eliminar módulo
           </button>
         </div>
-        <p className="ayuda">Solo el dueño o un administrador puede cambiar la estructura o eliminar tablas.</p>
+        <p className="ayuda">Solo el dueño o un administrador puede cambiar la estructura o eliminar módulos.</p>
       </div>
     </details>
   );

@@ -1,7 +1,7 @@
 // Chequeo de sugerirRoles: node scripts/test-roles.mjs
 // Importa el .ts real (Node 22.18+/24 quita los tipos solo), sin duplicar la lógica.
 import assert from "node:assert";
-import { sugerirRoles } from "../src/lib/roles.ts";
+import { sugerirRoles, estructuraConfusa } from "../src/lib/roles.ts";
 
 // Ventas del Excel real
 const ventas = sugerirRoles([
@@ -45,5 +45,28 @@ const dobles = sugerirRoles([
   { key: "total", label: "Total", tipo: "numero" },
 ]);
 assert.strictEqual(Object.values(dobles).filter((r) => r === "monto").length, 1);
+
+// --- estructuraConfusa: cuándo ofrecer la sugerencia por IA ---
+assert.strictEqual(estructuraConfusa([]), false, "sin columnas no hay nada que sugerir");
+assert.strictEqual(
+  estructuraConfusa([{ rol: "cliente", sospechosa: false }, { rol: null, sospechosa: false }]),
+  false,
+  "con al menos un rol reconocido, no es confusa"
+);
+assert.strictEqual(
+  estructuraConfusa([{ rol: null, sospechosa: false }, { rol: null, sospechosa: false }]),
+  true,
+  "ningún rol reconocido = confusa"
+);
+assert.strictEqual(
+  estructuraConfusa([
+    { rol: "cliente", sospechosa: false },
+    { rol: null, sospechosa: true },
+    { rol: null, sospechosa: true },
+    { rol: null, sospechosa: true },
+  ]),
+  true,
+  "más del 40% de columnas sospechosas = confusa, aunque haya un rol"
+);
 
 console.log("OK: test-roles (todas las aserciones pasaron)");

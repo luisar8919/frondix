@@ -6,9 +6,9 @@ import Logo from "@/components/Logo";
 import { crearClienteBrowser } from "@/lib/supabase/client";
 
 const enlaces = [
-  { href: "/dashboard", texto: "Mis tablas" },
+  { href: "/dashboard", texto: "Mis módulos" },
   { href: "/dashboard/upload", texto: "Subir Excel" },
-  { href: "/dashboard/upload/auto", texto: "Generar tablas" },
+  { href: "/dashboard/upload/auto", texto: "Crear módulos" },
   { href: "/dashboard/seguimiento", texto: "Seguimiento" },
   { href: "/dashboard/team", texto: "Equipo" },
   { href: "/dashboard/billing", texto: "Plan y pagos" },
@@ -18,7 +18,7 @@ export default function BarraPanel() {
   const ruta = usePathname();
   const router = useRouter();
 
-  // "Mis tablas" también queda marcada dentro de una tabla concreta (/dashboard/<id>).
+  // "Mis módulos" también queda marcada dentro de un módulo concreto (/dashboard/<id>).
   const fijas = enlaces.map((e) => e.href);
   const activo = (href: string) =>
     href === "/dashboard" ? ruta === "/dashboard" || !fijas.some((f) => f !== "/dashboard" && ruta.startsWith(f)) : ruta === href;

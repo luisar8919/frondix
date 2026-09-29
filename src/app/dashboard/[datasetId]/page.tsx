@@ -84,13 +84,13 @@ export default function DatasetPage({
   if (error) {
     return (
       <div className="tarjeta vacio">
-        <h2 style={{ fontSize: 24 }}>No pudimos abrir esta tabla</h2>
+        <h2 style={{ fontSize: 24 }}>No pudimos abrir este módulo</h2>
         <p>Puede que no exista o que no tengas acceso.</p>
-        <Link href="/dashboard" className="btn btn-primario">Volver a mis tablas</Link>
+        <Link href="/dashboard" className="btn btn-primario">Volver a mis módulos</Link>
       </div>
     );
   }
-  if (!dataset) return <p className="suave" role="status">Cargando tu tabla...</p>;
+  if (!dataset) return <p className="suave" role="status">Cargando tu módulo...</p>;
 
   async function agregarRegistro(valores: Record<string, unknown>): Promise<string | null> {
     const res = await fetch(`/api/records/${datasetId}`, {
@@ -100,7 +100,7 @@ export default function DatasetPage({
     });
     const body = await res.json();
     if (!res.ok) return body.error ?? "No se pudo guardar el registro";
-    // Se suma el registro nuevo en pantalla: recargar toda la tabla por cada alta
+    // Se suma el registro nuevo en pantalla: recargar todo el módulo por cada alta
     // gastaría transferencia (el plan gratis de Supabase da 5 GB al mes).
     setRegistros((anteriores) => [body.record, ...anteriores]);
     setTotal((t) => t + 1);
@@ -147,7 +147,7 @@ export default function DatasetPage({
       .map((c) => {
         const destino = otras.find((d) => d.id === c.enlace!.datasetId);
         const col = destino?.columnas.find((x) => x.key === c.enlace!.columnaKey);
-        return [c.key, destino ? `${destino.nombre} > ${col?.label ?? c.enlace!.columnaKey}` : "otra tabla"];
+        return [c.key, destino ? `${destino.nombre} > ${col?.label ?? c.enlace!.columnaKey}` : "otro módulo"];
       })
   );
 
@@ -160,7 +160,7 @@ export default function DatasetPage({
     <>
       <div className="panel-cabecera">
         <div>
-          <Link href="/dashboard" className="migas">&larr; Mis tablas</Link>
+          <Link href="/dashboard" className="migas">&larr; Mis módulos</Link>
           <h1>{dataset.nombre}</h1>
           <p className="suave">
             {total.toLocaleString("es-PE")} {total === 1 ? "registro" : "registros"}
@@ -171,7 +171,7 @@ export default function DatasetPage({
 
       {incompleta && !cargando && (
         <p className="alerta alerta-aviso">
-          Esta tabla tiene {total.toLocaleString("es-PE")} registros y aquí se muestran los primeros{" "}
+          Este módulo tiene {total.toLocaleString("es-PE")} registros y aquí se muestran los primeros{" "}
           {registros.length.toLocaleString("es-PE")} (los más recientes). La búsqueda solo mira esos.
         </p>
       )}
@@ -215,7 +215,7 @@ export default function DatasetPage({
       )}
 
       <div className="buscador">
-        <label htmlFor="buscar" className="solo-lectores">Buscar en la tabla</label>
+        <label htmlFor="buscar" className="solo-lectores">Buscar en el módulo</label>
         <input
           id="buscar"
           type="search"

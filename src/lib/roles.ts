@@ -38,3 +38,13 @@ export function sugerirRoles(
   }
   return asignados;
 }
+
+// Una tabla es "confusa" para las reglas de arriba cuando no reconocieron nada, o cuando
+// muchas columnas quedaron marcadas "sospechosa" (el encabezado en realidad era un dato).
+// En ese caso conviene ofrecer la sugerencia por IA en vez de dejar todo en blanco.
+export function estructuraConfusa(columnas: { rol: string | null; sospechosa: boolean }[]): boolean {
+  if (columnas.length === 0) return false;
+  const sinNingunRol = columnas.every((c) => !c.rol);
+  const proporcionSospechosa = columnas.filter((c) => c.sospechosa).length / columnas.length;
+  return sinNingunRol || proporcionSospechosa > 0.4;
+}

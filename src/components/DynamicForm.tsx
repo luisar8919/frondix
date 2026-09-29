@@ -89,7 +89,7 @@ export default function DynamicForm({
                       <option key={v} value={v} />
                     ))}
                   </datalist>
-                  <p className="ayuda">Enlazada con {etiquetasEnlace?.[c.key] ?? "otra tabla"}</p>
+                  <p className="ayuda">Enlazada con {etiquetasEnlace?.[c.key] ?? "otro módulo"}</p>
                 </>
               )}
             </div>

@@ -21,7 +21,7 @@ export default async function DashboardPage() {
     .order("created_at", { ascending: false });
 
   const empresa = (miembro?.empresas as any)?.nombre ?? "tu negocio";
-  const hayTablas = !!datasets && datasets.length > 0;
+  const hayModulos = !!datasets && datasets.length > 0;
 
   return (
     <>
@@ -29,26 +29,26 @@ export default async function DashboardPage() {
         <div>
           <h1>{empresa}</h1>
           <p className="suave">
-            {hayTablas ? `${datasets!.length} ${datasets!.length === 1 ? "tabla" : "tablas"} en tu panel` : "Empecemos por tu primer Excel"}
+            {hayModulos ? `${datasets!.length} ${datasets!.length === 1 ? "módulo" : "módulos"} en tu panel` : "Empecemos por tu primer Excel"}
           </p>
         </div>
         <div className="acciones">
-          <Link href="/dashboard/upload/auto" className="btn btn-secundario">Generar tablas</Link>
-          <Link href="/dashboard/upload" className="btn btn-primario">Subir Excel</Link>
+          <Link href="/dashboard/upload/auto" className="btn btn-primario">Crear módulos</Link>
+          <Link href="/dashboard/upload" className="btn btn-fantasma">Subir 1 hoja (avanzado)</Link>
         </div>
       </div>
 
-      {!hayTablas && (
+      {!hayModulos && (
         <div className="tarjeta tarjeta-elevada vacio">
-          <h2 style={{ fontSize: 24 }}>Todavía no hay tablas</h2>
+          <h2 style={{ fontSize: 24 }}>Todavía no hay módulos</h2>
           <p style={{ maxWidth: 46 + "ch", margin: "0 auto 20px" }}>
-            Sube el Excel que ya usas y en un minuto tienes una tabla con formulario de carga y buscador.
+            Sube el Excel que ya usas: detectamos tus datos y armamos un módulo por cada tipo de información, con formulario de carga y buscador.
           </p>
-          <Link href="/dashboard/upload" className="btn btn-primario btn-grande">Subir mi primer Excel</Link>
+          <Link href="/dashboard/upload/auto" className="btn btn-primario btn-grande">Subir mi primer Excel</Link>
         </div>
       )}
 
-      {hayTablas && (
+      {hayModulos && (
         <div className="grilla-tablas">
           {datasets!.map((d) => (
             <Link key={d.id} href={`/dashboard/${d.id}`} className="tarjeta tarjeta-tabla">

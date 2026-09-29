@@ -18,7 +18,7 @@ const dolores = [
 const pasos = [
   { titulo: "Sube tu Excel", texto: "El que ya usas, aunque esté desordenado. Si tiene varias hojas, las ordenamos por ti." },
   { titulo: "Revisa las columnas", texto: "Confirmas qué es cada dato: producto, cliente, monto, fecha. Toma un minuto." },
-  { titulo: "Carga y busca", texto: "Tienes tu tabla, un formulario para agregar registros y un buscador. Sin configurar nada." },
+  { titulo: "Carga y busca", texto: "Tienes tu módulo, un formulario para agregar registros y un buscador. Sin configurar nada." },
 ];
 
 export default function Portada() {
@@ -89,7 +89,7 @@ export default function Portada() {
         <section id="como-funciona" className="seccion seccion-suave">
           <div className="contenedor">
             <div className="seccion-titulo">
-              <h2>De tu Excel a tu tabla en pocos minutos</h2>
+              <h2>De tu Excel a tus módulos en pocos minutos</h2>
               <p>Sin cursos, sin instalar nada y sin cambiar tu forma de trabajar.</p>
             </div>
             <div className="grilla-3">
@@ -116,7 +116,7 @@ export default function Portada() {
               <p className="suave pequeno">Para ordenar tus datos tú solo.</p>
               <ul>
                 <li>Un usuario</li>
-                <li>Todas las tablas que quieras</li>
+                <li>Todos los módulos que quieras</li>
                 <li>Formulario de carga y buscador</li>
               </ul>
               <Link href="/signup" className="btn btn-secundario btn-bloque">Crear cuenta gratis</Link>

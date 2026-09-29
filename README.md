@@ -23,6 +23,7 @@ recordatorios por WhatsApp Cloud API.
    - `CULQI_PLAN_ID` — crea un plan en Culqi Dashboard > Suscripciones > Planes (monto, moneda PEN, frecuencia mensual) y copia su id.
    - `WHATSAPP_TOKEN` / `WHATSAPP_PHONE_NUMBER_ID` — en developers.facebook.com, tu app > WhatsApp > API Setup.
    - `WHATSAPP_VERIFY_TOKEN` — cualquier texto secreto que tú inventes, se usa solo para que Meta confirme el webhook.
+   - `ANTHROPIC_API_KEY` — en console.anthropic.com > API Keys. Solo hace falta para "Sugerir con IA" en el asistente de Crear módulos (estructura de Excel muy desordenada); sin ella, esa función avisa que falta configurarla y todo lo demás sigue funcionando.
 
 3. **Instalar y correr**:
    ```

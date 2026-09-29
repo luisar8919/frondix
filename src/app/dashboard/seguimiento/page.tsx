@@ -102,12 +102,12 @@ export default function SeguimientoPage() {
         <button type="submit" className="btn btn-primario" disabled={cargando}>Buscar clientes</button>
       </form>
 
-      {cargando && <p className="suave">Analizando tus tablas...</p>}
+      {cargando && <p className="suave">Analizando tus módulos...</p>}
 
       {!cargando && datos && datos.tablas.length === 0 && (
         <div className="tarjeta">
           <h3>Aún no hay datos para el seguimiento</h3>
-          <p className="suave">Necesitamos una tabla con una columna de cliente y una de fecha. Al subir tu Excel, confirma qué significa cada columna.</p>
+          <p className="suave">Necesitamos un módulo con una columna de cliente y una de fecha. Al subir tu Excel, confirma qué significa cada columna.</p>
           <Link href="/dashboard/upload" className="btn btn-primario">Subir Excel</Link>
         </div>
       )}
@@ -135,7 +135,7 @@ export default function SeguimientoPage() {
                 </p>
               )}
               {activo && !t.seguimiento.tieneTelefono && (
-                <p className="alerta alerta-aviso">Esta tabla no tiene una columna de teléfono marcada, así que no se puede escribir por WhatsApp.</p>
+                <p className="alerta alerta-aviso">Este módulo no tiene una columna de teléfono marcada, así que no se puede escribir por WhatsApp.</p>
               )}
               <ul style={{ listStyle: "none", padding: 0, margin: 0 }}>
                 {t.seguimiento.clientes.map((c) => {
