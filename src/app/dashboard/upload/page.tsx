@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { crearClienteBrowser } from "@/lib/supabase/client";
 import { tieneSuscripcionActiva } from "@/lib/suscripcion";
+import { empresaDelUsuario } from "@/lib/sesion";
 import { ROLES, type RolColumna } from "@/lib/roles";
 import type { Columna } from "@/lib/excel-parser";
 
@@ -52,11 +53,10 @@ export default function UploadPage() {
   useEffect(() => {
     const supabase = crearClienteBrowser();
     (async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      const { data: miembro } = await supabase.from("miembros").select("empresa_id").eq("user_id", user!.id).single();
-      if (!miembro) return;
-      setEmpresaId(miembro.empresa_id);
-      setPlanActivo(await tieneSuscripcionActiva(supabase, miembro.empresa_id));
+      const r = await empresaDelUsuario(supabase);
+      if (!r.ok) return; // silencioso al cargar la página; se vuelve a chequear (con aviso) al confirmar
+      setEmpresaId(r.empresaId);
+      setPlanActivo(await tieneSuscripcionActiva(supabase, r.empresaId));
     })();
   }, []);
 
@@ -126,13 +126,12 @@ export default function UploadPage() {
 
     try {
       const supabase = crearClienteBrowser();
-      const { data: { user } } = await supabase.auth.getUser();
-      const { data: miembro } = await supabase.from("miembros").select("empresa_id").eq("user_id", user!.id).single();
-      if (!miembro) return setError("No se pudo identificar tu empresa. Recarga la página e intenta de nuevo.");
+      const sesion = await empresaDelUsuario(supabase);
+      if (!sesion.ok) return setError(sesion.error);
 
       const form = new FormData();
       form.append("archivo", archivo);
-      form.append("empresaId", miembro.empresa_id);
+      form.append("empresaId", sesion.empresaId);
       form.append(
         "seleccion",
         JSON.stringify(

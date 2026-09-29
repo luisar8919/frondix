@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { crearClienteBrowser } from "@/lib/supabase/client";
+import { empresaDelUsuario } from "@/lib/sesion";
 
 export default function TeamPage() {
   const [email, setEmail] = useState("");
@@ -15,17 +16,16 @@ export default function TeamPage() {
     setMensaje(null);
     setEnviando(true);
     const supabase = crearClienteBrowser();
-    const { data: { user } } = await supabase.auth.getUser();
-    const { data: miembro } = await supabase
-      .from("miembros")
-      .select("empresa_id")
-      .eq("user_id", user!.id)
-      .single();
+    const sesion = await empresaDelUsuario(supabase);
+    if (!sesion.ok) {
+      setEnviando(false);
+      return setMensaje({ tipo: "error", texto: sesion.error });
+    }
 
     const res = await fetch("/api/team/invite", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ empresaId: miembro!.empresa_id, email, rol }),
+      body: JSON.stringify({ empresaId: sesion.empresaId, email, rol }),
     });
     const body = await res.json();
     setEnviando(false);
