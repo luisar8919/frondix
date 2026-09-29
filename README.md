@@ -17,6 +17,12 @@ recordatorios por WhatsApp Cloud API.
    En Authentication > Providers, para desarrollo puedes desactivar "Confirm email" para que el registro no requiera hacer clic en un correo.
    Si tu base ya tenía el esquema anterior, ejecuta en orden [`migracion-01-arreglar-rls.sql`](supabase/migracion-01-arreglar-rls.sql) y [`migracion-02-enlaces-y-capacidad.sql`](supabase/migracion-02-enlaces-y-capacidad.sql) (no borran datos).
 
+   **Login con Google (opcional, pasos manuales que no se pueden hacer por código):**
+   1. En [Google Cloud Console](https://console.cloud.google.com/apis/credentials) crea unas credenciales OAuth 2.0 de tipo "Aplicación web". En "URI de redireccionamiento autorizados" agrega la URL de callback que te muestra Supabase (paso siguiente) — normalmente `https://<tu-proyecto>.supabase.co/auth/v1/callback`.
+   2. En Supabase > Authentication > Providers > Google, actívalo y pega el Client ID y Client Secret que te dio Google.
+   3. En Supabase > Authentication > URL Configuration, agrega `http://localhost:3000/auth/callback` (desarrollo) y `https://<tu-dominio>/auth/callback` (producción) a "Redirect URLs".
+   Sin estos 3 pasos, el botón "Continuar con Google" da error — no es un bug del código, falta la configuración de arriba.
+
 2. **Variables de entorno**: copia `.env.example` a `.env.local` y completa:
    - `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_ANON_KEY` / `SUPABASE_SERVICE_ROLE_KEY` — en Supabase > Settings > API.
    - `NEXT_PUBLIC_CULQI_PUBLIC_KEY` / `CULQI_SECRET_KEY` — en culqi.com, llaves de prueba primero.

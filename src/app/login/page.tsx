@@ -27,6 +27,14 @@ export default function LoginPage() {
     router.refresh();
   }
 
+  async function conGoogle() {
+    const supabase = crearClienteBrowser();
+    await supabase.auth.signInWithOAuth({
+      provider: "google",
+      options: { redirectTo: `${window.location.origin}/auth/callback` },
+    });
+  }
+
   return (
     <div className="auth">
       <header className="cabecera">
@@ -50,6 +58,10 @@ export default function LoginPage() {
               {enviando ? "Ingresando..." : "Ingresar"}
             </button>
           </form>
+          <div className="separador-o"><span>o</span></div>
+          <button type="button" className="btn btn-secundario btn-grande btn-bloque" onClick={conGoogle}>
+            Continuar con Google
+          </button>
           <p className="centrado suave pequeno" style={{ marginTop: 20, marginBottom: 0 }}>
             ¿Todavía no tienes cuenta? <Link href="/signup">Crear cuenta gratis</Link>
           </p>

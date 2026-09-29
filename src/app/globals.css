@@ -168,6 +168,8 @@ th.num, td.num { text-align: right; font-variant-numeric: tabular-nums; }
 .auth-centro { flex: 1; display: grid; place-items: center; padding: 32px 20px 64px; }
 .auth-tarjeta { width: 100%; max-width: 420px; padding: 32px; }
 .auth-tarjeta h1 { font-size: 28px; }
+.separador-o { display: flex; align-items: center; gap: 12px; margin: 18px 0; color: var(--suave); font-size: 13px; }
+.separador-o::before, .separador-o::after { content: ""; flex: 1; height: 1px; background: var(--linea); }
 
 /* ----- Panel ----- */
 .barra-panel { position: sticky; top: 0; z-index: 10; background: var(--papel); border-bottom: 1px solid var(--linea); }
