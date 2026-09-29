@@ -139,3 +139,14 @@ $$;
 
 revoke all on function public.quitar_columna(uuid, text) from public, anon;
 grant execute on function public.quitar_columna(uuid, text) to authenticated;
+
+-- Limites de uso (migracion 05): registro de llamadas a "Sugerir con IA" para limitar
+-- cuantas puede hacer una empresa por hora. Sin policies: solo el servidor (llave de
+-- servicio) lo lee/escribe; RLS activado por defecto lo cierra a cualquier otro rol.
+create table if not exists ia_llamadas (
+  id uuid primary key default gen_random_uuid(),
+  empresa_id uuid not null references empresas(id) on delete cascade,
+  created_at timestamptz not null default now()
+);
+create index if not exists ia_llamadas_empresa_fecha_idx on ia_llamadas (empresa_id, created_at desc);
+alter table ia_llamadas enable row level security;

@@ -1,8 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { crearClienteServidor } from "@/lib/supabase/server";
+import { crearClienteAdmin } from "@/lib/supabase/admin";
 import { agruparHojas } from "@/lib/excel-parser";
 import { sugerirEstructuraConIA } from "@/lib/sugerencia-ia";
 import { tieneSuscripcionActiva } from "@/lib/suscripcion";
+
+// Cada llamada cuesta dinero real en la API de Claude; este tope evita que una
+// cuenta (comprometida o por error) genere un gasto grande sin que nadie lo note.
+const LIMITE_POR_HORA = 10;
 
 // Re-parsea el mismo archivo (no se guarda nada entre pasos) y le pide a Claude una
 // mejor etiqueta y rol para las columnas de un grupo puntual. Requiere sesión, para
@@ -28,6 +33,20 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  const admin = crearClienteAdmin();
+  const haceUnaHora = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+  const { count } = await admin
+    .from("ia_llamadas")
+    .select("id", { count: "exact", head: true })
+    .eq("empresa_id", empresaId)
+    .gte("created_at", haceUnaHora);
+  if ((count ?? 0) >= LIMITE_POR_HORA) {
+    return NextResponse.json(
+      { error: `Ya usaste las ${LIMITE_POR_HORA} sugerencias por IA que permite tu empresa esta hora. Intenta de nuevo más tarde.` },
+      { status: 429 }
+    );
+  }
+
   let grupos;
   try {
     ({ grupos } = agruparHojas(await archivo.arrayBuffer(), 3));
@@ -42,6 +61,7 @@ export async function POST(request: NextRequest) {
       grupo.columnas.map((c) => ({ key: c.key, labelActual: c.label })),
       grupo.filas
     );
+    await admin.from("ia_llamadas").insert({ empresa_id: empresaId }); // solo se cuenta lo que sí costó
     return NextResponse.json({ columnas });
   } catch (e) {
     const mensaje = e instanceof Error ? e.message : "No se pudo obtener la sugerencia";

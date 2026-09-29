@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { crearClienteAdmin } from "@/lib/supabase/admin";
 import { estadoSuscripcion } from "@/lib/culqi";
+import { ipDePeticion, limitePorIp } from "@/lib/limiteIp";
 
 // Culqi manda eventos aquí cuando cambia el estado de una suscripción (cobro exitoso,
 // cancelación, etc). Ver lista de eventos en https://apidocs.culqi.com/#section/Webhooks.
@@ -11,6 +12,10 @@ import { estadoSuscripcion } from "@/lib/culqi";
 // y el estado real (activa/cancelada/vencida) sale de esa respuesta verificada, nunca
 // del evento recibido.
 export async function POST(req: NextRequest) {
+  if (!limitePorIp(ipDePeticion(req), 30)) {
+    return NextResponse.json({ error: "Demasiadas peticiones" }, { status: 429 });
+  }
+
   const evento = await req.json().catch(() => null);
   const subscriptionId = evento?.data?.subscription_id ?? evento?.data?.id;
   if (!evento?.type?.startsWith("subscription.") || !subscriptionId) {
