@@ -68,15 +68,19 @@ export default function UploadPage() {
     setPestanaActiva(0);
     if (!file) return;
 
-    const form = new FormData();
-    form.append("archivo", file);
-    const res = await fetch("/api/upload/grupos", { method: "POST", body: form });
-    const body = await res.json();
-    if (!res.ok) return setError(body.error ?? "No se pudo leer el archivo");
+    try {
+      const form = new FormData();
+      form.append("archivo", file);
+      const res = await fetch("/api/upload/grupos", { method: "POST", body: form });
+      const body = await res.json();
+      if (!res.ok) return setError(body.error ?? "No se pudo leer el archivo");
 
-    setGrupos(body.grupos);
-    setHojasOmitidas(body.hojasOmitidas ?? []);
-    setEdiciones((body.grupos as GrupoDetectado[]).map(aEdicion));
+      setGrupos(body.grupos);
+      setHojasOmitidas(body.hojasOmitidas ?? []);
+      setEdiciones((body.grupos as GrupoDetectado[]).map(aEdicion));
+    } catch {
+      setError("No se pudo leer el archivo. Revisa tu conexión e intenta de nuevo.");
+    }
   }
 
   function cambiarGrupo(i: number, parche: Partial<EdicionGrupo>) {
@@ -93,21 +97,26 @@ export default function UploadPage() {
     if (!archivo || !empresaId) return;
     setSugiriendoIA(gi);
     setError(null);
-    const form = new FormData();
-    form.append("archivo", archivo);
-    form.append("grupoIndex", String(gi));
-    form.append("empresaId", empresaId);
-    const res = await fetch("/api/upload/sugerir-ia", { method: "POST", body: form });
-    const body = await res.json();
-    setSugiriendoIA(null);
-    if (!res.ok) return setError(body.error ?? "No se pudo obtener la sugerencia de IA");
-    const sugeridas: { key: string; label: string; rol: string | null }[] = body.columnas;
-    cambiarGrupo(gi, {
-      columnas: ediciones[gi].columnas.map((c) => {
-        const s = sugeridas.find((x) => x.key === c.key);
-        return s ? { ...c, label: s.label, rol: (s.rol ?? "") as RolColumna | "" } : c;
-      }),
-    });
+    try {
+      const form = new FormData();
+      form.append("archivo", archivo);
+      form.append("grupoIndex", String(gi));
+      form.append("empresaId", empresaId);
+      const res = await fetch("/api/upload/sugerir-ia", { method: "POST", body: form });
+      const body = await res.json();
+      if (!res.ok) return setError(body.error ?? "No se pudo obtener la sugerencia de IA");
+      const sugeridas: { key: string; label: string; rol: string | null }[] = body.columnas;
+      cambiarGrupo(gi, {
+        columnas: ediciones[gi].columnas.map((c) => {
+          const s = sugeridas.find((x) => x.key === c.key);
+          return s ? { ...c, label: s.label, rol: (s.rol ?? "") as RolColumna | "" } : c;
+        }),
+      });
+    } catch {
+      setError("No se pudo obtener la sugerencia de IA. Intenta de nuevo.");
+    } finally {
+      setSugiriendoIA(null);
+    }
   }
 
   async function onConfirmar() {
@@ -115,31 +124,36 @@ export default function UploadPage() {
     setCargando(true);
     setError(null);
 
-    const supabase = crearClienteBrowser();
-    const { data: { user } } = await supabase.auth.getUser();
-    const { data: miembro } = await supabase.from("miembros").select("empresa_id").eq("user_id", user!.id).single();
+    try {
+      const supabase = crearClienteBrowser();
+      const { data: { user } } = await supabase.auth.getUser();
+      const { data: miembro } = await supabase.from("miembros").select("empresa_id").eq("user_id", user!.id).single();
+      if (!miembro) return setError("No se pudo identificar tu empresa. Recarga la página e intenta de nuevo.");
 
-    const form = new FormData();
-    form.append("archivo", archivo);
-    form.append("empresaId", miembro!.empresa_id);
-    form.append(
-      "seleccion",
-      JSON.stringify(
-        ediciones.map((e) => ({
-          incluir: e.incluir,
-          nombre: e.nombre,
-          columnas: e.columnas.map((c) => ({ key: c.key, label: c.label, rol: c.rol || null })),
-        }))
-      )
-    );
+      const form = new FormData();
+      form.append("archivo", archivo);
+      form.append("empresaId", miembro.empresa_id);
+      form.append(
+        "seleccion",
+        JSON.stringify(
+          ediciones.map((e) => ({
+            incluir: e.incluir,
+            nombre: e.nombre,
+            columnas: e.columnas.map((c) => ({ key: c.key, label: c.label, rol: c.rol || null })),
+          }))
+        )
+      );
 
-    const res = await fetch("/api/upload/auto", { method: "POST", body: form });
-    const body = await res.json();
-    setCargando(false);
-
-    if (!res.ok) return setError(body.error ?? "Error procesando el archivo");
-    setResultado(body);
-    setGrupos(null);
+      const res = await fetch("/api/upload/auto", { method: "POST", body: form });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) return setError(body.error ?? `El servidor no pudo procesar el archivo (código ${res.status}). Si es un archivo grande, prueba dividirlo en partes.`);
+      setResultado(body);
+      setGrupos(null);
+    } catch {
+      setError("No se pudo conectar con el servidor. Revisa tu conexión e intenta de nuevo.");
+    } finally {
+      setCargando(false);
+    }
   }
 
   const hayIncluidos = ediciones.some((e) => e.incluir);
