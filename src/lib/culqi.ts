@@ -51,6 +51,12 @@ export async function crearCargoYape(email: string, tokenYape: string, montoCent
   });
 }
 
+// Cancela la suscripción en Culqi: no se le vuelve a cobrar. No borra nada
+// localmente (eso lo hace quien llama, después de confirmar que esto no falló).
+export async function cancelarSuscripcion(subscriptionId: string): Promise<void> {
+  await culqiFetch(`/recurrent/subscriptions/${subscriptionId}`, { method: "DELETE" });
+}
+
 // El webhook de Culqi no firma sus peticiones (no hay secreto que validar), así que
 // cualquiera podría mandarnos un POST fingiendo un pago exitoso. Por eso el webhook
 // nunca confía en el body: usa esto para preguntarle a Culqi mismo (con nuestra llave
