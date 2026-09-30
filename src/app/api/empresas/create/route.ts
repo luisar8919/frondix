@@ -10,16 +10,19 @@ export async function POST(req: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "No autenticado" }, { status: 401 });
 
-  const { nombreEmpresa } = await req.json();
+  const { nombreEmpresa, telefono } = await req.json();
   if (!nombreEmpresa || typeof nombreEmpresa !== "string") {
     return NextResponse.json({ error: "Falta nombreEmpresa" }, { status: 400 });
+  }
+  if (!telefono || typeof telefono !== "string" || !/^\d{9}$/.test(telefono)) {
+    return NextResponse.json({ error: "El teléfono debe tener 9 dígitos (sin +51)" }, { status: 400 });
   }
 
   const admin = crearClienteAdmin();
 
   const { data: empresa, error: errorEmpresa } = await admin
     .from("empresas")
-    .insert({ nombre: nombreEmpresa })
+    .insert({ nombre: nombreEmpresa, telefono })
     .select()
     .single();
   if (errorEmpresa || !empresa) {

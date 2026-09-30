@@ -5,6 +5,7 @@ create extension if not exists "pgcrypto";
 create table empresas (
   id uuid primary key default gen_random_uuid(),
   nombre text not null,
+  telefono text, -- WhatsApp del negocio: contacto de cuenta y, a futuro, promociones
   created_at timestamptz not null default now()
 );
 

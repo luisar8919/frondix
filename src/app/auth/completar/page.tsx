@@ -12,6 +12,7 @@ import Logo from "@/components/Logo";
 export default function CompletarPage() {
   const [cargando, setCargando] = useState(true);
   const [nombreEmpresa, setNombreEmpresa] = useState("");
+  const [telefono, setTelefono] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [enviando, setEnviando] = useState(false);
   const router = useRouter();
@@ -39,7 +40,7 @@ export default function CompletarPage() {
     const res = await fetch("/api/empresas/create", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ nombreEmpresa }),
+      body: JSON.stringify({ nombreEmpresa, telefono }),
     });
     if (!res.ok) {
       const body = await res.json();
@@ -65,6 +66,11 @@ export default function CompletarPage() {
             <div className="campo">
               <label htmlFor="negocio">Nombre de tu negocio</label>
               <input id="negocio" value={nombreEmpresa} onChange={(e) => setNombreEmpresa(e.target.value)} placeholder="Ej. Taller Los Andes" required autoFocus />
+            </div>
+            <div className="campo">
+              <label htmlFor="telefono">WhatsApp del negocio</label>
+              <input id="telefono" type="tel" inputMode="numeric" value={telefono} onChange={(e) => setTelefono(e.target.value.replace(/\D/g, "").slice(0, 9))} placeholder="987654321" required />
+              <p className="ayuda">9 dígitos, sin +51. Para avisos de tu cuenta y, de vez en cuando, alguna promoción.</p>
             </div>
             {error && <p className="alerta alerta-error" role="alert">{error}</p>}
             <button type="submit" className="btn btn-primario btn-grande btn-bloque" disabled={enviando}>

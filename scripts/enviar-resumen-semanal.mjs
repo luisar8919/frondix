@@ -1,6 +1,7 @@
 // Correr con: npm run enviar-resumen (pensado para un cron semanal, ej. GitHub Actions o Vercel Cron).
 // Requiere las mismas env vars que la app (.env) cargadas en el entorno.
 import { createClient } from "@supabase/supabase-js";
+import { normalizarTelefonoPE } from "../src/lib/seguimiento.ts";
 
 const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
 
@@ -30,11 +31,12 @@ async function main() {
 
   const { data: empresas } = await supabase
     .from("empresas")
-    .select("id, nombre, miembros(user_id, rol), datasets(id), suscripciones(estado)");
+    .select("id, nombre, telefono, datasets(id), suscripciones(estado)");
 
   for (const empresa of empresas ?? []) {
     // El resumen semanal es parte del plan pago, igual que el resto de WhatsApp.
     if (empresa.suscripciones?.estado !== "activa") continue;
+    if (!empresa.telefono) continue; // empresas creadas antes de pedir el teléfono al registrarse
 
     const datasetIds = (empresa.datasets ?? []).map((d) => d.id);
     if (datasetIds.length === 0) continue;
@@ -45,12 +47,8 @@ async function main() {
       .in("dataset_id", datasetIds)
       .gte("created_at", desde.toISOString());
 
-    const dueno = (empresa.miembros ?? []).find((m) => m.rol === "dueno");
-    if (!dueno) continue;
-
-    const { data: userData } = await supabase.auth.admin.getUserById(dueno.user_id);
-    const telefono = userData?.user?.phone;
-    if (!telefono) continue; // requiere que el usuario haya cargado su teléfono en el perfil
+    const telefono = normalizarTelefonoPE(empresa.telefono);
+    if (!telefono) continue;
 
     // "resumen_semanal" es el nombre de una plantilla que hay que crear y aprobar
     // en Meta Business Manager antes de poder usarla (WhatsApp > Plantillas de mensaje).
