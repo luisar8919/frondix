@@ -93,6 +93,22 @@ export function listarHojas(buffer: ArrayBuffer): string[] {
   return workbook.SheetNames;
 }
 
+// Límites defensivos: un Excel real puede traer decenas de hojas (reportes pivot,
+// una hoja por cliente, etc.) que no sirven para importar como tabla. Sin esto,
+// un archivo de ~80 hojas / ~50MB puede tardar varios minutos y superar el
+// tiempo de espera del servidor. Se valida antes de parsear, no después.
+export const TOPE_TAMANO_BYTES = 20 * 1024 * 1024; // 20MB
+export const TOPE_HOJAS = 60;
+
+function validarTamano(buffer: ArrayBuffer) {
+  if (buffer.byteLength > TOPE_TAMANO_BYTES) {
+    const mb = (buffer.byteLength / 1024 / 1024).toFixed(1);
+    throw new Error(
+      `El archivo pesa ${mb}MB y el máximo soportado es ${TOPE_TAMANO_BYTES / 1024 / 1024}MB. Divide la información en varios archivos más chicos.`
+    );
+  }
+}
+
 // Toma la hoja indicada (o la primera si no se especifica), usa la primera fila
 // como encabezados, e infiere el tipo de cada columna mirando los datos reales.
 // `renombres` (key -> nuevo label) permite pisar el nombre de columnas que el
@@ -103,7 +119,21 @@ export function parsearExcel(
   renombres?: Record<string, string>,
   opciones?: OpcionesParseo
 ): ExcelParseado {
+  validarTamano(buffer);
   const workbook = XLSX.read(buffer, { type: "array", cellDates: true });
+  return parsearHojaDeWorkbook(workbook, nombreHoja, renombres, opciones);
+}
+
+// Misma lógica de arriba, pero reutilizando un workbook ya leído: leer el buffer
+// una vez por hoja (como hacía antes agruparHojas, llamando a parsearExcel en un
+// for) era la causa real de que archivos con muchas hojas tardaran minutos —
+// cada llamada releía el archivo completo desde cero.
+function parsearHojaDeWorkbook(
+  workbook: XLSX.WorkBook,
+  nombreHoja?: string,
+  renombres?: Record<string, string>,
+  opciones?: OpcionesParseo
+): ExcelParseado {
   const hojaElegida = nombreHoja ?? workbook.SheetNames[0];
   const hoja = workbook.Sheets[hojaElegida];
   if (!hoja) throw new Error(`No se encontró la hoja "${hojaElegida}" en el archivo.`);
@@ -217,12 +247,18 @@ export function agruparHojas(
   buffer: ArrayBuffer,
   maxGrupos = 3
 ): { grupos: GrupoHojas[]; hojasOmitidas: string[] } {
-  const nombres = listarHojas(buffer);
+  validarTamano(buffer);
+  const workbook = XLSX.read(buffer, { type: "array", cellDates: true });
+  const nombres = workbook.SheetNames;
+  // Si son muchísimas hojas (ej. una por cliente), procesamos solo las primeras
+  // TOPE_HOJAS y avisamos el resto como omitidas, en vez de tardar minutos.
+  const nombresAProcesar = nombres.slice(0, TOPE_HOJAS);
+  const hojasIgnoradasPorTope = nombres.slice(TOPE_HOJAS);
 
   const hojas: HojaParseada[] = [];
-  for (const nombre of nombres) {
+  for (const nombre of nombresAProcesar) {
     try {
-      const { columnas, filas } = parsearExcel(buffer, nombre);
+      const { columnas, filas } = parsearHojaDeWorkbook(workbook, nombre);
       if (columnas.length > 0 && filas.length > 0) hojas.push({ nombre, columnas, filas });
     } catch {
       // hoja vacía o ilegible: se ignora, no rompe el resto del archivo
@@ -249,7 +285,10 @@ export function agruparHojas(
   });
 
   const gruposFinales = grupos.slice(0, maxGrupos);
-  const hojasOmitidas = grupos.slice(maxGrupos).flatMap((g) => g.map((h) => h.nombre));
+  const hojasOmitidas = [
+    ...grupos.slice(maxGrupos).flatMap((g) => g.map((h) => h.nombre)),
+    ...hojasIgnoradasPorTope,
+  ];
 
   const resultado: GrupoHojas[] = gruposFinales.map((grupo) => {
     const canonica = grupo[0]; // la de más columnas, por el sort de arriba

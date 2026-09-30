@@ -10,6 +10,7 @@ export default function SignupPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [nombreEmpresa, setNombreEmpresa] = useState("");
+  const [aceptaTerminos, setAceptaTerminos] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [enviando, setEnviando] = useState(false);
   const router = useRouter();
@@ -17,6 +18,7 @@ export default function SignupPage() {
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
+    if (!aceptaTerminos) return setError("Debes aceptar los Términos de Servicio para crear tu cuenta.");
     setEnviando(true);
     const supabase = crearClienteBrowser();
 
@@ -44,6 +46,8 @@ export default function SignupPage() {
   }
 
   async function conGoogle() {
+    setError(null);
+    if (!aceptaTerminos) return setError("Debes aceptar los Términos de Servicio para crear tu cuenta.");
     const supabase = crearClienteBrowser();
     await supabase.auth.signInWithOAuth({
       provider: "google",
@@ -73,6 +77,12 @@ export default function SignupPage() {
               <label htmlFor="password">Contraseña</label>
               <input id="password" type="password" autoComplete="new-password" value={password} onChange={(e) => setPassword(e.target.value)} required minLength={6} />
               <p className="ayuda">Mínimo 6 caracteres.</p>
+            </div>
+            <div className="campo campo-check">
+              <label>
+                <input type="checkbox" checked={aceptaTerminos} onChange={(e) => setAceptaTerminos(e.target.checked)} />{" "}
+                He leído y acepto los <Link href="/terminos" target="_blank">Términos de Servicio</Link>, incluyendo que soy responsable de los datos que subo.
+              </label>
             </div>
             {error && <p className="alerta alerta-error" role="alert">{error}</p>}
             <button type="submit" className="btn btn-primario btn-grande btn-bloque" disabled={enviando}>

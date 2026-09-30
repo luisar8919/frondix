@@ -52,6 +52,14 @@ export function totalesPorMes(filas: FilaMonto[], ahora: Date, meses = 6): Total
   return resultado;
 }
 
+// Suma simple de un monto, sin agrupar por fecha ni producto: cubre el caso "caja"
+// (ingresos/egresos por concepto, sin columna de fecha) donde totalesPorMes no aplica
+// pero igual hay un monto que el usuario quiere ver sumado.
+export function sumaMonto(filas: { m?: string | number | null }[]): number {
+  const total = filas.reduce((s, f) => s + (aNumero(f.m) ?? 0), 0);
+  return Math.round(total * 100) / 100;
+}
+
 export interface FilaAgrupable {
   clave?: string | null; // producto o cliente
   m?: string | number | null; // monto (opcional)

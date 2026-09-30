@@ -11,6 +11,7 @@ interface Modulo {
   totalesPorMes: TotalMes[] | null;
   topProducto: RankingItem[] | null;
   topCliente: RankingItem[] | null;
+  sumaTotal: number | null;
 }
 
 const soles = (n: number) => `S/ ${n.toLocaleString("es-PE", { maximumFractionDigits: 2 })}`;
@@ -64,7 +65,7 @@ export default function ReportesPage() {
         <div className="tarjeta">
           <h3>Todavía no hay reportes</h3>
           <p className="suave">
-            Necesitas al menos un módulo con columnas marcadas como Monto + Fecha, Producto o Cliente. Puedes
+            Necesitas al menos un módulo con columnas marcadas como Monto, Producto o Cliente. Puedes
             agregar esos significados desde &quot;Editar tabla y campos&quot; en cualquier módulo, o al subir un Excel nuevo.
           </p>
           <Link href="/dashboard" className="btn btn-primario">Ver mis módulos</Link>
@@ -76,6 +77,13 @@ export default function ReportesPage() {
         return (
           <section key={m.datasetId} className="tarjeta" style={{ marginBottom: 20 }}>
             <h3>{m.nombre}</h3>
+
+            {m.sumaTotal !== null && (
+              <p style={{ marginTop: 10 }}>
+                Total: <strong>{soles(m.sumaTotal)}</strong>
+                <span className="suave pequeno" style={{ marginLeft: 6 }}>(no tiene columna de fecha para mostrarlo por mes)</span>
+              </p>
+            )}
 
             {m.totalesPorMes && (
               <div style={{ marginTop: 14 }}>

@@ -1,6 +1,6 @@
 // node scripts/test-reportes.mjs
 import assert from "node:assert";
-import { totalesPorMes, topPor } from "../src/lib/reportes.ts";
+import { totalesPorMes, topPor, sumaMonto } from "../src/lib/reportes.ts";
 
 const ahora = new Date("2026-09-25T15:00:00Z"); // "hoy" para las pruebas
 
@@ -45,5 +45,9 @@ assert.deepStrictEqual(topSinMonto[0], { clave: "Ana", total: 0, veces: 2 });
 
 assert.deepStrictEqual(topPor([], 5), []);
 assert.strictEqual(topPor([{ clave: "A", m: 1 }, { clave: "B", m: 2 }, { clave: "C", m: 3 }], 2).length, 2, "respeta el limite n");
+
+// --- sumaMonto (caso "caja": monto sin fecha) ---
+assert.strictEqual(sumaMonto([{ m: 100 }, { m: "50.5" }, { m: "abc" }, { m: null }]), 150.5);
+assert.strictEqual(sumaMonto([]), 0);
 
 console.log("OK: test-reportes (todas las aserciones pasaron)");

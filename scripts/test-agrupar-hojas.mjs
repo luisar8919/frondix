@@ -41,4 +41,18 @@ const r2 = agruparHojas(libro4, 3);
 assert.strictEqual(r2.grupos.length, 3, "se capa a 3 aunque haya 4 familias");
 assert.deepStrictEqual(r2.hojasOmitidas, ["D"], "queda afuera la de menos datos");
 
+// --- archivo muy pesado: rechazo temprano, no cuelga intentando parsear ---
+const libroFalsoGrande = libro({ Hoja1: [["a"], [1]] });
+Object.defineProperty(libroFalsoGrande, "byteLength", { value: 25 * 1024 * 1024 });
+assert.throws(() => agruparHojas(libroFalsoGrande, 3), /máximo soportado/, "rechaza archivos de más de 20MB");
+
+// --- demasiadas hojas: se procesan solo las primeras 60, el resto queda omitido ---
+const hojasDeMas = Object.fromEntries(
+  Array.from({ length: 65 }, (_, i) => [`H${i}`, [["col"], [i]]])
+);
+const r3 = agruparHojas(libro(hojasDeMas), 3);
+const totalHojasEnGrupos = r3.grupos.reduce((s, g) => s + g.hojas.length, 0);
+assert.strictEqual(totalHojasEnGrupos + r3.hojasOmitidas.length, 65, "no se pierde el conteo total");
+assert.ok(r3.hojasOmitidas.includes("H60"), "hojas más allá del tope 60 quedan omitidas");
+
 console.log("OK: test-agrupar-hojas (todas las aserciones pasaron)");

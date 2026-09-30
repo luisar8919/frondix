@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { crearClienteServidor } from "@/lib/supabase/server";
 import { claveValida } from "@/lib/enlaces";
-import { totalesPorMes, topPor } from "@/lib/reportes";
+import { totalesPorMes, topPor, sumaMonto } from "@/lib/reportes";
 import type { Columna } from "@/lib/excel-parser";
 
 const PAGINA = 1000; // Supabase corta cada respuesta en 1000 filas
@@ -58,7 +58,10 @@ export async function GET() {
     const conTotales = !!(cFecha && cMonto);
     const conTopProducto = !!cProducto;
     const conTopCliente = !!cCliente;
-    if (!conTotales && !conTopProducto && !conTopCliente) continue;
+    // Caso "caja" (ej. Concepto + Entrada, sin columna de fecha): no hay para armar
+    // total por mes, pero igual sirve mostrar la suma total del monto.
+    const conSumaTotal = !!cMonto && !conTotales;
+    if (!conTotales && !conTopProducto && !conTopCliente && !conSumaTotal) continue;
 
     let filas;
     try {
@@ -78,6 +81,7 @@ export async function GET() {
       totalesPorMes: conTotales ? totalesPorMes(filas, ahora, 6) : null,
       topProducto: conTopProducto ? topPor(filas.map((f) => ({ clave: f.p, m: f.m })), 5) : null,
       topCliente: conTopCliente ? topPor(filas.map((f) => ({ clave: f.c, m: f.m })), 5) : null,
+      sumaTotal: conSumaTotal ? sumaMonto(filas) : null,
     });
   }
 
