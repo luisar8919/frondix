@@ -2,8 +2,7 @@ import Link from "next/link";
 import Logo from "@/components/Logo";
 
 // Piloto gratis por WhatsApp directo con el fundador (ver campaña "Primeros 10 talleres").
-// TODO: reemplazar por el número real (9 dígitos, sin +51) antes de compartir la landing.
-const WHATSAPP_FUNDADOR = "TU_NUMERO_AQUI";
+const WHATSAPP_FUNDADOR = "998235775";
 const enlaceWhatsappFundador = `https://wa.me/51${WHATSAPP_FUNDADOR}?text=${encodeURIComponent(
   "Hola, vi Frondix y quiero probarlo gratis con mi propio Excel."
 )}`;
