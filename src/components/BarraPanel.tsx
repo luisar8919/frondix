@@ -9,6 +9,7 @@ const enlaces = [
   { href: "/dashboard", texto: "Mis módulos" },
   { href: "/dashboard/upload", texto: "Subir Excel" },
   { href: "/dashboard/seguimiento", texto: "Seguimiento" },
+  { href: "/dashboard/reportes", texto: "Reportes" },
   { href: "/dashboard/team", texto: "Equipo" },
   { href: "/dashboard/billing", texto: "Plan y pagos" },
 ];
