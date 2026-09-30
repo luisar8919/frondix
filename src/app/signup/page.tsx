@@ -9,11 +9,10 @@ import Logo from "@/components/Logo";
 export default function SignupPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [nombreEmpresa, setNombreEmpresa] = useState("");
-  const [telefono, setTelefono] = useState("");
   const [aceptaTerminos, setAceptaTerminos] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [enviando, setEnviando] = useState(false);
+  const [correoEnviado, setCorreoEnviado] = useState(false);
   const router = useRouter();
 
   async function onSubmit(e: React.FormEvent) {
@@ -23,26 +22,20 @@ export default function SignupPage() {
     setEnviando(true);
     const supabase = crearClienteBrowser();
 
-    const { error: errorSignup } = await supabase.auth.signUp({ email, password });
-    if (errorSignup) {
-      setEnviando(false);
-      return setError(errorSignup.message);
-    }
-
-    // signUp ya deja la sesión activa si la confirmación de email está desactivada
-    // (recomendado en desarrollo). En producción, el usuario confirma su email primero.
-    const res = await fetch("/api/empresas/create", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ nombreEmpresa, telefono }),
+    const { data, error: errorSignup } = await supabase.auth.signUp({
+      email,
+      password,
+      options: { emailRedirectTo: `${window.location.origin}/auth/confirm` },
     });
-    if (!res.ok) {
-      const body = await res.json();
-      setEnviando(false);
-      return setError(body.error ?? "No se pudo crear la empresa");
-    }
+    setEnviando(false);
+    if (errorSignup) return setError(errorSignup.message);
 
-    router.push("/dashboard");
+    // Con "Confirm email" activado en Supabase (recomendado), signUp no deja
+    // sesión activa todavía: hay que esperar a que confirme por correo. El
+    // nombre del negocio y el teléfono se piden después, en /auth/completar,
+    // el mismo paso por el que ya pasa el login con Google.
+    if (!data.session) return setCorreoEnviado(true);
+    router.push("/auth/completar");
     router.refresh();
   }
 
@@ -63,45 +56,48 @@ export default function SignupPage() {
       </header>
       <main className="auth-centro">
         <div className="tarjeta tarjeta-elevada auth-tarjeta">
-          <h1>Crea tu cuenta</h1>
-          <p className="suave">Gratis, sin tarjeta. En un minuto estás subiendo tu Excel.</p>
-          <form onSubmit={onSubmit}>
-            <div className="campo">
-              <label htmlFor="negocio">Nombre de tu negocio</label>
-              <input id="negocio" value={nombreEmpresa} onChange={(e) => setNombreEmpresa(e.target.value)} placeholder="Ej. Taller Los Andes" required />
-            </div>
-            <div className="campo">
-              <label htmlFor="telefono">WhatsApp del negocio</label>
-              <input id="telefono" type="tel" inputMode="numeric" value={telefono} onChange={(e) => setTelefono(e.target.value.replace(/\D/g, "").slice(0, 9))} placeholder="987654321" required />
-              <p className="ayuda">9 dígitos, sin +51. Para avisos de tu cuenta y, de vez en cuando, alguna promoción.</p>
-            </div>
-            <div className="campo">
-              <label htmlFor="email">Email</label>
-              <input id="email" type="email" autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
-            </div>
-            <div className="campo">
-              <label htmlFor="password">Contraseña</label>
-              <input id="password" type="password" autoComplete="new-password" value={password} onChange={(e) => setPassword(e.target.value)} required minLength={6} />
-              <p className="ayuda">Mínimo 6 caracteres.</p>
-            </div>
-            <div className="campo campo-check">
-              <label>
-                <input type="checkbox" checked={aceptaTerminos} onChange={(e) => setAceptaTerminos(e.target.checked)} />{" "}
-                He leído y acepto los <Link href="/terminos" target="_blank">Términos de Servicio</Link>, incluyendo que soy responsable de los datos que subo.
-              </label>
-            </div>
-            {error && <p className="alerta alerta-error" role="alert">{error}</p>}
-            <button type="submit" className="btn btn-primario btn-grande btn-bloque" disabled={enviando}>
-              {enviando ? "Creando tu cuenta..." : "Crear cuenta"}
-            </button>
-          </form>
-          <div className="separador-o"><span>o</span></div>
-          <button type="button" className="btn btn-secundario btn-grande btn-bloque" onClick={conGoogle}>
-            Continuar con Google
-          </button>
-          <p className="centrado suave pequeno" style={{ marginTop: 20, marginBottom: 0 }}>
-            ¿Ya tienes cuenta? <Link href="/login">Ingresar</Link>
-          </p>
+          {correoEnviado ? (
+            <>
+              <h1>Revisa tu correo</h1>
+              <p className="suave">
+                Te mandamos un enlace a <strong>{email}</strong> para confirmar tu cuenta. Ábrelo desde el mismo
+                celular o computadora donde quieres usar Frondix.
+              </p>
+            </>
+          ) : (
+            <>
+              <h1>Crea tu cuenta</h1>
+              <p className="suave">Gratis, sin tarjeta. En un minuto estás subiendo tu Excel.</p>
+              <form onSubmit={onSubmit}>
+                <div className="campo">
+                  <label htmlFor="email">Email</label>
+                  <input id="email" type="email" autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
+                </div>
+                <div className="campo">
+                  <label htmlFor="password">Contraseña</label>
+                  <input id="password" type="password" autoComplete="new-password" value={password} onChange={(e) => setPassword(e.target.value)} required minLength={6} />
+                  <p className="ayuda">Mínimo 6 caracteres.</p>
+                </div>
+                <div className="campo campo-check">
+                  <label>
+                    <input type="checkbox" checked={aceptaTerminos} onChange={(e) => setAceptaTerminos(e.target.checked)} />{" "}
+                    He leído y acepto los <Link href="/terminos" target="_blank">Términos de Servicio</Link>, incluyendo que soy responsable de los datos que subo.
+                  </label>
+                </div>
+                {error && <p className="alerta alerta-error" role="alert">{error}</p>}
+                <button type="submit" className="btn btn-primario btn-grande btn-bloque" disabled={enviando}>
+                  {enviando ? "Creando tu cuenta..." : "Crear cuenta"}
+                </button>
+              </form>
+              <div className="separador-o"><span>o</span></div>
+              <button type="button" className="btn btn-secundario btn-grande btn-bloque" onClick={conGoogle}>
+                Continuar con Google
+              </button>
+              <p className="centrado suave pequeno" style={{ marginTop: 20, marginBottom: 0 }}>
+                ¿Ya tienes cuenta? <Link href="/login">Ingresar</Link>
+              </p>
+            </>
+          )}
         </div>
       </main>
     </div>

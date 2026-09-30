@@ -28,7 +28,9 @@ function LoginForm() {
   // equivalente en src/app/auth/callback/route.ts una vez que funcione.
   useEffect(() => {
     const googleError = searchParams.get("google_error");
-    if (googleError) setError(`Google: ${googleError}`);
+    if (googleError) return setError(`Google: ${googleError}`);
+    const error = searchParams.get("error");
+    if (error) setError(`No se pudo confirmar tu correo: ${error}`);
   }, [searchParams]);
 
   async function onSubmit(e: React.FormEvent) {

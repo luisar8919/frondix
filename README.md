@@ -14,8 +14,14 @@ recordatorios por WhatsApp Cloud API.
 ## Puesta en marcha
 
 1. **Supabase**: crea un proyecto en supabase.com, ve a SQL Editor y ejecuta [`supabase/schema.sql`](supabase/schema.sql) completo.
-   En Authentication > Providers, para desarrollo puedes desactivar "Confirm email" para que el registro no requiera hacer clic en un correo.
-   Si tu base ya tenía el esquema anterior, ejecuta en orden [`migracion-01-arreglar-rls.sql`](supabase/migracion-01-arreglar-rls.sql) y [`migracion-02-enlaces-y-capacidad.sql`](supabase/migracion-02-enlaces-y-capacidad.sql) (no borran datos).
+   Si tu base ya tenía el esquema anterior, ejecuta en orden las migraciones en `supabase/migracion-*.sql` (no borran datos).
+
+   **Confirmación de correo al registrarse (pasos manuales en Supabase, no se pueden hacer por código):**
+   1. En Supabase > Authentication > Providers > Email, activa "Confirm email". Con esto apagado (útil solo para probar en desarrollo), `signUp` deja la sesión activa al toque, sin pasar por `/auth/completar`.
+   2. En Supabase > Authentication > Email Templates > "Confirm signup", reemplaza el enlace por uno que apunte a nuestra propia ruta de confirmación (así se puede redirigir a `/auth/completar` después, en vez de la pantalla genérica de Supabase):
+      `{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=email`
+   3. En Supabase > Authentication > URL Configuration, agrega `http://localhost:3000/auth/confirm` (desarrollo) y `https://<tu-dominio>/auth/confirm` (producción) a "Redirect URLs" (mismo lugar donde ya agregaste `/auth/callback` para Google).
+   Sin estos 3 pasos, el correo de confirmación existe pero manda al usuario a una pantalla de Supabase en vez de volver a Frondix.
 
    **Login con Google (opcional, pasos manuales que no se pueden hacer por código):**
    1. En [Google Cloud Console](https://console.cloud.google.com/apis/credentials) crea unas credenciales OAuth 2.0 de tipo "Aplicación web". En "URI de redireccionamiento autorizados" agrega la URL de callback que te muestra Supabase (paso siguiente) — normalmente `https://<tu-proyecto>.supabase.co/auth/v1/callback`.
