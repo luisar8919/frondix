@@ -25,6 +25,7 @@ export async function POST(request: NextRequest) {
       nombreSugerido: g.hojas.length > 1 ? `${g.hojas[0]} y otras` : g.hojas[0],
       columnas: g.columnas,
       filasCount: g.filas.length,
+      filasVaciasDescartadas: g.filasVaciasDescartadas,
       confuso: estructuraConfusa(g.columnas),
       muestra: g.filas.slice(0, 5),
     })),

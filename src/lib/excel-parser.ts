@@ -26,6 +26,8 @@ export interface ExcelParseado {
   filas: Record<string, unknown>[];
   // true si la primera fila se trató como dato (la hoja no tenía encabezado)
   sinEncabezado: boolean;
+  // filas que se descartaron por venir completamente vacías (para avisarle al usuario)
+  filasVaciasDescartadas: number;
 }
 
 export interface OpcionesParseo {
@@ -190,8 +192,9 @@ function parsearHojaDeWorkbook(
   // inventamos nosotros (sin encabezado), también se piden confirmar.
   if (columnas.length === 1 || sinEncabezado) columnas.forEach((c) => (c.sospechosa = true));
 
-  const filas = filasDatos
-    .filter((fila) => fila.some((v) => v !== null && v !== undefined && v !== ""))
+  const filasNoVacias = filasDatos.filter((fila) => fila.some((v) => v !== null && v !== undefined && v !== ""));
+  const filasVaciasDescartadas = filasDatos.length - filasNoVacias.length;
+  const filas = filasNoVacias
     .map((fila) => {
       const registro: Record<string, unknown> = {};
       columnas.forEach((col) => {
@@ -212,6 +215,7 @@ function parsearHojaDeWorkbook(
     })),
     filas,
     sinEncabezado,
+    filasVaciasDescartadas,
   };
 }
 
@@ -219,12 +223,14 @@ export interface GrupoHojas {
   hojas: string[];
   columnas: Columna[];
   filas: Record<string, unknown>[];
+  filasVaciasDescartadas: number;
 }
 
 interface HojaParseada {
   nombre: string;
   columnas: Columna[];
   filas: Record<string, unknown>[];
+  filasVaciasDescartadas: number;
 }
 
 // Dos hojas son "la misma estructura" si casi todas las columnas de la más
@@ -258,8 +264,8 @@ export function agruparHojas(
   const hojas: HojaParseada[] = [];
   for (const nombre of nombresAProcesar) {
     try {
-      const { columnas, filas } = parsearHojaDeWorkbook(workbook, nombre);
-      if (columnas.length > 0 && filas.length > 0) hojas.push({ nombre, columnas, filas });
+      const { columnas, filas, filasVaciasDescartadas } = parsearHojaDeWorkbook(workbook, nombre);
+      if (columnas.length > 0 && filas.length > 0) hojas.push({ nombre, columnas, filas, filasVaciasDescartadas });
     } catch {
       // hoja vacía o ilegible: se ignora, no rompe el resto del archivo
     }
@@ -299,7 +305,12 @@ export function agruparHojas(
         return registro;
       })
     );
-    return { hojas: grupo.map((h) => h.nombre), columnas: canonica.columnas, filas };
+    return {
+      hojas: grupo.map((h) => h.nombre),
+      columnas: canonica.columnas,
+      filas,
+      filasVaciasDescartadas: grupo.reduce((s, h) => s + h.filasVaciasDescartadas, 0),
+    };
   });
 
   return { grupos: resultado, hojasOmitidas };

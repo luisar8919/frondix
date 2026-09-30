@@ -13,6 +13,7 @@ interface GrupoDetectado {
   nombreSugerido: string;
   columnas: Columna[];
   filasCount: number;
+  filasVaciasDescartadas: number;
   confuso: boolean;
   muestra: Record<string, unknown>[];
 }
@@ -249,6 +250,13 @@ export default function UploadPage() {
               <span className="suave pequeno">{g.filasCount} filas, de: {g.hojas.join(", ")}</span>
             </div>
 
+            {g.filasVaciasDescartadas > 0 && ed.incluir && (
+              <p className="suave pequeno" style={{ marginTop: 10 }}>
+                Ojo: dejamos fuera {g.filasVaciasDescartadas === 1 ? "1 fila que estaba" : `${g.filasVaciasDescartadas} filas que estaban`} completamente vacía{g.filasVaciasDescartadas === 1 ? "" : "s"} en el Excel.
+                No pasa nada, no se van a cargar y así tu tabla queda limpia.
+              </p>
+            )}
+
             {g.confuso && ed.incluir && (
               <p className="alerta alerta-aviso" style={{ marginTop: 14 }}>
                 No reconocimos bien esta estructura.{" "}
@@ -268,24 +276,34 @@ export default function UploadPage() {
             {ed.incluir && (
               <div style={{ marginTop: 14 }}>
                 <h3 style={{ fontSize: 16, marginBottom: 10 }}>Revisa las columnas</h3>
-                {ed.columnas.map((c) => (
-                  <div key={c.key} className="fila-columna" style={{ gridTemplateColumns: "minmax(0,1.4fr) minmax(0,1.4fr)" }}>
-                    <input
-                      value={c.label}
-                      maxLength={60}
-                      onChange={(e) => cambiarColumna(pestanaActiva, c.key, { label: e.target.value })}
-                      aria-label={`Nombre de la columna ${c.key}`}
-                    />
-                    <select
-                      value={c.rol}
-                      onChange={(e) => cambiarColumna(pestanaActiva, c.key, { rol: e.target.value as RolColumna | "" })}
-                      aria-label={`Qué significa ${c.label || c.key}`}
-                    >
-                      <option value="">Sin significado especial</option>
-                      {ROLES.map((r) => <option key={r.valor} value={r.valor}>{r.etiqueta}</option>)}
-                    </select>
-                  </div>
-                ))}
+                {ed.columnas.map((c) => {
+                  const sospechosa = g.columnas.find((gc) => gc.key === c.key)?.sospechosa;
+                  return (
+                    <div key={c.key} style={{ marginBottom: sospechosa ? 6 : 0 }}>
+                      <div className="fila-columna" style={{ gridTemplateColumns: "minmax(0,1.4fr) minmax(0,1.4fr)" }}>
+                        <input
+                          value={c.label}
+                          maxLength={60}
+                          onChange={(e) => cambiarColumna(pestanaActiva, c.key, { label: e.target.value })}
+                          aria-label={`Nombre de la columna ${c.key}`}
+                        />
+                        <select
+                          value={c.rol}
+                          onChange={(e) => cambiarColumna(pestanaActiva, c.key, { rol: e.target.value as RolColumna | "" })}
+                          aria-label={`Qué significa ${c.label || c.key}`}
+                        >
+                          <option value="">Sin significado especial</option>
+                          {ROLES.map((r) => <option key={r.valor} value={r.valor}>{r.etiqueta}</option>)}
+                        </select>
+                      </div>
+                      {sospechosa && (
+                        <p className="suave pequeno" style={{ margin: "4px 0 0" }}>
+                          Aquí no estamos muy seguros del nombre, ¿le echas un vistazo? Puedes escribir el que prefieras arriba.
+                        </p>
+                      )}
+                    </div>
+                  );
+                })}
                 <p className="ayuda">
                   Indica qué significa cada columna (monto, fecha, cliente...) para que el asistente pueda
                   armarte resúmenes y avisos. Puedes dejarlas sin significado especial.

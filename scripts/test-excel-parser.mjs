@@ -44,4 +44,15 @@ const r4 = parsearExcel(libro([
 assert.strictEqual(r4.columnas.find((c) => c.key === colNumero.key).label, "Compras");
 assert.strictEqual(r4.filas.length, r3.filas.length);
 
+// --- 5. filas vacías (celdas en blanco, no ausentes) se cuentan y se descartan ---
+const r5 = parsearExcel(libro([
+  ["Cliente", "Monto"],
+  ["Ana", 100],
+  ["", ""],
+  ["Luis", 200],
+]));
+assert.strictEqual(r5.filas.length, 2, "la fila en blanco no se carga como dato");
+assert.strictEqual(r5.filasVaciasDescartadas, 1);
+assert.strictEqual(parsearExcel(libro([["Cliente"], ["Ana"]])).filasVaciasDescartadas, 0, "sin filas vacías, queda en 0");
+
 console.log("OK: test-excel-parser (todas las aserciones pasaron)");
