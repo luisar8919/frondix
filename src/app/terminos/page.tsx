@@ -13,7 +13,7 @@ export default function TerminosPage() {
       </header>
       <main className="contenedor" style={{ maxWidth: 720, padding: "40px 16px 80px" }}>
         <h1>Términos de servicio</h1>
-        <p className="suave">Última actualización: 30 de setiembre de 2026.</p>
+        <p className="suave">Última actualización: 1 de octubre de 2026.</p>
 
         <h2>1. Qué es Frondix</h2>
         <p>
@@ -38,13 +38,30 @@ export default function TerminosPage() {
           Frondix puede eliminar o suspender contenido o cuentas que incumplan estos términos o la ley, sin previo aviso.
         </p>
 
-        <h2>4. Disponibilidad del servicio</h2>
+        <h2>4. Acceso a tus datos</h2>
+        <p>
+          Tus datos están encriptados en reposo (estándar de Supabase/Postgres, protege contra el robo físico de la
+          base de datos), y cada empresa solo puede ver y editar su propia información dentro de la aplicación
+          (reglas de acceso por fila a nivel de base de datos). Dicho esto, preferimos ser directos en vez de prometer
+          algo que no es real: Frondix no ofrece encriptación de extremo a extremo, así que el equipo que opera la
+          plataforma (hoy, su fundador) tiene la capacidad técnica de acceder a los datos almacenados.
+        </p>
+        <p>
+          Esto no es un descuido: funciones como el buscador, los reportes, el seguimiento de clientes por WhatsApp y
+          la sugerencia de columnas con IA necesitan que el servidor pueda leer tu información para funcionar. Una
+          encriptación donde ni el servidor pudiera leer nada eliminaría esas funciones. Por eso, en vez de prometer
+          un acceso cero que no podríamos sostener, nos comprometemos a: no acceder a tus datos salvo para dar soporte
+          cuando lo pidas, diagnosticar un problema técnico, o cuando la ley lo exija; no venderlos ni compartirlos con
+          terceros para publicidad; y eliminarlos si cierras tu cuenta y lo solicitas.
+        </p>
+
+        <h2>5. Disponibilidad del servicio</h2>
         <p>
           Frondix se ofrece &quot;tal como está&quot;, sin garantía de disponibilidad continua. Hacemos lo posible por
           mantener tus datos seguros y disponibles, pero te recomendamos conservar tu Excel original como respaldo.
         </p>
 
-        <h2>5. Contacto</h2>
+        <h2>6. Contacto</h2>
         <p>
           Dudas sobre estos términos: escríbenos a{" "}
           <a href="mailto:luisar8919@gmail.com">luisar8919@gmail.com</a>.
