@@ -34,8 +34,10 @@ export default function CompletarPage() {
           .then(({ data: miembro }) => {
             if (!activo) return;
             if (miembro) {
-              router.replace("/dashboard");
-              router.refresh();
+              // Navegación dura: dashboard/layout.tsx vuelve a validar la sesión en el
+              // servidor, y un push suave puede llegar antes de que la cookie termine
+              // de propagarse (ver login/page.tsx para el mismo caso).
+              window.location.href = "/dashboard";
             } else {
               setCargando(false);
             }
@@ -65,8 +67,7 @@ export default function CompletarPage() {
       setEnviando(false);
       return setError(body.error ?? "No se pudo crear la empresa");
     }
-    router.push("/dashboard");
-    router.refresh();
+    window.location.href = "/dashboard";
   }
 
   if (cargando) return null;

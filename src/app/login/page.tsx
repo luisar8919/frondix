@@ -2,7 +2,7 @@
 
 import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { crearClienteBrowser } from "@/lib/supabase/client";
 import Logo from "@/components/Logo";
 
@@ -20,7 +20,6 @@ function LoginForm() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [enviando, setEnviando] = useState(false);
-  const router = useRouter();
   const searchParams = useSearchParams();
 
   // TEMPORAL: mientras depuramos el login con Google, muestra el motivo real
@@ -43,8 +42,12 @@ function LoginForm() {
       setEnviando(false);
       return setError("El email o la contraseña no son correctos.");
     }
-    router.push("/dashboard");
-    router.refresh();
+    // Navegación dura (no router.push) a propósito: dashboard/layout.tsx valida la
+    // sesión en el servidor (Azure no corre middleware), y un push suave puede
+    // llegar antes de que la cookie recién creada por signInWithPassword termine
+    // de propagarse, rebotando de vuelta a /login sin aviso. Con window.location
+    // el navegador garantiza que la cookie ya está puesta antes de pedir la página.
+    window.location.href = "/dashboard";
   }
 
   async function conGoogle() {
