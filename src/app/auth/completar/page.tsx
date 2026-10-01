@@ -18,19 +18,37 @@ export default function CompletarPage() {
   const router = useRouter();
 
   useEffect(() => {
-    (async () => {
-      const supabase = crearClienteBrowser();
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return router.replace("/login");
+    const supabase = crearClienteBrowser();
+    let activo = true;
 
-      const { data: miembro } = await supabase.from("miembros").select("empresa_id").eq("user_id", user.id).limit(1).single();
-      if (miembro) {
-        router.replace("/dashboard");
-        router.refresh();
-      } else {
-        setCargando(false);
+    // El enlace de confirmación de correo llega con la sesión en el fragmento de la
+    // URL (#access_token=...), que el cliente procesa en segundo plano al cargar la
+    // página. Preguntar "¿hay usuario?" de una (getUser de una sola vez) corre antes
+    // de que termine ese procesamiento y manda a /login por error. onAuthStateChange
+    // avisa recién cuando el cliente terminó de resolver la sesión real (incluido el
+    // fragmento, si había uno), así que no hay carrera.
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((evento, session) => {
+      if (!activo) return;
+      if (session?.user) {
+        supabase.from("miembros").select("empresa_id").eq("user_id", session.user.id).limit(1).single()
+          .then(({ data: miembro }) => {
+            if (!activo) return;
+            if (miembro) {
+              router.replace("/dashboard");
+              router.refresh();
+            } else {
+              setCargando(false);
+            }
+          });
+      } else if (evento === "INITIAL_SESSION") {
+        router.replace("/login");
       }
-    })();
+    });
+
+    return () => {
+      activo = false;
+      subscription.unsubscribe();
+    };
   }, [router]);
 
   async function onSubmit(e: React.FormEvent) {

@@ -17,11 +17,23 @@ recordatorios por WhatsApp Cloud API.
    Si tu base ya tenía el esquema anterior, ejecuta en orden las migraciones en `supabase/migracion-*.sql` (no borran datos).
 
    **Confirmación de correo al registrarse (pasos manuales en Supabase, no se pueden hacer por código):**
-   1. En Supabase > Authentication > Providers > Email, activa "Confirm email". Con esto apagado (útil solo para probar en desarrollo), `signUp` deja la sesión activa al toque, sin pasar por `/auth/completar`.
-   2. En Supabase > Authentication > Email Templates > "Confirm signup", reemplaza el enlace por uno que apunte a nuestra propia ruta de confirmación (así se puede redirigir a `/auth/completar` después, en vez de la pantalla genérica de Supabase):
+
+   Frondix usa flujo PKCE (lo exige el login con Google y el patrón de sesión por cookies de todo el proyecto). El
+   enlace de confirmación que Supabase manda *por defecto* es de otro tipo (flujo implícito, `#access_token=...`)
+   y el cliente PKCE lo rechaza — por eso hace falta cambiar la plantilla del correo a un formato compatible
+   (`token_hash`), y Supabase **no deja editar plantillas de correo sin configurar tu propio SMTP** (su envío
+   gratuito solo usa las plantillas de fábrica). Hay que configurar SMTP propio sí o sí, no es opcional aquí.
+
+   1. Crea una cuenta gratis en [Resend](https://resend.com) (3,000 correos/mes gratis) u otro proveedor SMTP.
+      Resend trae un dominio de prueba (`onboarding@resend.dev`) que sirve para esto sin verificar un dominio propio.
+   2. En Supabase > Project Settings > Authentication > SMTP Settings, activa "Enable Custom SMTP" y pega el host/puerto/usuario/contraseña que te dio Resend (en Resend: API Keys o SMTP, según cómo lo integres).
+   3. En Supabase > Authentication > Providers > Email, activa "Confirm email". Con esto apagado (útil solo para probar en desarrollo), `signUp` deja la sesión activa al toque, sin pedir confirmar nada.
+   4. En Supabase > Authentication > Email Templates > "Confirm signup", reemplaza el enlace del botón/texto por:
       `{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=email`
-   3. En Supabase > Authentication > URL Configuration, agrega `http://localhost:3000/auth/confirm` (desarrollo) y `https://<tu-dominio>/auth/confirm` (producción) a "Redirect URLs" (mismo lugar donde ya agregaste `/auth/callback` para Google).
-   Sin estos 3 pasos, el correo de confirmación existe pero manda al usuario a una pantalla de Supabase en vez de volver a Frondix.
+   5. En Supabase > Authentication > URL Configuration, agrega `http://localhost:3000/auth/confirm` (desarrollo) y `https://<tu-dominio>/auth/confirm` (producción) a "Redirect URLs" (mismo lugar donde ya agregaste `/auth/callback` para Google).
+
+   De paso, el SMTP propio también quita el límite de envío muy bajo (pocos correos por hora) del mailer compartido
+   de Supabase — con confirmación obligatoria, cualquier pico de registros lo golpearía rápido.
 
    **Login con Google (opcional, pasos manuales que no se pueden hacer por código):**
    1. En [Google Cloud Console](https://console.cloud.google.com/apis/credentials) crea unas credenciales OAuth 2.0 de tipo "Aplicación web". En "URI de redireccionamiento autorizados" agrega la URL de callback que te muestra Supabase (paso siguiente) — normalmente `https://<tu-proyecto>.supabase.co/auth/v1/callback`.
