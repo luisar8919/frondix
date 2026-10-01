@@ -5,6 +5,7 @@ import Link from "next/link";
 
 interface TotalMes { mes: string; total: number; registros: number }
 interface RankingItem { clave: string; total: number; veces: number }
+interface FlujoCaja { ventas: number; costos: number; igv: number; gananciaBruta: number; gananciaNeta: number }
 interface Modulo {
   datasetId: string;
   nombre: string;
@@ -12,6 +13,7 @@ interface Modulo {
   topProducto: RankingItem[] | null;
   topCliente: RankingItem[] | null;
   sumaTotal: number | null;
+  flujoCaja: FlujoCaja | null;
 }
 
 const soles = (n: number) => `S/ ${n.toLocaleString("es-PE", { maximumFractionDigits: 2 })}`;
@@ -77,6 +79,39 @@ export default function ReportesPage() {
         return (
           <section key={m.datasetId} className="tarjeta" style={{ marginBottom: 20 }}>
             <h3>{m.nombre}</h3>
+
+            {m.flujoCaja && (
+              <div style={{ marginTop: 10 }}>
+                <p className="suave pequeno" style={{ marginBottom: 10 }}>Flujo de caja</p>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 10 }}>
+                  <div>
+                    <p className="suave pequeno" style={{ margin: 0 }}>Ventas</p>
+                    <p style={{ margin: 0, fontWeight: 600 }}>{soles(m.flujoCaja.ventas)}</p>
+                  </div>
+                  <div>
+                    <p className="suave pequeno" style={{ margin: 0 }}>Costos</p>
+                    <p style={{ margin: 0, fontWeight: 600 }}>{soles(m.flujoCaja.costos)}</p>
+                  </div>
+                  <div>
+                    <p className="suave pequeno" style={{ margin: 0 }}>IGV (18%)</p>
+                    <p style={{ margin: 0, fontWeight: 600 }}>{soles(m.flujoCaja.igv)}</p>
+                  </div>
+                  <div>
+                    <p className="suave pequeno" style={{ margin: 0 }}>Ganancia Bruta</p>
+                    <p style={{ margin: 0, fontWeight: 600 }}>{soles(m.flujoCaja.gananciaBruta)}</p>
+                  </div>
+                  <div>
+                    <p className="suave pequeno" style={{ margin: 0 }}>Ganancia Neta</p>
+                    <p style={{ margin: 0, fontWeight: 700, color: "var(--verde-700)" }}>{soles(m.flujoCaja.gananciaNeta)}</p>
+                  </div>
+                </div>
+                <p className="ayuda" style={{ marginTop: 8 }}>
+                  {m.flujoCaja.gananciaBruta === m.flujoCaja.gananciaNeta
+                    ? "Tus ventas no incluyen IGV (o no lo marcaste en \"Editar tabla y campos\"): el IGV se suma aparte, no se resta de la ganancia."
+                    : "Tus ventas ya incluyen IGV: se descontó de la ganancia bruta para calcular la neta, porque ese monto no es tuyo, es de SUNAT."}
+                </p>
+              </div>
+            )}
 
             {m.sumaTotal !== null && (
               <p style={{ marginTop: 10 }}>

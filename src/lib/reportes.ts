@@ -60,6 +60,29 @@ export function sumaMonto(filas: { m?: string | number | null }[]): number {
   return Math.round(total * 100) / 100;
 }
 
+const redondear = (n: number) => Math.round(n * 100) / 100;
+
+export interface FlujoCaja {
+  ventas: number;
+  costos: number;
+  igv: number;
+  gananciaBruta: number; // ventas - costos, sin tocar el IGV
+  gananciaNeta: number; // si incluyeIgv: gananciaBruta - igv (el IGV no es tuyo); si no, igual a la bruta
+}
+
+// Flujo de caja simple a partir de Monto (ventas) y Costo, ambos ya marcados por el
+// usuario. El IGV depende de si las ventas cargadas ya lo incluyen o no -- no se puede
+// adivinar, cada negocio carga sus montos distinto, así que lo decide el usuario por
+// módulo (ver incluye_igv en datasets).
+export function flujoCaja(filas: { m?: string | number | null; costo?: string | number | null }[], incluyeIgv: boolean): FlujoCaja {
+  const ventas = sumaMonto(filas.map((f) => ({ m: f.m })));
+  const costos = sumaMonto(filas.map((f) => ({ m: f.costo })));
+  const igv = redondear(incluyeIgv ? ventas * (18 / 118) : ventas * 0.18);
+  const gananciaBruta = redondear(ventas - costos);
+  const gananciaNeta = incluyeIgv ? redondear(gananciaBruta - igv) : gananciaBruta;
+  return { ventas, costos, igv, gananciaBruta, gananciaNeta };
+}
+
 export interface FilaAgrupable {
   clave?: string | null; // producto o cliente
   m?: string | number | null; // monto (opcional)

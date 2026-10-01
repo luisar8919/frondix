@@ -24,6 +24,7 @@ create table datasets (
   nombre text not null,
   columnas jsonb not null, -- [{ "key": "nombre", "label": "Nombre", "tipo": "texto" }, ...]
   archivo_original_url text,
+  incluye_igv boolean not null default false, -- las ventas de este modulo ya traen el 18% incluido
   created_at timestamptz not null default now()
 );
 

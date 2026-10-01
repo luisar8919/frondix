@@ -19,17 +19,20 @@ export default function EditarTabla({
   datasetId,
   nombre,
   columnas,
+  incluyeIgv,
   onGuardado,
 }: {
   datasetId: string;
   nombre: string;
   columnas: Columna[];
+  incluyeIgv: boolean;
   onGuardado: () => Promise<void>;
 }) {
   const router = useRouter();
   const desdeColumnas = () => columnas.map((c) => ({ key: c.key, label: c.label, tipo: c.tipo, rol: (c.rol ?? "") as Fila["rol"] }));
   const [nombreTabla, setNombreTabla] = useState(nombre);
   const [filas, setFilas] = useState<Fila[]>(desdeColumnas);
+  const [incluyeIgvLocal, setIncluyeIgvLocal] = useState(incluyeIgv);
   const [ocupado, setOcupado] = useState(false);
   const [mensaje, setMensaje] = useState<{ tipo: "ok" | "error"; texto: string } | null>(null);
 
@@ -41,6 +44,7 @@ export default function EditarTabla({
     const r = await enviarConfirmando(`/api/datasets/${datasetId}`, "PUT", {
       nombre: nombreTabla,
       columnas: filas.map((f) => ({ ...f, rol: f.rol || null })),
+      incluyeIgv: incluyeIgvLocal,
     });
     setOcupado(false);
     if (r.cancelado) return;
@@ -66,6 +70,14 @@ export default function EditarTabla({
         <div className="campo">
           <label htmlFor="nombre-tabla">Nombre del módulo</label>
           <input id="nombre-tabla" value={nombreTabla} onChange={(e) => setNombreTabla(e.target.value)} maxLength={120} />
+        </div>
+
+        <div className="campo campo-check">
+          <label>
+            <input type="checkbox" checked={incluyeIgvLocal} onChange={(e) => setIncluyeIgvLocal(e.target.checked)} />{" "}
+            Los montos de venta de este módulo ya incluyen IGV (18%)
+          </label>
+          <p className="ayuda">Lo usa el reporte de flujo de caja para calcular el IGV y la ganancia neta correctamente. Si no sabes, déjalo sin marcar.</p>
         </div>
 
         <p className="suave pequeno">

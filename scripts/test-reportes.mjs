@@ -1,6 +1,6 @@
 // node scripts/test-reportes.mjs
 import assert from "node:assert";
-import { totalesPorMes, topPor, sumaMonto } from "../src/lib/reportes.ts";
+import { totalesPorMes, topPor, sumaMonto, flujoCaja } from "../src/lib/reportes.ts";
 
 const ahora = new Date("2026-09-25T15:00:00Z"); // "hoy" para las pruebas
 
@@ -49,5 +49,19 @@ assert.strictEqual(topPor([{ clave: "A", m: 1 }, { clave: "B", m: 2 }, { clave: 
 // --- sumaMonto (caso "caja": monto sin fecha) ---
 assert.strictEqual(sumaMonto([{ m: 100 }, { m: "50.5" }, { m: "abc" }, { m: null }]), 150.5);
 assert.strictEqual(sumaMonto([]), 0);
+
+// --- flujoCaja ---
+// Ventas con IGV incluido: 118 = 100 neto + 18 de IGV
+const conIgv = flujoCaja([{ m: 118, costo: 50 }], true);
+assert.deepStrictEqual(conIgv, { ventas: 118, costos: 50, igv: 18, gananciaBruta: 68, gananciaNeta: 50 });
+
+// Ventas sin IGV incluido: el IGV se suma aparte, no se resta de la ganancia
+const sinIgv = flujoCaja([{ m: 100, costo: 50 }], false);
+assert.deepStrictEqual(sinIgv, { ventas: 100, costos: 50, igv: 18, gananciaBruta: 50, gananciaNeta: 50 });
+
+// Sin costos cargados, costos queda en 0 (no rompe el cálculo)
+const sinCostos = flujoCaja([{ m: 100 }], false);
+assert.strictEqual(sinCostos.costos, 0);
+assert.strictEqual(sinCostos.gananciaBruta, 100);
 
 console.log("OK: test-reportes (todas las aserciones pasaron)");

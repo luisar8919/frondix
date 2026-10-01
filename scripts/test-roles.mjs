@@ -14,8 +14,8 @@ const ventas = sugerirRoles([
 ]);
 assert.strictEqual(ventas.venta, "monto", "'Venta' numérica es el monto");
 assert.strictEqual(ventas.juegos, "producto", "'Juegos' es el producto");
-assert.strictEqual(ventas.costo, undefined, "'Costo' no se confunde con monto");
-assert.strictEqual(ventas.ganancia, undefined);
+assert.strictEqual(ventas.costo, "costo", "'Costo' se reconoce como costo, no como monto");
+assert.strictEqual(ventas.ganancia, undefined, "'Ganancia' (calculada) no se le asigna ningún rol");
 
 // Caja del Excel real
 const caja = sugerirRoles([

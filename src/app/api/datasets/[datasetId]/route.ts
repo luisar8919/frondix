@@ -14,10 +14,11 @@ async function cargar(ctx: Ctx) {
   const supabase = await crearClienteServidor();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { error: NextResponse.json({ error: "No autenticado" }, { status: 401 }) };
-  const { data: todas } = await supabase.from("datasets").select("id, nombre, columnas");
-  const actual = (todas ?? []).find((d) => d.id === datasetId) as DatasetResumen | undefined;
-  if (!actual) return { error: NextResponse.json({ error: "Tabla no encontrada" }, { status: 404 }) };
-  return { supabase, datasetId, actual, otras: (todas ?? []).filter((d) => d.id !== datasetId) as DatasetResumen[] };
+  const { data: todas } = await supabase.from("datasets").select("id, nombre, columnas, incluye_igv");
+  const fila = (todas ?? []).find((d) => d.id === datasetId);
+  if (!fila) return { error: NextResponse.json({ error: "Tabla no encontrada" }, { status: 404 }) };
+  const actual = fila as DatasetResumen;
+  return { supabase, datasetId, actual, incluyeIgvActual: !!fila.incluye_igv, otras: (todas ?? []).filter((d) => d.id !== datasetId) as DatasetResumen[] };
 }
 
 const SOLO_ADMIN = "Solo el dueño o un administrador puede modificar la estructura de las tablas";
@@ -35,11 +36,12 @@ async function romperEnlaces(supabase: SupabaseClient, otras: DatasetResumen[], 
 export async function PUT(req: NextRequest, ctx: Ctx) {
   const c = await cargar(ctx);
   if ("error" in c) return c.error;
-  const { supabase, datasetId, actual, otras } = c;
+  const { supabase, datasetId, actual, incluyeIgvActual, otras } = c;
 
-  const { nombre, columnas, confirmar } = (await req.json().catch(() => ({}))) as {
+  const { nombre, columnas, incluyeIgv, confirmar } = (await req.json().catch(() => ({}))) as {
     nombre?: string;
     columnas?: ColumnaPropuesta[];
+    incluyeIgv?: boolean;
     confirmar?: boolean;
   };
 
@@ -58,7 +60,7 @@ export async function PUT(req: NextRequest, ctx: Ctx) {
 
   const { data: actualizadas, error } = await supabase
     .from("datasets")
-    .update({ nombre: nombreFinal, columnas: plan.columnas })
+    .update({ nombre: nombreFinal, columnas: plan.columnas, incluye_igv: incluyeIgv ?? incluyeIgvActual })
     .eq("id", datasetId)
     .select("id");
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
@@ -74,7 +76,7 @@ export async function PUT(req: NextRequest, ctx: Ctx) {
       );
     }
   }
-  return NextResponse.json({ nombre: nombreFinal, columnas: plan.columnas });
+  return NextResponse.json({ nombre: nombreFinal, columnas: plan.columnas, incluyeIgv: incluyeIgv ?? incluyeIgvActual });
 }
 
 export async function DELETE(req: NextRequest, ctx: Ctx) {

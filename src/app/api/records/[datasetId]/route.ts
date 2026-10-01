@@ -43,7 +43,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ data
 
   const { data: datasets, error: errorDatasets } = await supabase
     .from("datasets")
-    .select("id, nombre, columnas")
+    .select("id, nombre, columnas, incluye_igv")
     .order("created_at", { ascending: false });
   if (errorDatasets) return respuestaError(errorDatasets);
 
