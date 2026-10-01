@@ -11,6 +11,7 @@ const enlaces = [
   { href: "/dashboard/seguimiento", texto: "Seguimiento" },
   { href: "/dashboard/reportes", texto: "Reportes" },
   { href: "/dashboard/team", texto: "Equipo" },
+  { href: "/dashboard/cuenta", texto: "Mi cuenta" },
   { href: "/dashboard/billing", texto: "Plan y pagos" },
 ];
 
