@@ -116,6 +116,18 @@ export default function DatasetPage({
     return null;
   }
 
+  // Edición rápida de un solo campo con doble clic, directo en la tabla (sin abrir
+  // el formulario de arriba) -- útil para corregir muchos registros sueltos después
+  // de una carga con columnas confusas.
+  async function guardarCelda(r: Registro, columna: Columna, nuevoValor: unknown): Promise<string | null> {
+    const datos = { ...r.data, [columna.key]: nuevoValor };
+    const res = await enviarConfirmando(`/api/records/${datasetId}/${r.id}`, "PATCH", { data: datos });
+    if (res.cancelado) return null;
+    if (!res.ok) return res.body.error ?? "No se pudo guardar el cambio";
+    setRegistros((rs) => rs.map((x) => (x.id === res.body.record.id ? { id: x.id, data: res.body.record.data } : x)));
+    return null;
+  }
+
   const vacios = registros.filter((r) => Object.values(r.data).every((v) => v === null || v === undefined || v === ""));
 
   async function eliminarVacios() {
@@ -238,9 +250,13 @@ export default function DatasetPage({
       )}
 
       {errorAccion && <p className="alerta alerta-error" role="alert">{errorAccion}</p>}
+      <p className="suave pequeno" style={{ marginBottom: 10 }}>
+        Doble clic en una celda para corregirla rápido, sin abrir el formulario.
+      </p>
       <DynamicTable
         onEditar={(r) => { setEditando(r); window.scrollTo({ top: 0, behavior: "smooth" }); }}
         onEliminar={eliminarRegistro}
+        onEditarCelda={guardarCelda}
         columnas={dataset.columnas}
         registros={registrosFiltrados}
         relacionadas={relacionesEntrantes(otras, datasetId)}
