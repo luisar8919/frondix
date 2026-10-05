@@ -61,8 +61,24 @@ create table contactos (
 );
 create index contactos_busqueda_idx on contactos (empresa_id, dataset_id, created_at desc);
 
+-- Metas de venta por producto: "quiero vender 50 de Mario Kart este mes", y
+-- Reportes calcula cuantos van vendidos y cuantos faltan.
+create table metas (
+  id uuid primary key default gen_random_uuid(),
+  empresa_id uuid not null references empresas(id) on delete cascade,
+  dataset_id uuid not null references datasets(id) on delete cascade,
+  producto text not null,
+  cantidad_objetivo integer not null check (cantidad_objetivo > 0),
+  created_by uuid references auth.users(id) on delete set null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  unique (dataset_id, producto)
+);
+create index metas_dataset_idx on metas (dataset_id);
+
 -- Row Level Security: un usuario solo ve/edita datos de las empresas donde es miembro.
 alter table contactos enable row level security;
+alter table metas enable row level security;
 alter table empresas enable row level security;
 alter table miembros enable row level security;
 alter table datasets enable row level security;
@@ -126,6 +142,18 @@ create policy "ver contactos de mi empresa" on contactos for select
 
 create policy "registrar contactos en mi empresa" on contactos for insert
   with check (empresa_id in (select public.mis_empresas()) and created_by = auth.uid());
+
+create policy "ver metas de mi empresa" on metas for select
+  using (empresa_id in (select public.mis_empresas()));
+
+create policy "crear metas en mi empresa" on metas for insert
+  with check (empresa_id in (select public.mis_empresas()) and created_by = auth.uid());
+
+create policy "editar metas de mi empresa" on metas for update
+  using (empresa_id in (select public.mis_empresas()));
+
+create policy "borrar metas de mi empresa" on metas for delete
+  using (empresa_id in (select public.mis_empresas()));
 
 -- Editar tablas (migracion 04): borrar registros y quitar columnas.
 drop policy if exists "borrar records de mi empresa" on records;

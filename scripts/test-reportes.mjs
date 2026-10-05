@@ -1,6 +1,6 @@
 // node scripts/test-reportes.mjs
 import assert from "node:assert";
-import { totalesPorMes, topPor, sumaMonto, flujoCaja } from "../src/lib/reportes.ts";
+import { totalesPorMes, topPor, sumaMonto, flujoCaja, progresoMetas } from "../src/lib/reportes.ts";
 
 const ahora = new Date("2026-09-25T15:00:00Z"); // "hoy" para las pruebas
 
@@ -63,5 +63,24 @@ assert.deepStrictEqual(sinIgv, { ventas: 100, costos: 50, igv: 18, gananciaBruta
 const sinCostos = flujoCaja([{ m: 100 }], false);
 assert.strictEqual(sinCostos.costos, 0);
 assert.strictEqual(sinCostos.gananciaBruta, 100);
+
+// --- progresoMetas ---
+const ventasProductos = [
+  { clave: "Mario Kart" }, { clave: "Mario Kart" }, { clave: "Mario Kart" },
+  { clave: "Zelda" },
+];
+const progreso = progresoMetas(ventasProductos, [
+  { producto: "Mario Kart", cantidadObjetivo: 5 },
+  { producto: "Zelda", cantidadObjetivo: 1 },
+  { producto: "Metroid", cantidadObjetivo: 3 }, // sin ventas todavía
+]);
+assert.deepStrictEqual(progreso[0], { producto: "Mario Kart", objetivo: 5, vendidos: 3, faltan: 2, porcentaje: 60, alcanzada: false });
+assert.deepStrictEqual(progreso[1], { producto: "Zelda", objetivo: 1, vendidos: 1, faltan: 0, porcentaje: 100, alcanzada: true });
+assert.deepStrictEqual(progreso[2], { producto: "Metroid", objetivo: 3, vendidos: 0, faltan: 3, porcentaje: 0, alcanzada: false });
+
+// superar la meta no pasa de 100%
+const superada = progresoMetas([{ clave: "A" }, { clave: "A" }, { clave: "A" }], [{ producto: "A", cantidadObjetivo: 2 }]);
+assert.strictEqual(superada[0].porcentaje, 100);
+assert.strictEqual(superada[0].alcanzada, true);
 
 console.log("OK: test-reportes (todas las aserciones pasaron)");

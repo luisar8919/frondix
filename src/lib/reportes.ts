@@ -112,3 +112,38 @@ export function topPor(filas: FilaAgrupable[], n = 5): RankingItem[] {
   items.sort((a, b) => (hayMontos ? b.total - a.total : b.veces - a.veces));
   return items.slice(0, n);
 }
+
+export interface ProgresoMeta {
+  producto: string;
+  objetivo: number;
+  vendidos: number;
+  faltan: number;
+  porcentaje: number; // 0-100, no pasa de 100 aunque ya se haya superado la meta
+  alcanzada: boolean;
+}
+
+// Cuántas veces aparece cada producto (una fila = una venta) contra la meta que el
+// usuario fijó para ese producto en ese módulo. No usa monto: "vender 50 de Mario Kart"
+// cuenta unidades, no soles.
+export function progresoMetas(
+  filas: { clave?: string | null }[],
+  metas: { producto: string; cantidadObjetivo: number }[]
+): ProgresoMeta[] {
+  const veces = new Map<string, number>();
+  for (const fila of filas) {
+    const clave = fila.clave?.toString().trim();
+    if (!clave) continue;
+    veces.set(clave, (veces.get(clave) ?? 0) + 1);
+  }
+  return metas.map((m) => {
+    const vendidos = veces.get(m.producto) ?? 0;
+    return {
+      producto: m.producto,
+      objetivo: m.cantidadObjetivo,
+      vendidos,
+      faltan: Math.max(0, m.cantidadObjetivo - vendidos),
+      porcentaje: Math.min(100, Math.round((vendidos / m.cantidadObjetivo) * 100)),
+      alcanzada: vendidos >= m.cantidadObjetivo,
+    };
+  });
+}

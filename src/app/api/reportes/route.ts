@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { crearClienteServidor } from "@/lib/supabase/server";
 import { claveValida } from "@/lib/enlaces";
-import { totalesPorMes, topPor, sumaMonto, flujoCaja } from "@/lib/reportes";
+import { totalesPorMes, topPor, sumaMonto, flujoCaja, progresoMetas } from "@/lib/reportes";
 import type { Columna } from "@/lib/excel-parser";
 
 const PAGINA = 1000; // Supabase corta cada respuesta en 1000 filas
@@ -89,6 +89,16 @@ export async function GET() {
       conSumaTotal && "total_simple",
     ].filter((x): x is string => !!x);
 
+    let metas = null;
+    if (conTopProducto) {
+      const { data: metasDataset } = await supabase.from("metas").select("id, producto, cantidad_objetivo").eq("dataset_id", d.id);
+      const idPorProducto = new Map((metasDataset ?? []).map((m) => [m.producto, m.id]));
+      metas = progresoMetas(
+        filas.map((f) => ({ clave: f.p })),
+        (metasDataset ?? []).map((m) => ({ producto: m.producto, cantidadObjetivo: m.cantidad_objetivo }))
+      ).map((p) => ({ ...p, id: idPorProducto.get(p.producto)! }));
+    }
+
     modulos.push({
       datasetId: d.id,
       nombre: d.nombre,
@@ -98,6 +108,7 @@ export async function GET() {
       topCliente: conTopCliente ? topPor(filas.map((f) => ({ clave: f.c, m: f.m })), 5) : null,
       sumaTotal: conSumaTotal ? sumaMonto(filas) : null,
       flujoCaja: conFlujoCaja ? flujoCaja(filas.map((f) => ({ m: f.m, costo: f.co })), !!d.incluye_igv) : null,
+      metas,
     });
   }
 
