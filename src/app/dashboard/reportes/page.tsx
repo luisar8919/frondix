@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { PLANTILLAS_REPORTE } from "@/lib/plantillasReporte";
 
 interface TotalMes { mes: string; total: number; registros: number }
 interface RankingItem { clave: string; total: number; veces: number }
@@ -9,12 +10,15 @@ interface FlujoCaja { ventas: number; costos: number; igv: number; gananciaBruta
 interface Modulo {
   datasetId: string;
   nombre: string;
+  plantillas: string[];
   totalesPorMes: TotalMes[] | null;
   topProducto: RankingItem[] | null;
   topCliente: RankingItem[] | null;
   sumaTotal: number | null;
   flujoCaja: FlujoCaja | null;
 }
+
+const nombrePlantilla = Object.fromEntries(PLANTILLAS_REPORTE.map((p) => [p.id, p.nombre]));
 
 const soles = (n: number) => `S/ ${n.toLocaleString("es-PE", { maximumFractionDigits: 2 })}`;
 const nombreMes = (clave: string) => {
@@ -60,6 +64,21 @@ export default function ReportesPage() {
         </div>
       </div>
 
+      <details className="tarjeta plegable" style={{ marginBottom: 20 }}>
+        <summary>Qué reportes puede armar Frondix</summary>
+        <div className="plegable-cuerpo">
+          <p className="suave pequeno" style={{ marginBottom: 10 }}>
+            No hay que configurar nada aparte: según qué columnas marques como Monto, Costo, Fecha, Producto o
+            Cliente (en &quot;Editar tabla y campos&quot; de cada módulo), se arma uno u otro automáticamente.
+          </p>
+          {PLANTILLAS_REPORTE.filter((p) => p.id !== "total_simple").map((p) => (
+            <p key={p.id} className="pequeno" style={{ margin: "6px 0" }}>
+              <strong>{p.nombre}</strong> <span className="suave">— {p.descripcion}</span>
+            </p>
+          ))}
+        </div>
+      </details>
+
       {error && <p className="alerta alerta-error" role="alert">{error}</p>}
       {!modulos && !error && <p className="suave">Cargando...</p>}
 
@@ -79,6 +98,11 @@ export default function ReportesPage() {
         return (
           <section key={m.datasetId} className="tarjeta" style={{ marginBottom: 20 }}>
             <h3>{m.nombre}</h3>
+            {m.plantillas.length > 0 && (
+              <p className="suave pequeno" style={{ margin: "2px 0 0" }}>
+                Se armó: {m.plantillas.map((id) => nombrePlantilla[id] ?? id).join(", ")}
+              </p>
+            )}
 
             {m.flujoCaja && (
               <div style={{ marginTop: 10 }}>

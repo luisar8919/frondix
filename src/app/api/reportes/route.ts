@@ -79,9 +79,20 @@ export async function GET() {
       return NextResponse.json({ error: e instanceof Error ? e.message : "No se pudo leer el módulo" }, { status: 500 });
     }
 
+    // Mismas condiciones de arriba, como ids del catálogo de plantillasReporte.ts --
+    // para que la pantalla explique "por qué" salió cada reporte sin duplicar la lógica.
+    const plantillas = [
+      conFlujoCaja && "flujo_caja",
+      conTotales && "ventas_mensuales",
+      conTopProducto && "top_productos",
+      conTopCliente && "top_clientes",
+      conSumaTotal && "total_simple",
+    ].filter((x): x is string => !!x);
+
     modulos.push({
       datasetId: d.id,
       nombre: d.nombre,
+      plantillas,
       totalesPorMes: conTotales ? totalesPorMes(filas, ahora, 6) : null,
       topProducto: conTopProducto ? topPor(filas.map((f) => ({ clave: f.p, m: f.m })), 5) : null,
       topCliente: conTopCliente ? topPor(filas.map((f) => ({ clave: f.c, m: f.m })), 5) : null,

@@ -6,7 +6,10 @@ import { crearClienteBrowser } from "@/lib/supabase/client";
 import { tieneSuscripcionActiva } from "@/lib/suscripcion";
 import { empresaDelUsuario } from "@/lib/sesion";
 import { ROLES, type RolColumna } from "@/lib/roles";
+import { PLANTILLAS_REPORTE, plantillasCubiertas, rolesFaltantes } from "@/lib/plantillasReporte";
 import type { Columna } from "@/lib/excel-parser";
+
+const etiquetaRol = Object.fromEntries(ROLES.map((r) => [r.valor, r.etiqueta.split(" (")[0]]));
 
 interface GrupoDetectado {
   hojas: string[];
@@ -308,6 +311,34 @@ export default function UploadPage() {
                   Indica qué significa cada columna (monto, fecha, cliente...) para que el asistente pueda
                   armarte resúmenes y avisos. Puedes dejarlas sin significado especial.
                 </p>
+
+                {(() => {
+                  const roles = ed.columnas.map((c) => c.rol);
+                  const cubiertas = plantillasCubiertas(roles);
+                  const idsCubiertas = new Set(cubiertas.map((p) => p.id));
+                  const aUnPaso = PLANTILLAS_REPORTE.filter((p) => {
+                    if (idsCubiertas.has(p.id)) return false;
+                    const faltan = rolesFaltantes(p, roles);
+                    return faltan.length > 0 && faltan.length < p.rolesNecesarios.length;
+                  });
+                  if (cubiertas.length === 0 && aUnPaso.length === 0) return null;
+                  return (
+                    <div style={{ marginTop: 18 }}>
+                      <h3 style={{ fontSize: 16, marginBottom: 10 }}>Reportes que se van a armar con esto</h3>
+                      {cubiertas.map((p) => (
+                        <p key={p.id} className="pequeno" style={{ margin: "4px 0" }}>
+                          <strong style={{ color: "var(--verde-700)" }}>✓ {p.nombre}</strong>
+                          <span className="suave"> — {p.descripcion}</span>
+                        </p>
+                      ))}
+                      {aUnPaso.map((p) => (
+                        <p key={p.id} className="suave pequeno" style={{ margin: "4px 0" }}>
+                          {p.nombre} — falta marcar una columna como {rolesFaltantes(p, roles).map((r) => etiquetaRol[r]).join(" o ")}.
+                        </p>
+                      ))}
+                    </div>
+                  );
+                })()}
               </div>
             )}
           </div>
