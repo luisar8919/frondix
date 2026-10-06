@@ -3,6 +3,9 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { PLANTILLAS_REPORTE } from "@/lib/plantillasReporte";
+import { crearClienteBrowser } from "@/lib/supabase/client";
+import { tieneSuscripcionActiva } from "@/lib/suscripcion";
+import { empresaDelUsuario } from "@/lib/sesion";
 
 interface TotalMes { mes: string; total: number; registros: number }
 interface RankingItem { clave: string; total: number; veces: number }
@@ -49,6 +52,29 @@ export default function ReportesPage() {
   const [formMeta, setFormMeta] = useState<Record<string, { producto: string; cantidad: string }>>({});
   const [errorMeta, setErrorMeta] = useState<Record<string, string>>({});
   const [guardandoMeta, setGuardandoMeta] = useState<string | null>(null);
+  const [planActivo, setPlanActivo] = useState<boolean | null>(null);
+  const [highlights, setHighlights] = useState<string[] | null>(null);
+  const [cargandoHighlights, setCargandoHighlights] = useState(false);
+  const [errorHighlights, setErrorHighlights] = useState("");
+
+  useEffect(() => {
+    const supabase = crearClienteBrowser();
+    (async () => {
+      const r = await empresaDelUsuario(supabase);
+      if (!r.ok) return;
+      setPlanActivo(await tieneSuscripcionActiva(supabase, r.empresaId));
+    })();
+  }, []);
+
+  async function pedirHighlights() {
+    setCargandoHighlights(true);
+    setErrorHighlights("");
+    const res = await fetch("/api/highlights", { method: "POST" });
+    const body = await res.json();
+    setCargandoHighlights(false);
+    if (!res.ok) return setErrorHighlights(body.error ?? "No se pudieron generar los highlights");
+    setHighlights(body.highlights);
+  }
 
   async function cargarReportes() {
     return fetch("/api/reportes")
@@ -99,6 +125,35 @@ export default function ReportesPage() {
           <h1>Reportes</h1>
           <p className="suave">Vistas automáticas de tus módulos, según lo que marcaste al subir el Excel (monto, fecha, producto, cliente).</p>
         </div>
+      </div>
+
+      <div className="tarjeta tarjeta-elevada" style={{ marginBottom: 20 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 10 }}>
+          <div>
+            <h3 style={{ margin: 0 }}>Lo más importante, en palabras</h3>
+            <p className="suave pequeno" style={{ margin: "4px 0 0" }}>
+              Un resumen corto de tus números generado por IA (Gemini) — solo le mandamos los totales que ya ves
+              aquí, nunca tus registros completos.
+            </p>
+          </div>
+          {planActivo && (
+            <button type="button" className="btn btn-secundario" onClick={pedirHighlights} disabled={cargandoHighlights}>
+              {cargandoHighlights ? "Pensando..." : highlights ? "Volver a generar" : "Generar highlights"}
+            </button>
+          )}
+        </div>
+
+        {planActivo === false && (
+          <p className="suave pequeno" style={{ marginTop: 10 }}>
+            Los highlights con IA son parte del plan pago. <Link href="/dashboard/billing">Activa tu suscripción</Link> para usarlos.
+          </p>
+        )}
+        {errorHighlights && <p className="alerta alerta-error pequeno" role="alert" style={{ marginTop: 10 }}>{errorHighlights}</p>}
+        {highlights && (
+          <ul style={{ marginTop: 14, paddingLeft: 20 }}>
+            {highlights.map((h, i) => <li key={i} className="pequeno" style={{ marginBottom: 6 }}>{h}</li>)}
+          </ul>
+        )}
       </div>
 
       <details className="tarjeta plegable" style={{ marginBottom: 20 }}>
