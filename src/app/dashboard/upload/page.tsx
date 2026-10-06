@@ -35,6 +35,13 @@ interface ModuloCreado {
   filasImportadas: number;
 }
 
+// Dos pistas simples por el nombre de la pestaña: si parece un reporte ya armado
+// (Frondix ya arma eso solo, en Reportes) o si parece un inventario (Stock), para
+// sugerir -- sin armarlo automáticamente, es solo un aviso -- que se puede alimentar
+// cruzando los productos que ya se vendieron en Ventas.
+const pareceReporte = (hojas: string[]) => hojas.find((h) => /reporte|resumen|dashboard|kpi/i.test(h));
+const pareceStock = (hojas: string[]) => hojas.find((h) => /stock|inventario/i.test(h));
+
 const aEdicion = (g: GrupoDetectado): EdicionGrupo => ({
   incluir: true,
   nombre: g.nombreSugerido,
@@ -257,6 +264,29 @@ export default function UploadPage() {
               <p className="suave pequeno" style={{ marginTop: 10 }}>
                 Ojo: dejamos fuera {g.filasVaciasDescartadas === 1 ? "1 fila que estaba" : `${g.filasVaciasDescartadas} filas que estaban`} completamente vacía{g.filasVaciasDescartadas === 1 ? "" : "s"} en el Excel.
                 No pasa nada, no se van a cargar y así tu tabla queda limpia.
+              </p>
+            )}
+
+            {ed.incluir && pareceReporte(g.hojas) && (
+              <p className="alerta alerta-aviso" style={{ marginTop: 14 }}>
+                La pestaña &quot;{pareceReporte(g.hojas)}&quot; parece ser un reporte ya armado (no datos sueltos de
+                cada venta). Frondix arma ese mismo tipo de resumen solo, a partir de tus ventas, en la pestaña
+                Reportes — probablemente no haga falta cargar esta tabla aparte.
+              </p>
+            )}
+
+            {ed.incluir && !pareceReporte(g.hojas) && pareceStock(g.hojas) && (
+              <p className="alerta alerta-aviso" style={{ marginTop: 14 }}>
+                Detectamos una pestaña de Stock. También se puede armar cruzando los productos que ya vendiste
+                en tus módulos de Ventas (cuántas unidades de cada uno). Si te interesa, escríbenos y te
+                ayudamos a armarlo.
+              </p>
+            )}
+
+            {ed.incluir && !pareceReporte(g.hojas) && !pareceStock(g.hojas) && ed.columnas.some((c) => c.rol === "producto") && (
+              <p className="alerta alerta-aviso" style={{ marginTop: 14 }}>
+                Como esta tabla tiene columna de Producto, también podemos armarte un módulo de Stock que se
+                alimente de los productos que has vendido. Si te interesa, escríbenos y lo armamos.
               </p>
             )}
 
