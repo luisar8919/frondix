@@ -212,9 +212,9 @@ export default function ReportesPage() {
             )}
 
             {m.flujoCaja && (
-              <div style={{ marginTop: 10 }}>
-                <p className="suave pequeno" style={{ marginBottom: 10 }}>Flujo de caja</p>
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 10 }}>
+              <div className="tarjeta" style={{ marginTop: 14, padding: 14 }}>
+                <strong>Flujo de caja</strong>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 10, marginTop: 10 }}>
                   <div>
                     <p className="suave pequeno" style={{ margin: 0 }}>Ventas</p>
                     <p style={{ margin: 0, fontWeight: 600 }}>{soles(m.flujoCaja.ventas)}</p>
@@ -245,42 +245,50 @@ export default function ReportesPage() {
             )}
 
             {m.sumaTotal !== null && (
-              <p style={{ marginTop: 10 }}>
-                Total: <strong>{soles(m.sumaTotal)}</strong>
-                <span className="suave pequeno" style={{ marginLeft: 6 }}>(no tiene columna de fecha para mostrarlo por mes)</span>
-              </p>
+              <div className="tarjeta" style={{ marginTop: 14, padding: 14 }}>
+                <strong>Total</strong>
+                <p style={{ margin: "6px 0 0" }}>
+                  {soles(m.sumaTotal)}
+                  <span className="suave pequeno" style={{ marginLeft: 6 }}>(no tiene columna de fecha para mostrarlo por mes)</span>
+                </p>
+              </div>
             )}
 
             {m.totalesPorMes && (
-              <div style={{ marginTop: 14 }}>
-                <p className="suave pequeno" style={{ marginBottom: 10 }}>Total por mes (últimos 6 meses)</p>
-                {m.totalesPorMes.map((t) => (
-                  <Barra key={t.mes} valor={t.total} maximo={maxMes} etiqueta={nombreMes(t.mes)} texto={soles(t.total)} />
-                ))}
+              <div className="tarjeta" style={{ marginTop: 14, padding: 14 }}>
+                <strong>Total por mes (últimos 6 meses)</strong>
+                <div style={{ marginTop: 10 }}>
+                  {m.totalesPorMes.map((t) => (
+                    <Barra key={t.mes} valor={t.total} maximo={maxMes} etiqueta={nombreMes(t.mes)} texto={soles(t.total)} />
+                  ))}
+                </div>
               </div>
             )}
 
             {m.topProducto && m.topProducto.length > 0 && (
-              <div style={{ marginTop: 20 }}>
-                <p className="suave pequeno" style={{ marginBottom: 10 }}>Top 5 productos</p>
-                {(() => {
-                  const max = Math.max(1, ...m.topProducto.map((x) => x.total || x.veces));
-                  return m.topProducto.map((p) => (
-                    <Barra
-                      key={p.clave}
-                      valor={p.total || p.veces}
-                      maximo={max}
-                      etiqueta={p.clave.length > 12 ? p.clave.slice(0, 11) + "…" : p.clave}
-                      texto={p.total > 0 ? soles(p.total) : `${p.veces}x`}
-                    />
-                  ));
-                })()}
+              <div className="tarjeta" style={{ marginTop: 14, padding: 14 }}>
+                <strong>Top 5 productos</strong>
+                <div style={{ marginTop: 10 }}>
+                  {(() => {
+                    const max = Math.max(1, ...m.topProducto.map((x) => x.total || x.veces));
+                    return m.topProducto.map((p) => (
+                      <Barra
+                        key={p.clave}
+                        valor={p.total || p.veces}
+                        maximo={max}
+                        etiqueta={p.clave.length > 12 ? p.clave.slice(0, 11) + "…" : p.clave}
+                        texto={p.total > 0 ? soles(p.total) : `${p.veces}x`}
+                      />
+                    ));
+                  })()}
+                </div>
               </div>
             )}
 
             {m.topProducto && (
-              <div style={{ marginTop: 20 }}>
-                <p className="suave pequeno" style={{ marginBottom: 10 }}>Metas de venta</p>
+              <div className="tarjeta" style={{ marginTop: 14, padding: 14 }}>
+                <strong>Metas de venta</strong>
+                <div style={{ marginTop: 10 }}>
                 {(m.metas ?? []).map((meta) => (
                   <div key={meta.id} style={{ display: "grid", gridTemplateColumns: "1fr auto", alignItems: "center", gap: 10, marginBottom: 8 }}>
                     <Barra
@@ -324,24 +332,27 @@ export default function ReportesPage() {
                   </button>
                 </div>
                 {errorMeta[m.datasetId] && <p className="alerta alerta-error pequeno" role="alert" style={{ marginTop: 8 }}>{errorMeta[m.datasetId]}</p>}
+                </div>
               </div>
             )}
 
             {m.topCliente && m.topCliente.length > 0 && (
-              <div style={{ marginTop: 20 }}>
-                <p className="suave pequeno" style={{ marginBottom: 10 }}>Top 5 clientes</p>
-                {(() => {
-                  const max = Math.max(1, ...m.topCliente.map((x) => x.total || x.veces));
-                  return m.topCliente.map((c) => (
-                    <Barra
-                      key={c.clave}
-                      valor={c.total || c.veces}
-                      maximo={max}
-                      etiqueta={c.clave.length > 12 ? c.clave.slice(0, 11) + "…" : c.clave}
-                      texto={c.total > 0 ? soles(c.total) : `${c.veces}x`}
-                    />
-                  ));
-                })()}
+              <div className="tarjeta" style={{ marginTop: 14, padding: 14 }}>
+                <strong>Top 5 clientes</strong>
+                <div style={{ marginTop: 10 }}>
+                  {(() => {
+                    const max = Math.max(1, ...m.topCliente.map((x) => x.total || x.veces));
+                    return m.topCliente.map((c) => (
+                      <Barra
+                        key={c.clave}
+                        valor={c.total || c.veces}
+                        maximo={max}
+                        etiqueta={c.clave.length > 12 ? c.clave.slice(0, 11) + "…" : c.clave}
+                        texto={c.total > 0 ? soles(c.total) : `${c.veces}x`}
+                      />
+                    ));
+                  })()}
+                </div>
               </div>
             )}
           </section>
