@@ -11,6 +11,7 @@ interface TotalMes { mes: string; total: number; registros: number }
 interface RankingItem { clave: string; total: number; veces: number }
 interface FlujoCaja { ventas: number; costos: number; igv: number; gananciaBruta: number; gananciaNeta: number }
 interface ProgresoMeta { id: string; producto: string; objetivo: number; vendidos: number; faltan: number; porcentaje: number; alcanzada: boolean }
+interface BloqueHighlight { titulo: string; texto: string }
 interface Modulo {
   datasetId: string;
   nombre: string;
@@ -53,7 +54,7 @@ export default function ReportesPage() {
   const [errorMeta, setErrorMeta] = useState<Record<string, string>>({});
   const [guardandoMeta, setGuardandoMeta] = useState<string | null>(null);
   const [planActivo, setPlanActivo] = useState<boolean | null>(null);
-  const [highlights, setHighlights] = useState<string | null>(null);
+  const [highlights, setHighlights] = useState<BloqueHighlight[] | null>(null);
   const [generadoEl, setGeneradoEl] = useState<string | null>(null);
   const [cargandoHighlights, setCargandoHighlights] = useState(true);
   const [errorHighlights, setErrorHighlights] = useState("");
@@ -143,7 +144,14 @@ export default function ReportesPage() {
           {errorHighlights && <p className="alerta alerta-error pequeno" role="alert" style={{ marginTop: 10 }}>{errorHighlights}</p>}
           {highlights && (
             <>
-              <div style={{ marginTop: 14, fontSize: 17, lineHeight: 1.5, whiteSpace: "pre-wrap" }}>{highlights}</div>
+              <div style={{ marginTop: 14, display: "grid", gap: 10 }}>
+                {highlights.map((b, i) => (
+                  <div key={i} className="tarjeta" style={{ padding: 14 }}>
+                    <strong style={{ fontSize: 15 }}>{b.titulo}</strong>
+                    <p style={{ margin: "6px 0 0", fontSize: 16, lineHeight: 1.5 }}>{b.texto}</p>
+                  </div>
+                ))}
+              </div>
               {generadoEl && (
                 <p className="suave pequeno" style={{ margin: "14px 0 0" }}>
                   Generado el {new Date(generadoEl).toLocaleString("es-PE", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}
