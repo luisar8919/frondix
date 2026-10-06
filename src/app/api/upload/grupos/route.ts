@@ -23,7 +23,12 @@ export async function POST(request: NextRequest) {
     grupos: grupos.map((g) => ({
       hojas: g.hojas,
       nombreSugerido: g.hojas.length > 1 ? `${g.hojas[0]} y otras` : g.hojas[0],
-      columnas: g.columnas,
+      // Si no hay columna de fecha, /api/upload/auto agrega una con la fecha de hoy
+      // al confirmar: se refleja aquí para que la vista previa de reportes no muestre
+      // de menos.
+      columnas: g.columnas.some((c) => c.rol === "fecha")
+        ? g.columnas
+        : [...g.columnas, { key: "fecha_carga", label: "Fecha de carga", tipo: "fecha" as const, rol: "fecha" as const, sospechosa: false }],
       filasCount: g.filas.length,
       filasVaciasDescartadas: g.filasVaciasDescartadas,
       confuso: estructuraConfusa(g.columnas),

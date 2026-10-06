@@ -59,9 +59,10 @@ export default function TerminosPage() {
         <p>
           Si tu plan incluye &quot;Lo más importante, en palabras&quot; (en Reportes), parte de la información de tus
           módulos se envía a un proveedor externo de inteligencia artificial (Gemini, de Google) para generar ese
-          resumen. Concretamente, se envían: los totales y rankings que ya ves en Reportes, y los últimos 50
-          registros de cada módulo con el nombre y el teléfono de tus clientes quitados antes del envío —
-          el resto de columnas (por ejemplo producto, monto, fecha, u otras que tu Excel traiga) sí viaja.
+          reporte. Concretamente, se envían solo números ya calculados por Frondix: los totales y rankings que ya
+          ves en Reportes, y porcentajes agregados de otras columnas de tu Excel (por ejemplo, qué rango de edad
+          o zona concentra más ventas). Nunca se envía una fila de tu tabla tal cual, ni el nombre o teléfono de
+          tus clientes.
         </p>
         <p>
           Esto implica una transferencia de datos a un servidor fuera del Perú, sujeta a los términos y la política

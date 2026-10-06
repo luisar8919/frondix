@@ -5,24 +5,31 @@
 const MODELO = "gemini-3.5-flash-lite";
 const GEMINI_API = `https://generativelanguage.googleapis.com/v1beta/models/${MODELO}:generateContent`;
 
-// Lo que entra en resumenDatos ya salió filtrado de datosReportes.ts: agregados
-// (ventas, costos, rankings) + los últimos 50 registros por módulo, con las
-// columnas de Cliente y Teléfono quitadas por la plataforma antes de llegar acá
-// (ver resumenConRecientesParaIA). Esta función no decide qué se manda, solo llama.
-export async function generarHighlights(resumenDatos: string): Promise<string[]> {
+// Lo que entra en resumenDatos ya salió filtrado de datosReportes.ts: solo agregados
+// (ventas, costos, rankings, % de columnas libres como edad o zona) -- nunca una fila
+// ni un nombre de cliente/teléfono (ver resumenConLibresParaIA). Como ya no se manda
+// texto crudo, el prompt le puede pedir un reporte más largo sin disparar el consumo
+// de tokens de entrada; el límite de salida (maxOutputTokens) es lo único que lo acota.
+export async function generarHighlights(resumenDatos: string): Promise<string> {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) throw new Error("Falta configurar GEMINI_API_KEY");
 
   const prompt = `Eres un asistente que ayuda a dueños de pequeños negocios peruanos a entender sus datos de ventas.
-Te doy un resumen YA CALCULADO de los módulos de su negocio. No inventes números que no estén ahí.
-Dame entre 3 y 5 puntos breves (máximo 20 palabras cada uno) en español neutro de Perú, tono cercano, sin
-tecnicismos. Destaca lo más importante: tendencias, qué producto o cliente resalta, alguna alerta si algo
-se ve bajo o una meta está lejos de cumplirse.
+Te doy un resumen YA CALCULADO (agregados, no filas individuales) de los módulos de su negocio. No inventes
+números que no estén en el resumen.
 
-Responde ÚNICAMENTE con los puntos, uno por línea. No agregues saludo, introducción, cierre ni ningún texto
-antes o después de los puntos. No los numeres, no uses viñetas ni markdown, cada línea debe ser un punto en
-sí mismo (nada de "Aquí tienes:" ni frases que no sean un dato del negocio). No menciones nombres de personas
-ni teléfonos en tu respuesta, aunque aparecieran en los datos.
+Escribe un reporte en español neutro de Perú, tono cercano, sin tecnicismos, organizado en estos bloques (en
+ese orden, solo los que apliquen según los datos que te di):
+
+1. Resumen financiero: ventas, costos y ganancia por mes si hay datos de varios meses, o el total si no.
+2. Lo que más se vende: qué producto, categoría o cliente destaca.
+3. Otros datos relevantes: si el resumen trae otros datos (edad, zona de entrega, etc.), el patrón más claro.
+4. Una recomendación práctica y accionable según todo lo anterior.
+
+Cada bloque: un título corto en mayúscula seguido de 2-4 líneas de texto. Sé conciso, no repitas el mismo
+número en más de un bloque, no uses markdown ni viñetas (texto plano, bloques separados por una línea en
+blanco). No agregues saludo, introducción ni cierre -- empieza directo con el primer bloque. No menciones
+nombres de personas ni teléfonos aunque aparecieran en los datos.
 
 Datos:
 ${resumenDatos}`;
@@ -32,7 +39,7 @@ ${resumenDatos}`;
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       contents: [{ parts: [{ text: prompt }] }],
-      generationConfig: { temperature: 0.4, maxOutputTokens: 400 },
+      generationConfig: { temperature: 0.4, maxOutputTokens: 700 },
     }),
   });
 
@@ -43,8 +50,5 @@ ${resumenDatos}`;
 
   const data = await res.json();
   const texto: string = data.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
-  return texto
-    .split("\n")
-    .map((l) => l.trim().replace(/^[-•*]\s*/, ""))
-    .filter(Boolean);
+  return texto.trim();
 }

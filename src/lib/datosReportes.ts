@@ -8,9 +8,11 @@ const PAGINA = 1000; // Supabase corta cada respuesta en 1000 filas
 const TOPE_FILAS = 20000; // por módulo; más que eso hoy no se analiza
 
 // Mismo patrón que /api/seguimiento: pide solo las columnas necesarias, paginado.
-async function leerFilas(supabase: SupabaseClient, datasetId: string, claves: Partial<Record<"f" | "m" | "p" | "c" | "co", string>>) {
+// `claves` es alias -> key de columna; el alias puede ser cualquier string (se usa
+// tanto con los alias fijos f/m/p/c/co como con keys de columnas libres).
+async function leerFilas(supabase: SupabaseClient, datasetId: string, claves: Record<string, string>) {
   const seleccion = Object.entries(claves).map(([alias, clave]) => `${alias}:data->>${clave}`).join(",");
-  const filas: { f?: string | null; m?: string | number | null; p?: string | null; c?: string | null; co?: string | number | null }[] = [];
+  const filas: Record<string, string | null>[] = [];
   for (let desde = 0; desde < TOPE_FILAS; desde += PAGINA) {
     const { data, error } = await supabase
       .from("records")
@@ -141,17 +143,53 @@ export function resumenParaIA(modulos: ModuloReporte[], opciones?: { omitirNombr
     .join("\n\n");
 }
 
-// Columnas que nunca se le mandan a la IA, decidido por la plataforma según el rol
-// que el usuario ya marcó -- no hace falta que la IA elija qué omitir.
-const ROLES_SENSIBLES = new Set(["cliente", "telefono"]);
-const TOPE_FILAS_RECIENTES_IA = 50;
+// Columnas sin rol (no son monto/costo/producto/cliente/fecha/teléfono) -- lo que
+// el usuario tipeó pero la plataforma no sabe qué significa (edad, zona de entrega,
+// talla...). Se resumen por frecuencia (top 5 valores + % de las filas) en vez de
+// mandar las filas crudas: mismo patrón útil para la IA, una fracción del texto,
+// y cero riesgo de que se cuele un dato sensible fila por fila -- ya nunca se le
+// manda un registro completo a Gemini, solo números ya calculados.
+const TOPE_VALORES_POR_COLUMNA_LIBRE = 5;
 
-// Agrega a `agregados` los últimos TOPE_FILAS_RECIENTES_IA registros de cada módulo,
-// con las columnas de Cliente y Teléfono quitadas ANTES de armar el texto (la
-// plataforma decide qué se omite comparando roles, nunca se le manda la columna completa
-// a la IA para que ella la ignore). El resto de columnas sí viaja (producto, monto,
-// costo, fecha, y cualquier otra que el Excel traiga, como edad o zona de entrega).
-export async function resumenConRecientesParaIA(supabase: SupabaseClient, empresaId: string, modulos: ModuloReporte[]): Promise<string> {
+interface ColumnaLibreResumen {
+  label: string;
+  principales: { valor: string; cantidad: number; porcentaje: number }[];
+}
+
+async function agregarColumnasLibres(
+  supabase: SupabaseClient,
+  datasetId: string,
+  columnas: Columna[]
+): Promise<ColumnaLibreResumen[]> {
+  const libres = columnas.filter((c) => !c.rol && c.tipo === "texto" && claveValida(c.key)).slice(0, 5);
+  if (libres.length === 0) return [];
+
+  const claves = Object.fromEntries(libres.map((c) => [c.key, c.key]));
+  const filas = await leerFilas(supabase, datasetId, claves);
+
+  return libres
+    .map((c) => {
+      const conteo = new Map<string, number>();
+      let total = 0;
+      for (const fila of filas) {
+        const v = fila[c.key]?.toString().trim();
+        if (!v) continue;
+        conteo.set(v, (conteo.get(v) ?? 0) + 1);
+        total++;
+      }
+      const principales = [...conteo.entries()]
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, TOPE_VALORES_POR_COLUMNA_LIBRE)
+        .map(([valor, cantidad]) => ({ valor, cantidad, porcentaje: Math.round((cantidad / total) * 100) }));
+      return { label: c.label, principales };
+    })
+    .filter((c) => c.principales.length > 0);
+}
+
+// Igual que resumenParaIA, pero agrega además el resumen de columnas libres de
+// cada módulo (ver arriba). Todo lo que viaja a Gemini es un número o un % ya
+// calculado por la plataforma -- nunca una fila ni un nombre de cliente/teléfono.
+export async function resumenConLibresParaIA(supabase: SupabaseClient, empresaId: string, modulos: ModuloReporte[]): Promise<string> {
   const agregados = resumenParaIA(modulos, { omitirNombresCliente: true });
   if (modulos.length === 0) return agregados;
 
@@ -164,24 +202,11 @@ export async function resumenConRecientesParaIA(supabase: SupabaseClient, empres
 
   const bloques: string[] = [];
   for (const m of modulos) {
-    const todasColumnas = columnasPorId.get(m.datasetId) ?? [];
-    const columnas = todasColumnas.filter((c) => !c.rol || !ROLES_SENSIBLES.has(c.rol));
-    if (columnas.length === 0) continue;
-
-    const { data: registros, error } = await supabase
-      .from("records")
-      .select("data")
-      .eq("dataset_id", m.datasetId)
-      .order("created_at", { ascending: false })
-      .limit(TOPE_FILAS_RECIENTES_IA);
-    if (error) throw new Error(error.message);
-    if (!registros?.length) continue;
-
-    const encabezado = columnas.map((c) => c.label).join(" | ");
-    const filas = registros.map((r) => columnas.map((c) => String((r.data as Record<string, unknown>)[c.key] ?? "")).join(" | "));
-    bloques.push(
-      `Últimos ${filas.length} registros de "${m.nombre}" (sin cliente ni teléfono):\n${encabezado}\n${filas.join("\n")}`
-    );
+    const columnas = columnasPorId.get(m.datasetId) ?? [];
+    const libres = await agregarColumnasLibres(supabase, m.datasetId, columnas);
+    if (libres.length === 0) continue;
+    const lineas = libres.map((c) => `  ${c.label}: ${c.principales.map((p) => `${p.valor} (${p.porcentaje}%)`).join(", ")}`);
+    bloques.push(`Otros datos de "${m.nombre}":\n${lineas.join("\n")}`);
   }
 
   return bloques.length ? `${agregados}\n\n${bloques.join("\n\n")}` : agregados;

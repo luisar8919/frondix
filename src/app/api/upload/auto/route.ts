@@ -74,10 +74,20 @@ export async function POST(request: NextRequest) {
 
     // Solo se toman label/rol de la selección del usuario; key y tipo los sigue
     // decidiendo el parser, para no desalinear los datos ya extraídos del Excel.
-    const columnas: Columna[] = grupo.columnas.map((c) => {
+    let columnas: Columna[] = grupo.columnas.map((c) => {
       const edicion = sel?.columnas?.find((e) => e.key === c.key);
       return edicion ? { ...c, label: edicion.label || c.label, rol: (edicion.rol as Columna["rol"]) ?? null } : c;
     });
+
+    // Los reportes/highlights dependen de tener una fecha (tendencia mensual,
+    // "últimos 50 registros"). Si el Excel no trae ninguna columna de fecha,
+    // se agrega una con la fecha de hoy como referencia en vez de dejarlo sin fecha.
+    let filas = grupo.filas;
+    if (!columnas.some((c) => c.rol === "fecha")) {
+      const hoy = new Date().toISOString().slice(0, 10);
+      columnas = [...columnas, { key: "fecha_carga", label: "Fecha de carga", tipo: "fecha", rol: "fecha", sospechosa: false }];
+      filas = grupo.filas.map((f) => ({ ...f, fecha_carga: hoy }));
+    }
 
     const { data: dataset, error: errorDataset } = await supabase
       .from("datasets")
@@ -91,7 +101,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const errorInsertar = await insertarRegistros(supabase, dataset.id, grupo.filas);
+    const errorInsertar = await insertarRegistros(supabase, dataset.id, filas);
     if (errorInsertar) {
       await deshacerTabla(supabase, dataset.id);
       return NextResponse.json(

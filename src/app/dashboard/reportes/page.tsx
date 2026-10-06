@@ -53,7 +53,7 @@ export default function ReportesPage() {
   const [errorMeta, setErrorMeta] = useState<Record<string, string>>({});
   const [guardandoMeta, setGuardandoMeta] = useState<string | null>(null);
   const [planActivo, setPlanActivo] = useState<boolean | null>(null);
-  const [highlights, setHighlights] = useState<string[] | null>(null);
+  const [highlights, setHighlights] = useState<string | null>(null);
   const [generadoEl, setGeneradoEl] = useState<string | null>(null);
   const [cargandoHighlights, setCargandoHighlights] = useState(true);
   const [errorHighlights, setErrorHighlights] = useState("");
@@ -134,21 +134,18 @@ export default function ReportesPage() {
         <div className="tarjeta tarjeta-elevada" style={{ marginBottom: 20 }}>
           <h3 style={{ margin: 0 }}>Lo más importante, en palabras</h3>
           <p className="suave pequeno" style={{ margin: "4px 0 0" }}>
-            Un resumen corto de tus números generado por IA (Gemini) — le mandamos tus totales y tus últimos 50
-            registros de cada módulo, sin el nombre ni el teléfono de tus clientes (los quitamos antes de
-            mandarlo, nunca viajan). Se actualiza solo, como mucho una vez al día y solo si hubo cambios reales,
-            para no gastar de más.
+            Un reporte generado por IA (Gemini) a partir de tus totales y porcentajes ya calculados — nunca le
+            mandamos una fila ni el nombre o teléfono de tus clientes, solo números. Se actualiza solo, como
+            mucho una vez al día y solo si hubo cambios reales, para no gastar de más.
           </p>
 
           {cargandoHighlights && <p className="suave pequeno" style={{ marginTop: 14 }}>Generando...</p>}
           {errorHighlights && <p className="alerta alerta-error pequeno" role="alert" style={{ marginTop: 10 }}>{errorHighlights}</p>}
           {highlights && (
             <>
-              <ul style={{ marginTop: 14, paddingLeft: 20 }}>
-                {highlights.map((h, i) => <li key={i} className="pequeno" style={{ marginBottom: 6 }}>{h}</li>)}
-              </ul>
+              <div style={{ marginTop: 14, fontSize: 17, lineHeight: 1.5, whiteSpace: "pre-wrap" }}>{highlights}</div>
               {generadoEl && (
-                <p className="suave pequeno" style={{ margin: 0 }}>
+                <p className="suave pequeno" style={{ margin: "14px 0 0" }}>
                   Generado el {new Date(generadoEl).toLocaleString("es-PE", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}
                 </p>
               )}
