@@ -15,7 +15,11 @@ export async function generarHighlights(resumenDatos: string): Promise<string[]>
 Te doy un resumen YA CALCULADO de los módulos de su negocio. No inventes números que no estén ahí.
 Dame entre 3 y 5 puntos breves (máximo 20 palabras cada uno) en español neutro de Perú, tono cercano, sin
 tecnicismos. Destaca lo más importante: tendencias, qué producto o cliente resalta, alguna alerta si algo
-se ve bajo o una meta está lejos de cumplirse. Un punto por línea, sin numerarlos, sin viñetas ni markdown.
+se ve bajo o una meta está lejos de cumplirse.
+
+Responde ÚNICAMENTE con los puntos, uno por línea. No agregues saludo, introducción, cierre ni ningún texto
+antes o después de los puntos. No los numeres, no uses viñetas ni markdown, cada línea debe ser un punto en
+sí mismo (nada de "Aquí tienes:" ni frases que no sean un dato del negocio).
 
 Datos:
 ${resumenDatos}`;
