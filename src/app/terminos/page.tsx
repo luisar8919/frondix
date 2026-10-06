@@ -55,13 +55,27 @@ export default function TerminosPage() {
           terceros para publicidad; y eliminarlos si cierras tu cuenta y lo solicitas.
         </p>
 
-        <h2>5. Disponibilidad del servicio</h2>
+        <h2>5. Highlights generados con inteligencia artificial</h2>
+        <p>
+          Si tu plan incluye &quot;Lo más importante, en palabras&quot; (en Reportes), parte de la información de tus
+          módulos se envía a un proveedor externo de inteligencia artificial (Gemini, de Google) para generar ese
+          resumen. Concretamente, se envían: los totales y rankings que ya ves en Reportes, y los últimos 50
+          registros de cada módulo con el nombre y el teléfono de tus clientes quitados antes del envío —
+          el resto de columnas (por ejemplo producto, monto, fecha, u otras que tu Excel traiga) sí viaja.
+        </p>
+        <p>
+          Esto implica una transferencia de datos a un servidor fuera del Perú, sujeta a los términos y la política
+          de privacidad de Google. Si prefieres que tus datos nunca salgan de Frondix, no actives o no uses esta
+          función (puede desactivarse a pedido escribiéndonos a soporte).
+        </p>
+
+        <h2>6. Disponibilidad del servicio</h2>
         <p>
           Frondix se ofrece &quot;tal como está&quot;, sin garantía de disponibilidad continua. Hacemos lo posible por
           mantener tus datos seguros y disponibles, pero te recomendamos conservar tu Excel original como respaldo.
         </p>
 
-        <h2>6. Contacto</h2>
+        <h2>7. Contacto</h2>
         <p>
           Dudas sobre estos términos: escríbenos a{" "}
           <a href="mailto:luisar8919@gmail.com">luisar8919@gmail.com</a>.

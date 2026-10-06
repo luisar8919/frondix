@@ -134,9 +134,10 @@ export default function ReportesPage() {
         <div className="tarjeta tarjeta-elevada" style={{ marginBottom: 20 }}>
           <h3 style={{ margin: 0 }}>Lo más importante, en palabras</h3>
           <p className="suave pequeno" style={{ margin: "4px 0 0" }}>
-            Un resumen corto de tus números generado por IA (Gemini) — solo le mandamos los totales que ya ves
-            aquí, nunca tus registros completos. Se actualiza solo, como mucho una vez al día y solo si hubo
-            cambios reales, para no gastar de más.
+            Un resumen corto de tus números generado por IA (Gemini) — le mandamos tus totales y tus últimos 50
+            registros de cada módulo, sin el nombre ni el teléfono de tus clientes (los quitamos antes de
+            mandarlo, nunca viajan). Se actualiza solo, como mucho una vez al día y solo si hubo cambios reales,
+            para no gastar de más.
           </p>
 
           {cargandoHighlights && <p className="suave pequeno" style={{ marginTop: 14 }}>Generando...</p>}

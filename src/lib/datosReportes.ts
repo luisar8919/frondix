@@ -114,7 +114,10 @@ export async function calcularModulosReporte(supabase: SupabaseClient, empresaId
 // Texto plano con solo los números ya calculados (nunca filas/registros crudos) para
 // mandarle a la IA. Determinista y acotado: nada de volcar la base, solo lo que ya
 // se le muestra al usuario en Reportes.
-export function resumenParaIA(modulos: ModuloReporte[]): string {
+// `omitirNombresCliente`: "Top clientes" por definición expone nombres (es un ranking
+// por cliente) -- para el camino que va a un tercero (Gemini) se arma sin esa línea,
+// aunque internamente/en pantalla (donde el dueño ve sus propios datos) sí se muestra.
+export function resumenParaIA(modulos: ModuloReporte[], opciones?: { omitirNombresCliente?: boolean }): string {
   if (modulos.length === 0) return "Todavía no hay módulos con suficientes datos para reportar.";
   return modulos
     .map((m) => {
@@ -129,11 +132,59 @@ export function resumenParaIA(modulos: ModuloReporte[]): string {
       }
       if (m.sumaTotal !== null) lineas.push(`  Total: S/ ${m.sumaTotal}`);
       if (m.topProducto?.length) lineas.push(`  Top productos: ${m.topProducto.map((p) => `${p.clave} (${p.total > 0 ? "S/ " + p.total : p.veces + "x"})`).join(", ")}`);
-      if (m.topCliente?.length) lineas.push(`  Top clientes: ${m.topCliente.map((c) => `${c.clave} (${c.total > 0 ? "S/ " + c.total : c.veces + "x"})`).join(", ")}`);
+      if (m.topCliente?.length && !opciones?.omitirNombresCliente) {
+        lineas.push(`  Top clientes: ${m.topCliente.map((c) => `${c.clave} (${c.total > 0 ? "S/ " + c.total : c.veces + "x"})`).join(", ")}`);
+      }
       if (m.metas?.length) lineas.push(`  Metas: ${m.metas.map((x) => `${x.producto} ${x.vendidos}/${x.objetivo}${x.alcanzada ? " lograda" : ""}`).join(", ")}`);
       return lineas.join("\n");
     })
     .join("\n\n");
+}
+
+// Columnas que nunca se le mandan a la IA, decidido por la plataforma según el rol
+// que el usuario ya marcó -- no hace falta que la IA elija qué omitir.
+const ROLES_SENSIBLES = new Set(["cliente", "telefono"]);
+const TOPE_FILAS_RECIENTES_IA = 50;
+
+// Agrega a `agregados` los últimos TOPE_FILAS_RECIENTES_IA registros de cada módulo,
+// con las columnas de Cliente y Teléfono quitadas ANTES de armar el texto (la
+// plataforma decide qué se omite comparando roles, nunca se le manda la columna completa
+// a la IA para que ella la ignore). El resto de columnas sí viaja (producto, monto,
+// costo, fecha, y cualquier otra que el Excel traiga, como edad o zona de entrega).
+export async function resumenConRecientesParaIA(supabase: SupabaseClient, empresaId: string, modulos: ModuloReporte[]): Promise<string> {
+  const agregados = resumenParaIA(modulos, { omitirNombresCliente: true });
+  if (modulos.length === 0) return agregados;
+
+  const { data: datasets } = await supabase
+    .from("datasets")
+    .select("id, columnas")
+    .eq("empresa_id", empresaId)
+    .in("id", modulos.map((m) => m.datasetId));
+  const columnasPorId = new Map((datasets ?? []).map((d) => [d.id, d.columnas as Columna[]]));
+
+  const bloques: string[] = [];
+  for (const m of modulos) {
+    const todasColumnas = columnasPorId.get(m.datasetId) ?? [];
+    const columnas = todasColumnas.filter((c) => !c.rol || !ROLES_SENSIBLES.has(c.rol));
+    if (columnas.length === 0) continue;
+
+    const { data: registros, error } = await supabase
+      .from("records")
+      .select("data")
+      .eq("dataset_id", m.datasetId)
+      .order("created_at", { ascending: false })
+      .limit(TOPE_FILAS_RECIENTES_IA);
+    if (error) throw new Error(error.message);
+    if (!registros?.length) continue;
+
+    const encabezado = columnas.map((c) => c.label).join(" | ");
+    const filas = registros.map((r) => columnas.map((c) => String((r.data as Record<string, unknown>)[c.key] ?? "")).join(" | "));
+    bloques.push(
+      `Últimos ${filas.length} registros de "${m.nombre}" (sin cliente ni teléfono):\n${encabezado}\n${filas.join("\n")}`
+    );
+  }
+
+  return bloques.length ? `${agregados}\n\n${bloques.join("\n\n")}` : agregados;
 }
 
 // Huella de los números que le importan a un highlight (sin ids ni nombres de

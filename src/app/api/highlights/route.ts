@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { crearClienteServidor } from "@/lib/supabase/server";
 import { crearClienteAdmin } from "@/lib/supabase/admin";
-import { calcularModulosReporte, resumenParaIA, huellaModulos } from "@/lib/datosReportes";
+import { calcularModulosReporte, resumenConRecientesParaIA, huellaModulos } from "@/lib/datosReportes";
 import { generarHighlights } from "@/lib/gemini";
 import { tieneSuscripcionActiva } from "@/lib/suscripcion";
 
@@ -60,7 +60,7 @@ export async function GET() {
       return NextResponse.json({ error: "Demasiadas llamadas a IA esta hora. Intenta de nuevo más tarde." }, { status: 429 });
     }
 
-    const resumen = resumenParaIA(modulos);
+    const resumen = await resumenConRecientesParaIA(supabase, empresaId, modulos);
     const highlights = await generarHighlights(resumen);
     const generadoEl = new Date().toISOString();
 

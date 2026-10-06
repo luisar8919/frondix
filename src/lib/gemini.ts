@@ -5,8 +5,10 @@
 const MODELO = "gemini-3.5-flash-lite";
 const GEMINI_API = `https://generativelanguage.googleapis.com/v1beta/models/${MODELO}:generateContent`;
 
-// Solo se le manda a Gemini el resumen YA CALCULADO (ventas, costos, rankings),
-// nunca los registros crudos del negocio -- ver resumenParaIA en reportes.ts.
+// Lo que entra en resumenDatos ya salió filtrado de datosReportes.ts: agregados
+// (ventas, costos, rankings) + los últimos 50 registros por módulo, con las
+// columnas de Cliente y Teléfono quitadas por la plataforma antes de llegar acá
+// (ver resumenConRecientesParaIA). Esta función no decide qué se manda, solo llama.
 export async function generarHighlights(resumenDatos: string): Promise<string[]> {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) throw new Error("Falta configurar GEMINI_API_KEY");
@@ -19,7 +21,8 @@ se ve bajo o una meta está lejos de cumplirse.
 
 Responde ÚNICAMENTE con los puntos, uno por línea. No agregues saludo, introducción, cierre ni ningún texto
 antes o después de los puntos. No los numeres, no uses viñetas ni markdown, cada línea debe ser un punto en
-sí mismo (nada de "Aquí tienes:" ni frases que no sean un dato del negocio).
+sí mismo (nada de "Aquí tienes:" ni frases que no sean un dato del negocio). No menciones nombres de personas
+ni teléfonos en tu respuesta, aunque aparecieran en los datos.
 
 Datos:
 ${resumenDatos}`;
