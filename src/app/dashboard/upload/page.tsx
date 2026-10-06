@@ -26,6 +26,9 @@ interface EdicionGrupo {
   incluir: boolean;
   nombre: string;
   columnas: { key: string; label: string; rol: RolColumna | "" }[];
+  // Si esta tabla tiene columna de Producto, el usuario puede pedir que además se
+  // cree un módulo "Stock" (Producto + Cantidad en 0, una fila por producto distinto).
+  crearStock: boolean;
 }
 
 interface ModuloCreado {
@@ -43,9 +46,12 @@ const pareceReporte = (hojas: string[]) => hojas.find((h) => /reporte|resumen|da
 const pareceStock = (hojas: string[]) => hojas.find((h) => /stock|inventario/i.test(h));
 
 const aEdicion = (g: GrupoDetectado): EdicionGrupo => ({
-  incluir: true,
+  // Un reporte ya armado no hace falta cargarlo (Frondix arma ese mismo resumen
+  // solo, en Reportes): se deja desmarcado por defecto, el usuario lo puede marcar igual.
+  incluir: !pareceReporte(g.hojas),
   nombre: g.nombreSugerido,
   columnas: g.columnas.map((c) => ({ key: c.key, label: c.label, rol: (c.rol ?? "") as RolColumna | "" })),
+  crearStock: false,
 });
 
 export default function UploadPage() {
@@ -150,6 +156,7 @@ export default function UploadPage() {
             incluir: e.incluir,
             nombre: e.nombre,
             columnas: e.columnas.map((c) => ({ key: c.key, label: c.label, rol: c.rol || null })),
+            crearStock: e.crearStock,
           }))
         )
       );
@@ -267,27 +274,37 @@ export default function UploadPage() {
               </p>
             )}
 
-            {ed.incluir && pareceReporte(g.hojas) && (
+            {pareceReporte(g.hojas) && (
               <p className="alerta alerta-aviso" style={{ marginTop: 14 }}>
                 La pestaña &quot;{pareceReporte(g.hojas)}&quot; parece ser un reporte ya armado (no datos sueltos de
                 cada venta). Frondix arma ese mismo tipo de resumen solo, a partir de tus ventas, en la pestaña
-                Reportes — probablemente no haga falta cargar esta tabla aparte.
+                Reportes — por eso la dejamos sin marcar para cargar. Puedes marcarla igual si de verdad la
+                quieres como tabla.
               </p>
             )}
 
             {ed.incluir && !pareceReporte(g.hojas) && pareceStock(g.hojas) && (
               <p className="alerta alerta-aviso" style={{ marginTop: 14 }}>
                 Detectamos una pestaña de Stock. También se puede armar cruzando los productos que ya vendiste
-                en tus módulos de Ventas (cuántas unidades de cada uno). Si te interesa, escríbenos y te
-                ayudamos a armarlo.
+                en tus módulos de Ventas (cuántas unidades de cada uno).
               </p>
             )}
 
             {ed.incluir && !pareceReporte(g.hojas) && !pareceStock(g.hojas) && ed.columnas.some((c) => c.rol === "producto") && (
-              <p className="alerta alerta-aviso" style={{ marginTop: 14 }}>
-                Como esta tabla tiene columna de Producto, también podemos armarte un módulo de Stock que se
-                alimente de los productos que has vendido. Si te interesa, escríbenos y lo armamos.
-              </p>
+              <div className="alerta alerta-aviso" style={{ marginTop: 14 }}>
+                <p style={{ margin: 0 }}>
+                  Como esta tabla tiene columna de Producto, también puedes crear un módulo de Stock con esos
+                  productos (la cantidad empieza en 0, tú la editas después). Queda enlazado al Producto de esta tabla.
+                </p>
+                <button
+                  type="button"
+                  className={`btn ${ed.crearStock ? "btn-primario" : "btn-secundario"}`}
+                  style={{ marginTop: 10, padding: "4px 14px" }}
+                  onClick={() => cambiarGrupo(pestanaActiva, { crearStock: !ed.crearStock })}
+                >
+                  {ed.crearStock ? "✓ Se va a crear el módulo Stock" : "+ Crear también un módulo Stock"}
+                </button>
+              </div>
             )}
 
             {g.confuso && ed.incluir && (

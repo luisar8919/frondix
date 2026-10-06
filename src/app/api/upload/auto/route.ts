@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { crearClienteServidor } from "@/lib/supabase/server";
 import { agruparHojas, type Columna } from "@/lib/excel-parser";
 import { insertarRegistros, deshacerTabla, MAX_FILAS_IMPORTACION } from "@/lib/insertar";
+import { tieneSuscripcionActiva } from "@/lib/suscripcion";
 
 // El asistente de importación ya mostró los grupos (vía /api/upload/grupos) y el
 // usuario eligió cuáles quedarse, con nombre y roles ya confirmados/editados. Aquí se
@@ -10,7 +11,15 @@ interface SeleccionGrupo {
   incluir: boolean;
   nombre?: string;
   columnas?: { key: string; label: string; rol: string | null }[];
+  // Si esta tabla tiene columna de Producto, el usuario pudo pedir que además se
+  // cree un módulo "Stock" (Producto + Cantidad en 0) a partir de sus productos.
+  crearStock?: boolean;
 }
+
+// Tope de módulos por empresa: evita que una empresa (sobre todo gratis) acumule
+// decenas de tablas de prueba/abandonadas. Se revisa antes de crear nada (todo o nada).
+const LIMITE_MODULOS_GRATIS = 10;
+const LIMITE_MODULOS_PAGO = 30;
 
 export async function POST(request: NextRequest) {
   const supabase = await crearClienteServidor();
@@ -67,6 +76,18 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  const modulosNuevos = gruposAImportar.length + gruposAImportar.filter(({ sel }) => sel?.crearStock).length;
+  const { count: modulosActuales } = await supabase.from("datasets").select("id", { count: "exact", head: true }).eq("empresa_id", empresaId);
+  const limite = (await tieneSuscripcionActiva(supabase, empresaId)) ? LIMITE_MODULOS_PAGO : LIMITE_MODULOS_GRATIS;
+  if ((modulosActuales ?? 0) + modulosNuevos > limite) {
+    return NextResponse.json(
+      {
+        error: `Tu plan permite hasta ${limite} módulos y ya tienes ${modulosActuales}. Esto crearía ${modulosNuevos} más. Borra algún módulo que no uses${limite === LIMITE_MODULOS_GRATIS ? ", o activa el plan pago para hasta " + LIMITE_MODULOS_PAGO : ""}.`,
+      },
+      { status: 422 }
+    );
+  }
+
   const creados: { datasetId: string; nombre: string; hojas: string[]; filasImportadas: number }[] = [];
 
   for (const { grupo, sel } of gruposAImportar) {
@@ -116,6 +137,46 @@ export async function POST(request: NextRequest) {
       hojas: grupo.hojas,
       filasImportadas: grupo.filas.length,
     });
+
+    // Módulo Stock opcional: Producto (enlazado al producto de este módulo) + Cantidad
+    // en 0, una fila por cada producto distinto que aparece en lo que se acaba de
+    // importar. El usuario edita las cantidades a mano después -- esto solo arma el
+    // punto de partida. Si algo falla acá no se revierte el módulo principal, que ya
+    // quedó bien creado.
+    if (sel?.crearStock) {
+      const colProducto = columnas.find((c) => c.rol === "producto");
+      if (colProducto) {
+        const vistos = new Set<string>();
+        const productos: string[] = [];
+        for (const f of filas) {
+          const texto = f[colProducto.key] === null || f[colProducto.key] === undefined ? "" : String(f[colProducto.key]).trim();
+          if (texto && !vistos.has(texto)) {
+            vistos.add(texto);
+            productos.push(texto);
+          }
+        }
+        if (productos.length > 0) {
+          const columnasStock: Columna[] = [
+            { key: "producto", label: "Producto", tipo: "texto", rol: "producto", sospechosa: false, enlace: { datasetId: dataset.id, columnaKey: colProducto.key } },
+            { key: "cantidad", label: "Cantidad", tipo: "numero", rol: null, sospechosa: false },
+          ];
+          const { data: datasetStock, error: errorStock } = await supabase
+            .from("datasets")
+            .insert({ empresa_id: empresaId, nombre: `Stock - ${nombreDataset}`, columnas: columnasStock })
+            .select()
+            .single();
+          if (!errorStock && datasetStock) {
+            const filasStock = productos.map((producto) => ({ producto, cantidad: 0 }));
+            const errorInsertarStock = await insertarRegistros(supabase, datasetStock.id, filasStock);
+            if (!errorInsertarStock) {
+              creados.push({ datasetId: datasetStock.id, nombre: datasetStock.nombre, hojas: [], filasImportadas: filasStock.length });
+            } else {
+              await deshacerTabla(supabase, datasetStock.id);
+            }
+          }
+        }
+      }
+    }
   }
 
   return NextResponse.json({ tablas: creados, hojasOmitidas });
