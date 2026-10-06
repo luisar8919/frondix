@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { claveValida } from "./enlaces.ts";
 import { totalesPorMes, topPor, sumaMonto, flujoCaja, progresoMetas } from "./reportes.ts";
@@ -133,4 +134,20 @@ export function resumenParaIA(modulos: ModuloReporte[]): string {
       return lineas.join("\n");
     })
     .join("\n\n");
+}
+
+// Huella de los números que le importan a un highlight (sin ids ni nombres de
+// módulo, que no cambian el contenido). La decide la plataforma, no la IA: si la
+// huella de hoy es igual a la del último highlight guardado, no cambió nada que
+// valga la pena contarle de nuevo al usuario, así que no se gasta una llamada.
+export function huellaModulos(modulos: ModuloReporte[]): string {
+  const datos = modulos.map((m) => ({
+    totalesPorMes: m.totalesPorMes,
+    topProducto: m.topProducto,
+    topCliente: m.topCliente,
+    sumaTotal: m.sumaTotal,
+    flujoCaja: m.flujoCaja,
+    metas: m.metas?.map(({ id, ...resto }) => resto), // el id de la meta es aleatorio, no un dato real
+  }));
+  return createHash("sha256").update(JSON.stringify(datos)).digest("hex");
 }

@@ -54,27 +54,30 @@ export default function ReportesPage() {
   const [guardandoMeta, setGuardandoMeta] = useState<string | null>(null);
   const [planActivo, setPlanActivo] = useState<boolean | null>(null);
   const [highlights, setHighlights] = useState<string[] | null>(null);
-  const [cargandoHighlights, setCargandoHighlights] = useState(false);
+  const [generadoEl, setGeneradoEl] = useState<string | null>(null);
+  const [cargandoHighlights, setCargandoHighlights] = useState(true);
   const [errorHighlights, setErrorHighlights] = useState("");
 
   useEffect(() => {
     const supabase = crearClienteBrowser();
     (async () => {
       const r = await empresaDelUsuario(supabase);
-      if (!r.ok) return;
-      setPlanActivo(await tieneSuscripcionActiva(supabase, r.empresaId));
+      if (!r.ok) return setCargandoHighlights(false);
+      const activo = await tieneSuscripcionActiva(supabase, r.empresaId);
+      setPlanActivo(activo);
+      if (!activo) return setCargandoHighlights(false);
+
+      // Sin botón: se pide solo al entrar. El servidor decide si hace falta generar
+      // de nuevo (pasó un día y cambiaron los números) o si devuelve lo ya guardado
+      // -- entrar a Reportes varias veces el mismo día no gasta llamadas a Gemini.
+      const res = await fetch("/api/highlights");
+      const body = await res.json();
+      setCargandoHighlights(false);
+      if (!res.ok) return setErrorHighlights(body.error ?? "No se pudieron generar los highlights");
+      setHighlights(body.highlights);
+      setGeneradoEl(body.generadoEl);
     })();
   }, []);
-
-  async function pedirHighlights() {
-    setCargandoHighlights(true);
-    setErrorHighlights("");
-    const res = await fetch("/api/highlights", { method: "POST" });
-    const body = await res.json();
-    setCargandoHighlights(false);
-    if (!res.ok) return setErrorHighlights(body.error ?? "No se pudieron generar los highlights");
-    setHighlights(body.highlights);
-  }
 
   async function cargarReportes() {
     return fetch("/api/reportes")
@@ -127,34 +130,40 @@ export default function ReportesPage() {
         </div>
       </div>
 
-      <div className="tarjeta tarjeta-elevada" style={{ marginBottom: 20 }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 10 }}>
-          <div>
-            <h3 style={{ margin: 0 }}>Lo más importante, en palabras</h3>
-            <p className="suave pequeno" style={{ margin: "4px 0 0" }}>
-              Un resumen corto de tus números generado por IA (Gemini) — solo le mandamos los totales que ya ves
-              aquí, nunca tus registros completos.
-            </p>
-          </div>
-          {planActivo && (
-            <button type="button" className="btn btn-secundario" onClick={pedirHighlights} disabled={cargandoHighlights}>
-              {cargandoHighlights ? "Pensando..." : highlights ? "Volver a generar" : "Generar highlights"}
-            </button>
+      {planActivo !== false && (
+        <div className="tarjeta tarjeta-elevada" style={{ marginBottom: 20 }}>
+          <h3 style={{ margin: 0 }}>Lo más importante, en palabras</h3>
+          <p className="suave pequeno" style={{ margin: "4px 0 0" }}>
+            Un resumen corto de tus números generado por IA (Gemini) — solo le mandamos los totales que ya ves
+            aquí, nunca tus registros completos. Se actualiza solo, como mucho una vez al día y solo si hubo
+            cambios reales, para no gastar de más.
+          </p>
+
+          {cargandoHighlights && <p className="suave pequeno" style={{ marginTop: 14 }}>Generando...</p>}
+          {errorHighlights && <p className="alerta alerta-error pequeno" role="alert" style={{ marginTop: 10 }}>{errorHighlights}</p>}
+          {highlights && (
+            <>
+              <ul style={{ marginTop: 14, paddingLeft: 20 }}>
+                {highlights.map((h, i) => <li key={i} className="pequeno" style={{ marginBottom: 6 }}>{h}</li>)}
+              </ul>
+              {generadoEl && (
+                <p className="suave pequeno" style={{ margin: 0 }}>
+                  Generado el {new Date(generadoEl).toLocaleString("es-PE", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}
+                </p>
+              )}
+            </>
           )}
         </div>
+      )}
 
-        {planActivo === false && (
+      {planActivo === false && (
+        <div className="tarjeta" style={{ marginBottom: 20 }}>
+          <h3 style={{ margin: 0 }}>Lo más importante, en palabras</h3>
           <p className="suave pequeno" style={{ marginTop: 10 }}>
             Los highlights con IA son parte del plan pago. <Link href="/dashboard/billing">Activa tu suscripción</Link> para usarlos.
           </p>
-        )}
-        {errorHighlights && <p className="alerta alerta-error pequeno" role="alert" style={{ marginTop: 10 }}>{errorHighlights}</p>}
-        {highlights && (
-          <ul style={{ marginTop: 14, paddingLeft: 20 }}>
-            {highlights.map((h, i) => <li key={i} className="pequeno" style={{ marginBottom: 6 }}>{h}</li>)}
-          </ul>
-        )}
-      </div>
+        </div>
+      )}
 
       <details className="tarjeta plegable" style={{ marginBottom: 20 }}>
         <summary>Qué reportes puede armar Frondix</summary>

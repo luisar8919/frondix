@@ -180,3 +180,15 @@ create table if not exists ia_llamadas (
 );
 create index if not exists ia_llamadas_empresa_fecha_idx on ia_llamadas (empresa_id, created_at desc);
 alter table ia_llamadas enable row level security;
+
+-- Highlights con IA guardados por empresa (migracion 09): se generan solos, como mucho
+-- una vez al dia y solo si los numeros cambiaron -- ver /api/highlights.
+create table highlights (
+  empresa_id uuid primary key references empresas(id) on delete cascade,
+  contenido jsonb not null,
+  huella text not null,
+  generado_en timestamptz not null default now()
+);
+alter table highlights enable row level security;
+create policy "ver highlights de mi empresa" on highlights for select
+  using (empresa_id in (select public.mis_empresas()));
