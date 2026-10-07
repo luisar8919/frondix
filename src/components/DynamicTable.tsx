@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { Fragment, useRef, useState } from "react";
 import Link from "next/link";
 import type { Columna } from "@/lib/excel-parser";
 import { urlFiltrada, type RelacionEntrante } from "@/lib/enlaces";
@@ -24,9 +24,10 @@ export default function DynamicTable({
   onEditar,
   onEliminar,
   onEditarCelda,
+  onEditarSustento,
 }: {
   columnas: Columna[];
-  registros: { id: string; data: Record<string, unknown> }[];
+  registros: { id: string; data: Record<string, unknown>; sustento?: string | null }[];
   // otras tablas con una columna enlazada a esta (para ir "hacia atrás")
   relacionadas?: RelacionEntrante[];
   onEditar?: (r: { id: string; data: Record<string, unknown> }) => void;
@@ -34,6 +35,8 @@ export default function DynamicTable({
   // edición rápida de un solo campo con doble clic en la celda; null = guardado
   // (o el usuario canceló una advertencia), string = mensaje de error a mostrar
   onEditarCelda?: (r: { id: string; data: Record<string, unknown> }, columna: Columna, nuevoValor: unknown) => Promise<string | null>;
+  // guarda el sustento contable (boleta/factura) de un registro; null = guardado, string = error
+  onEditarSustento?: (r: { id: string }, texto: string) => Promise<string | null>;
 }) {
   const [visibles, setVisibles] = useState(TRAMO);
   const [celda, setCelda] = useState<{ id: string; key: string } | null>(null);
@@ -41,6 +44,25 @@ export default function DynamicTable({
   const [guardandoCelda, setGuardandoCelda] = useState(false);
   const [errorCelda, setErrorCelda] = useState("");
   const guardandoRef = useRef(false); // evita doble guardado: Enter dispara blur justo después
+
+  const [sustentoAbierto, setSustentoAbierto] = useState<string | null>(null);
+  const [valorSustento, setValorSustento] = useState("");
+  const [guardandoSustento, setGuardandoSustento] = useState(false);
+  const [errorSustento, setErrorSustento] = useState("");
+
+  function abrirSustento(r: { id: string; sustento?: string | null }) {
+    setSustentoAbierto(sustentoAbierto === r.id ? null : r.id);
+    setValorSustento(r.sustento ?? "");
+    setErrorSustento("");
+  }
+
+  async function guardarSustento(r: { id: string }) {
+    setGuardandoSustento(true);
+    const error = await onEditarSustento!(r, valorSustento);
+    setGuardandoSustento(false);
+    if (error) return setErrorSustento(error);
+    setSustentoAbierto(null);
+  }
 
   function abrirCelda(r: { id: string; data: Record<string, unknown> }, c: Columna) {
     if (!onEditarCelda || c.enlace) return; // enlazadas se editan desde el formulario (necesitan el autocompletado)
@@ -78,12 +100,13 @@ export default function DynamicTable({
                 <th key={c.key} className={c.tipo === "numero" ? "num" : undefined}>{c.label}</th>
               ))}
               {relacionadas.length > 0 && <th>Relacionado</th>}
-              {(onEditar || onEliminar) && <th>Acciones</th>}
+              {(onEditar || onEliminar || onEditarSustento) && <th>Acciones</th>}
             </tr>
           </thead>
           <tbody>
             {mostrados.map((r) => (
-              <tr key={r.id}>
+              <Fragment key={r.id}>
+              <tr>
                 {columnas.map((c) => {
                   const valor = r.data[c.key];
                   const texto =
@@ -135,13 +158,44 @@ export default function DynamicTable({
                     })}
                   </td>
                 )}
-                {(onEditar || onEliminar) && (
+                {(onEditar || onEliminar || onEditarSustento) && (
                   <td style={{ whiteSpace: "nowrap" }}>
+                    {onEditarSustento && (
+                      <button type="button" className="btn btn-fantasma" onClick={() => abrirSustento(r)}>
+                        {r.sustento ? "✓ Sustento" : "Sustento"}
+                      </button>
+                    )}
                     {onEditar && <button type="button" className="btn btn-fantasma" onClick={() => onEditar(r)}>Editar</button>}
                     {onEliminar && <button type="button" className="btn btn-fantasma" onClick={() => onEliminar(r)}>Eliminar</button>}
                   </td>
                 )}
               </tr>
+              {sustentoAbierto === r.id && (
+                <tr>
+                  <td colSpan={columnas.length + (relacionadas.length > 0 ? 1 : 0) + 1} style={{ background: "var(--verde-50)" }}>
+                    <div style={{ display: "flex", gap: 8, alignItems: "flex-start", flexWrap: "wrap", padding: "6px 0" }}>
+                      <textarea
+                        autoFocus
+                        value={valorSustento}
+                        onChange={(e) => setValorSustento(e.target.value)}
+                        placeholder="Ej: Factura F001-123, Boleta B001-456"
+                        rows={2}
+                        style={{ flex: 1, minWidth: 220 }}
+                      />
+                      <div style={{ display: "flex", gap: 8 }}>
+                        <button type="button" className="btn btn-primario" onClick={() => guardarSustento(r)} disabled={guardandoSustento}>
+                          {guardandoSustento ? "Guardando..." : "Guardar"}
+                        </button>
+                        <button type="button" className="btn btn-fantasma" onClick={() => setSustentoAbierto(null)} disabled={guardandoSustento}>
+                          Cancelar
+                        </button>
+                      </div>
+                    </div>
+                    {errorSustento && <p className="alerta alerta-error pequeno" role="alert">{errorSustento}</p>}
+                  </td>
+                </tr>
+              )}
+              </Fragment>
             ))}
           </tbody>
         </table>

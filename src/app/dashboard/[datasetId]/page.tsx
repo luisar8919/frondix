@@ -14,6 +14,7 @@ import { filtrarPorColumna, relacionesEntrantes, type DatasetResumen } from "@/l
 interface Registro {
   id: string;
   data: Record<string, unknown>;
+  sustento?: string | null;
 }
 
 // Se traen por tramos de 1000 (el máximo que devuelve Supabase por consulta) hasta este
@@ -111,7 +112,7 @@ export default function DatasetPage({
     const r = await enviarConfirmando(`/api/records/${datasetId}/${editando!.id}`, "PATCH", { data: valores });
     if (r.cancelado) return null;
     if (!r.ok) return r.body.error ?? "No se pudo guardar el registro";
-    setRegistros((rs) => rs.map((x) => (x.id === r.body.record.id ? { id: x.id, data: r.body.record.data } : x)));
+    setRegistros((rs) => rs.map((x) => (x.id === r.body.record.id ? { ...x, data: r.body.record.data } : x)));
     setEditando(null);
     return null;
   }
@@ -124,7 +125,22 @@ export default function DatasetPage({
     const res = await enviarConfirmando(`/api/records/${datasetId}/${r.id}`, "PATCH", { data: datos });
     if (res.cancelado) return null;
     if (!res.ok) return res.body.error ?? "No se pudo guardar el cambio";
-    setRegistros((rs) => rs.map((x) => (x.id === res.body.record.id ? { id: x.id, data: res.body.record.data } : x)));
+    setRegistros((rs) => rs.map((x) => (x.id === res.body.record.id ? { ...x, data: res.body.record.data } : x)));
+    return null;
+  }
+
+  // Sustento contable (boleta/factura, etc.): campo propio del registro, aparte
+  // de los datos del Excel -- PATCH directo, sin pasar por las advertencias de
+  // enlaces (no tiene nada que ver con eso).
+  async function guardarSustento(r: { id: string }, texto: string): Promise<string | null> {
+    const res = await fetch(`/api/records/${datasetId}/${r.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ sustento: texto }),
+    });
+    const body = await res.json();
+    if (!res.ok) return body.error ?? "No se pudo guardar el sustento";
+    setRegistros((rs) => rs.map((x) => (x.id === r.id ? { ...x, sustento: body.record.sustento } : x)));
     return null;
   }
 
@@ -264,6 +280,7 @@ export default function DatasetPage({
         onEditar={(r) => { setEditando(r); window.scrollTo({ top: 0, behavior: "smooth" }); }}
         onEliminar={eliminarRegistro}
         onEditarCelda={guardarCelda}
+        onEditarSustento={guardarSustento}
         columnas={dataset.columnas}
         registros={registrosFiltrados}
         relacionadas={relacionesEntrantes(otras, datasetId)}

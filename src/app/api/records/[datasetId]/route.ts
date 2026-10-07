@@ -30,7 +30,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ data
   // sin eso, una página podría repetir o saltarse filas.
   const { data: records, count, error } = await supabase
     .from("records")
-    .select("id, data, created_at", { count: "exact" })
+    .select("id, data, sustento, created_at", { count: "exact" })
     .eq("dataset_id", datasetId)
     .order("created_at", { ascending: false })
     .order("id")

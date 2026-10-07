@@ -6,6 +6,7 @@ import { PLANTILLAS_REPORTE } from "@/lib/plantillasReporte";
 import { crearClienteBrowser } from "@/lib/supabase/client";
 import { tieneSuscripcionActiva } from "@/lib/suscripcion";
 import { empresaDelUsuario } from "@/lib/sesion";
+import Barra from "@/components/Barra";
 
 interface TotalMes { mes: string; total: number; registros: number }
 interface RankingItem { clave: string; total: number; veces: number }
@@ -33,20 +34,6 @@ const nombreMes = (clave: string) => {
   return new Date(Date.UTC(anio, mes - 1, 1)).toLocaleDateString("es-PE", { month: "short", year: "2-digit" });
 };
 
-// Una barra hecha con CSS (sin librería de gráficos): un div cuyo ancho es el
-// porcentaje del máximo del grupo. Simple y ligero, acorde al resto del panel.
-function Barra({ valor, maximo, etiqueta, texto }: { valor: number; maximo: number; etiqueta: string; texto: string }) {
-  const porcentaje = maximo > 0 ? Math.max(4, Math.round((valor / maximo) * 100)) : 0;
-  return (
-    <div style={{ display: "grid", gridTemplateColumns: "70px 1fr auto", alignItems: "center", gap: 10, marginBottom: 8 }}>
-      <span className="suave pequeno">{etiqueta}</span>
-      <div style={{ background: "var(--verde-100)", borderRadius: 4, height: 20 }}>
-        <div style={{ width: `${porcentaje}%`, background: "var(--verde-600)", height: "100%", borderRadius: 4 }} />
-      </div>
-      <span className="pequeno" style={{ fontWeight: 600, whiteSpace: "nowrap" }}>{texto}</span>
-    </div>
-  );
-}
 
 export default function ReportesPage() {
   const [modulos, setModulos] = useState<Modulo[] | null>(null);
@@ -127,8 +114,11 @@ export default function ReportesPage() {
     <>
       <div className="panel-cabecera">
         <div>
-          <h1>Reportes</h1>
-          <p className="suave">Vistas automáticas de tus módulos, según lo que marcaste al subir el Excel (monto, fecha, producto, cliente).</p>
+          <h1>Reportes generales</h1>
+          <p className="suave">
+            La foto completa de todos tus módulos juntos (compras y ventas combinadas). Para ver cada uno por
+            separado, con su propio registro rápido, entra a Compras o Ventas.
+          </p>
         </div>
       </div>
 

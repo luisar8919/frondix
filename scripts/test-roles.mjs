@@ -1,7 +1,7 @@
 // Chequeo de sugerirRoles: node scripts/test-roles.mjs
 // Importa el .ts real (Node 22.18+/24 quita los tipos solo), sin duplicar la lógica.
 import assert from "node:assert";
-import { sugerirRoles, estructuraConfusa } from "../src/lib/roles.ts";
+import { sugerirRoles, estructuraConfusa, tipoModulo } from "../src/lib/roles.ts";
 
 // Ventas del Excel real
 const ventas = sugerirRoles([
@@ -76,5 +76,12 @@ assert.strictEqual(
   true,
   "más del 40% de columnas sospechosas = confusa, aunque haya un rol"
 );
+
+// --- tipoModulo: a qué pestaña (Compras/Ventas) cae un módulo ---
+assert.strictEqual(tipoModulo(["proveedor", "monto"]), "compras", "proveedor manda, aunque haya monto");
+assert.strictEqual(tipoModulo(["cliente", "producto"]), "ventas");
+assert.strictEqual(tipoModulo(["producto", "monto"]), "ventas", "producto+monto sin cliente ni proveedor, igual es venta");
+assert.strictEqual(tipoModulo(["producto"]), "otro", "solo producto, sin monto ni cliente, no alcanza");
+assert.strictEqual(tipoModulo([null, "", "telefono"]), "otro");
 
 console.log("OK: test-roles (todas las aserciones pasaron)");

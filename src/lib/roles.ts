@@ -46,6 +46,19 @@ export function sugerirRoles(
   return asignados;
 }
 
+// En qué pestaña (Compras/Ventas) cae un módulo, según los roles que ya tiene
+// marcados -- no es un campo nuevo que haya que elegir, se deduce de lo mismo
+// que ya alimenta los reportes. "Proveedor" manda (es la señal más clara de
+// que es un gasto/compra); si no, Producto+Monto o Cliente lo marca como venta.
+export type TipoModulo = "compras" | "ventas" | "otro";
+
+export function tipoModulo(roles: (RolColumna | null | "")[]): TipoModulo {
+  const presentes = new Set(roles.filter(Boolean));
+  if (presentes.has("proveedor")) return "compras";
+  if (presentes.has("cliente") || (presentes.has("producto") && presentes.has("monto"))) return "ventas";
+  return "otro";
+}
+
 // Una tabla es "confusa" para las reglas de arriba cuando no reconocieron nada, o cuando
 // muchas columnas quedaron marcadas "sospechosa" (el encabezado en realidad era un dato).
 // En ese caso conviene ofrecer la sugerencia por IA en vez de dejar todo en blanco.

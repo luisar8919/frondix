@@ -10,8 +10,10 @@ import { COOKIE_EMPRESA_ACTIVA } from "@/lib/sesion";
 const enlaces = [
   { href: "/dashboard", texto: "Mis módulos" },
   { href: "/dashboard/upload", texto: "Subir Excel" },
+  { href: "/dashboard/compras", texto: "Compras" },
+  { href: "/dashboard/ventas", texto: "Ventas" },
   { href: "/dashboard/seguimiento", texto: "Seguimiento" },
-  { href: "/dashboard/reportes", texto: "Reportes" },
+  { href: "/dashboard/reportes", texto: "Reportes generales" },
   { href: "/dashboard/calendario", texto: "Calendario" },
   { href: "/dashboard/team", texto: "Equipo" },
 ];

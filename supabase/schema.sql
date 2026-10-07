@@ -32,6 +32,9 @@ create table records (
   id uuid primary key default gen_random_uuid(),
   dataset_id uuid not null references datasets(id) on delete cascade,
   data jsonb not null,
+  -- Sustento contable (boleta/factura, etc.): campo de la plataforma, no una
+  -- columna del Excel, por eso va aparte de "data".
+  sustento text,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
