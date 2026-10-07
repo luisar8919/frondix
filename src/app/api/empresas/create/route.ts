@@ -50,11 +50,11 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: errorMiembro.message }, { status: 500 });
   }
 
-  // 3 meses de prueba gratis del plan pago (ver tieneSuscripcionActiva). Si esto
+  // 1 mes de prueba gratis del plan pago (ver tieneSuscripcionActiva). Si esto
   // falla no se revierte la empresa -- el usuario igual queda en el plan gratis,
   // que es peor pero no bloquea el signup; se puede activar a mano si hace falta.
   const prueba_hasta = new Date();
-  prueba_hasta.setMonth(prueba_hasta.getMonth() + 3);
+  prueba_hasta.setMonth(prueba_hasta.getMonth() + 1);
   await admin.from("suscripciones").insert({ empresa_id: empresa.id, estado: "activa", prueba_hasta: prueba_hasta.toISOString() });
 
   return NextResponse.json({ empresa });

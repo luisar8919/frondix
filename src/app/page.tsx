@@ -124,6 +124,9 @@ export default function Portada() {
               <h3>Completo <span className="insignia" style={{ marginLeft: 6 }}>Recomendado</span></h3>
               <div className="precio-monto">S/ 35<small> /mes</small></div>
               <p className="suave pequeno">Para trabajar en equipo.</p>
+              <p className="pequeno" style={{ fontWeight: 700, color: "var(--verde-700)", margin: "2px 0 0" }}>
+                Primer mes gratis. No pedimos tarjeta.
+              </p>
               <ul>
                 <li>Todo lo del plan gratis</li>
                 <li>Invita a tu equipo con accesos por rol</li>

@@ -22,6 +22,15 @@ export default function EmpresaPage() {
   const [errorNueva, setErrorNueva] = useState<string | null>(null);
   const [enviandoNueva, setEnviandoNueva] = useState(false);
 
+  const [otrosMiembros, setOtrosMiembros] = useState<{ userId: string; email: string; rol: string }[]>([]);
+  const [destinoTransferir, setDestinoTransferir] = useState("");
+  const [mensajeTransferir, setMensajeTransferir] = useState<{ tipo: "ok" | "error"; texto: string } | null>(null);
+  const [transfiriendo, setTransfiriendo] = useState(false);
+
+  const [confirmarNombre, setConfirmarNombre] = useState("");
+  const [errorEliminar, setErrorEliminar] = useState<string | null>(null);
+  const [eliminando, setEliminando] = useState(false);
+
   async function cargar() {
     const supabase = crearClienteBrowser();
     const sesion = await empresaDelUsuario(supabase);
@@ -41,6 +50,14 @@ export default function EmpresaPage() {
       setNombre(empresa.nombre ?? "");
       setTelefono(empresa.telefono ?? "");
     }
+
+    const miRolActual = sesion.empresas.find((e) => e.empresaId === sesion.empresaId)?.rol;
+    if (miRolActual === "dueno") {
+      const resMiembros = await fetch(`/api/team/miembros?empresaId=${sesion.empresaId}`);
+      const bodyMiembros = await resMiembros.json();
+      if (resMiembros.ok) setOtrosMiembros(bodyMiembros.miembros.filter((m: { rol: string }) => m.rol !== "dueno"));
+    }
+
     setCargando(false);
   }
 
@@ -77,6 +94,41 @@ export default function EmpresaPage() {
     if (!res.ok) return setErrorNueva(body.error ?? "No se pudo crear la empresa");
     // Pasa directo a gestionar la empresa recién creada.
     elegirEmpresaActiva(body.empresa.id);
+  }
+
+  async function transferir(e: React.FormEvent) {
+    e.preventDefault();
+    if (!empresaId || !destinoTransferir) return;
+    setMensajeTransferir(null);
+    setTransfiriendo(true);
+    const res = await fetch("/api/empresas/transferir", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ empresaId, nuevoDuenoId: destinoTransferir }),
+    });
+    const body = await res.json();
+    setTransfiriendo(false);
+    if (!res.ok) return setMensajeTransferir({ tipo: "error", texto: body.error ?? "No se pudo transferir" });
+    setMensajeTransferir({ tipo: "ok", texto: "Listo. Ahora eres administrador, ya no dueño, de esta empresa." });
+    setRol("admin");
+  }
+
+  async function eliminarEmpresa(e: React.FormEvent) {
+    e.preventDefault();
+    if (!empresaId || confirmarNombre.trim() !== nombre.trim()) return;
+    setErrorEliminar(null);
+    setEliminando(true);
+    const res = await fetch("/api/empresas/eliminar", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ empresaId }),
+    });
+    if (!res.ok) {
+      const body = await res.json();
+      setEliminando(false);
+      return setErrorEliminar(body.error ?? "No se pudo eliminar");
+    }
+    window.location.href = "/dashboard";
   }
 
   if (cargando) return null;
@@ -185,6 +237,58 @@ export default function EmpresaPage() {
               </div>
             </form>
           )}
+        </div>
+      )}
+
+      {rol === "dueno" && (
+        <div className="tarjeta" style={{ maxWidth: 460, marginTop: 20, borderColor: "var(--error-100)" }}>
+          <h3 style={{ marginTop: 0 }}>Zona de riesgo</h3>
+
+          {otrosMiembros.length > 0 && (
+            <form onSubmit={transferir} style={{ marginBottom: 20 }}>
+              <p className="suave pequeno" style={{ marginBottom: 8 }}>
+                Pasa la propiedad de esta empresa a alguien más del equipo. Tú quedas como administrador, no pierdes el acceso.
+              </p>
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                <select value={destinoTransferir} onChange={(e) => setDestinoTransferir(e.target.value)} required>
+                  <option value="">Elige a quién...</option>
+                  {otrosMiembros.map((m) => (
+                    <option key={m.userId} value={m.userId}>{m.email}</option>
+                  ))}
+                </select>
+                <button type="submit" className="btn btn-secundario" disabled={transfiriendo || !destinoTransferir}>
+                  {transfiriendo ? "Transfiriendo..." : "Transferir empresa"}
+                </button>
+              </div>
+              {mensajeTransferir && (
+                <p className={`alerta alerta-${mensajeTransferir.tipo}`} role="status" style={{ marginTop: 10 }}>{mensajeTransferir.texto}</p>
+              )}
+            </form>
+          )}
+
+          <form onSubmit={eliminarEmpresa}>
+            <p className="suave pequeno" style={{ marginBottom: 8 }}>
+              Elimina &quot;{nombre}&quot; para siempre: módulos, registros, equipo, todo. No se puede deshacer.
+              Escribe el nombre exacto para confirmar.
+            </p>
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+              <input
+                value={confirmarNombre}
+                onChange={(e) => setConfirmarNombre(e.target.value)}
+                placeholder={nombre}
+                aria-label="Escribe el nombre de la empresa para confirmar"
+              />
+              <button
+                type="submit"
+                className="btn btn-primario"
+                style={{ background: "var(--error)" }}
+                disabled={eliminando || confirmarNombre.trim() !== nombre.trim()}
+              >
+                {eliminando ? "Eliminando..." : "Eliminar empresa"}
+              </button>
+            </div>
+            {errorEliminar && <p className="alerta alerta-error" role="alert" style={{ marginTop: 10 }}>{errorEliminar}</p>}
+          </form>
         </div>
       )}
     </>

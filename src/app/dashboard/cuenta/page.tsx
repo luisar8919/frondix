@@ -9,6 +9,7 @@ const ETIQUETA_ROL: Record<string, string> = { dueno: "Dueño", admin: "Administ
 export default function CuentaPage() {
   const [cargando, setCargando] = useState(true);
   const [email, setEmail] = useState("");
+  const [ultimoIngreso, setUltimoIngreso] = useState<string | null>(null);
   const [rol, setRol] = useState<string | null>(null);
   const [nombreEmpresa, setNombreEmpresa] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -29,6 +30,7 @@ export default function CuentaPage() {
 
       const { data: { user } } = await supabase.auth.getUser();
       setEmail(user?.email ?? "");
+      setUltimoIngreso(user?.last_sign_in_at ?? null);
 
       const actual = sesion.empresas.find((e) => e.empresaId === sesion.empresaId);
       setRol(actual?.rol ?? null);
@@ -78,6 +80,12 @@ export default function CuentaPage() {
           <label htmlFor="rol-cuenta">Tu rol ahí</label>
           <input id="rol-cuenta" value={rol ? ETIQUETA_ROL[rol] ?? rol : ""} disabled />
         </div>
+        {ultimoIngreso && (
+          <p className="suave pequeno" style={{ margin: "14px 0 0" }}>
+            Último ingreso: {new Date(ultimoIngreso).toLocaleString("es-PE", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}.
+            Si no fuiste tú, cambia tu contraseña abajo.
+          </p>
+        )}
       </div>
 
       <form onSubmit={cambiarPassword} className="tarjeta" style={{ maxWidth: 460 }}>
