@@ -173,14 +173,14 @@ th.num, td.num { text-align: right; font-variant-numeric: tabular-nums; }
 
 /* ----- Panel ----- */
 .barra-panel { position: sticky; top: 0; z-index: 10; background: var(--papel); border-bottom: 1px solid var(--linea); }
-.barra-fila { display: flex; align-items: center; gap: 20px; min-height: 64px; }
-.nav-panel { display: flex; align-items: center; gap: 4px; flex: 1; overflow-x: auto; scrollbar-width: none; }
+.barra-fila { display: flex; align-items: center; gap: 12px; min-height: 64px; }
+.nav-panel { display: flex; align-items: center; gap: 2px; flex: 1; min-width: 0; overflow-x: auto; scrollbar-width: none; }
 .nav-panel::-webkit-scrollbar { display: none; }
-.nav-link { flex: none; padding: 8px 14px; border-radius: 999px; font-size: 15px; font-weight: 600; text-decoration: none; color: var(--suave); }
+.nav-link { flex: none; padding: 7px 10px; border-radius: 999px; font-size: 14px; font-weight: 600; text-decoration: none; color: var(--suave); white-space: nowrap; }
 .nav-link:hover { background: var(--verde-50); color: var(--verde-800); }
 .nav-link[aria-current="page"] { background: var(--verde-100); color: var(--verde-800); }
 .menu-cuenta { position: relative; flex: none; }
-.menu-cuenta-boton { display: flex; align-items: center; gap: 6px; padding: 8px 14px; border-radius: 999px; font-size: 15px; font-weight: 600; color: var(--tinta); background: transparent; border: 1px solid var(--linea-fuerte); cursor: pointer; }
+.menu-cuenta-boton { display: flex; align-items: center; gap: 6px; padding: 7px 12px; border-radius: 999px; font-size: 14px; font-weight: 600; color: var(--tinta); background: transparent; border: 1px solid var(--linea-fuerte); cursor: pointer; white-space: nowrap; }
 .menu-cuenta-boton:hover { background: var(--verde-50); border-color: var(--verde-500); }
 .menu-cuenta-lista { position: absolute; top: calc(100% + 8px); right: 0; min-width: 190px; background: var(--papel); border: 1px solid var(--linea); border-radius: var(--radio-sm); box-shadow: var(--sombra); padding: 6px; z-index: 20; }
 .menu-cuenta-item { display: block; width: 100%; text-align: left; padding: 10px 12px; border-radius: 8px; font-size: 14px; font-weight: 600; color: var(--tinta); text-decoration: none; background: transparent; border: none; cursor: pointer; }

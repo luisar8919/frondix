@@ -14,7 +14,7 @@ export async function POST(request: NextRequest) {
   let grupos, hojasOmitidas;
   try {
     const buffer = await archivo.arrayBuffer();
-    ({ grupos, hojasOmitidas } = agruparHojas(buffer, 3));
+    ({ grupos, hojasOmitidas } = agruparHojas(buffer, 6));
   } catch (e) {
     return NextResponse.json({ error: e instanceof Error ? e.message : "No se pudo leer el Excel" }, { status: 422 });
   }

@@ -49,7 +49,9 @@ export async function POST(request: NextRequest) {
 
   let grupos;
   try {
-    ({ grupos } = agruparHojas(await archivo.arrayBuffer(), 3));
+    // Mismo tope que /api/upload/grupos y /api/upload/auto: tiene que coincidir,
+    // si no, grupoIndex (la pestaña que el cliente ve) apunta a otro grupo acá.
+    ({ grupos } = agruparHojas(await archivo.arrayBuffer(), 6));
   } catch (e) {
     return NextResponse.json({ error: e instanceof Error ? e.message : "No se pudo leer el Excel" }, { status: 422 });
   }
