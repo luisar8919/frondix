@@ -1,38 +1,23 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createServerClient, type CookieOptions } from "@supabase/ssr";
-import type { EmailOtpType } from "@supabase/supabase-js";
 
-// A donde Supabase manda al usuario al hacer clic en el enlace de "confirma tu
-// correo" (requiere cambiar la plantilla de email en Supabase, ver README).
-// Mismo patrón que /auth/callback: arma la URL con los headers x-forwarded-*
-// (nunca req.url, ver ese archivo) y escribe las cookies directo en la respuesta.
+// A donde Supabase manda al usuario al hacer clic en cualquier enlace de correo
+// (confirmar cuenta, invitación, etc -- requiere la plantilla de email en
+// Supabase, ver README). NO verifica el token acá -- antes sí, y eso rompía las
+// invitaciones: Outlook/Hotmail ("Safe Links") y otros escáneres de correo abren
+// los enlaces del mensaje con un GET antes de que la persona lo haga, para
+// revisarlos por seguridad; si la verificación pasa en ese GET, el escáner
+// consume el token de un solo uso y el usuario real llega con un enlace ya
+// gastado (visto en vivo: invitación a un @hotmail.com que "no tenía cuenta").
+// La verificación real pasa en /auth/confirmar, que exige un clic humano.
 export async function GET(req: NextRequest) {
   const tokenHash = req.nextUrl.searchParams.get("token_hash");
-  const type = req.nextUrl.searchParams.get("type") as EmailOtpType | null;
+  const type = req.nextUrl.searchParams.get("type");
 
   const host = req.headers.get("x-forwarded-host") ?? req.nextUrl.host;
   const proto = req.headers.get("x-forwarded-proto") ?? req.nextUrl.protocol.replace(":", "");
-  // "invite" se manda a /auth/completar para que pida crear una contraseña --
-  // quien llega por invitación nunca pasó por el formulario de signup, que es
-  // donde normalmente se define.
-  const destino = type === "invite" ? "/auth/completar?type=invite" : "/auth/completar";
-  const response = NextResponse.redirect(`${proto}://${host}${destino}`);
 
-  if (tokenHash && type) {
-    const supabase = createServerClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-      {
-        cookies: {
-          getAll: () => req.cookies.getAll(),
-          setAll: (cookiesToSet: { name: string; value: string; options: CookieOptions }[]) =>
-            cookiesToSet.forEach(({ name, value, options }) => response.cookies.set(name, value, options)),
-        },
-      }
-    );
-    const { error } = await supabase.auth.verifyOtp({ type, token_hash: tokenHash });
-    if (error) return NextResponse.redirect(`${proto}://${host}/login?error=${encodeURIComponent(error.message)}`);
-  }
-
-  return response;
+  if (!tokenHash || !type) return NextResponse.redirect(`${proto}://${host}/login`);
+  return NextResponse.redirect(
+    `${proto}://${host}/auth/confirmar?token_hash=${encodeURIComponent(tokenHash)}&type=${encodeURIComponent(type)}`
+  );
 }
