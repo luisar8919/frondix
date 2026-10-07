@@ -44,6 +44,10 @@ create table suscripciones (
   culqi_customer_id text,
   culqi_subscription_id text,
   estado text not null default 'pendiente' check (estado in ('pendiente', 'activa', 'vencida', 'cancelada')),
+  -- Prueba gratis de 3 meses al crear la empresa: mientras no pase esta fecha,
+  -- estado='activa' cuenta como plan pago aunque no haya pagado. Se limpia (null)
+  -- al pagar de verdad, para que quede activa sin depender de una fecha.
+  prueba_hasta timestamptz,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );

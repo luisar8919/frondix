@@ -28,7 +28,11 @@ export async function POST(req: NextRequest) {
     const estado = [2, 3].includes(status) ? "activa" : status === 4 ? "cancelada" : status === 6 ? "vencida" : null;
     if (estado) {
       const admin = crearClienteAdmin();
-      await admin.from("suscripciones").update({ estado, updated_at: new Date().toISOString() }).eq("culqi_subscription_id", subscriptionId);
+      // Si Culqi confirma que está activa de verdad, ya no depende de la fecha de
+      // prueba (prueba_hasta=null); para cancelada/vencida no hace falta tocarla.
+      const cambios: Record<string, unknown> = { estado, updated_at: new Date().toISOString() };
+      if (estado === "activa") cambios.prueba_hasta = null;
+      await admin.from("suscripciones").update(cambios).eq("culqi_subscription_id", subscriptionId);
     }
   } catch (e) {
     // Si Culqi no confirma el estado, no se toca la base: mejor no actualizar

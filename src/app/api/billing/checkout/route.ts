@@ -26,6 +26,7 @@ export async function POST(req: NextRequest) {
         culqi_customer_id: customerId,
         culqi_subscription_id: subscriptionId,
         estado: "activa",
+        prueba_hasta: null, // ya paga de verdad, no depende de la fecha de prueba
       }, { onConflict: "empresa_id" });
       if (error) return NextResponse.json({ error: error.message }, { status: 500 });
       return NextResponse.json({ ok: true, tipo: "suscripcion_automatica" });
@@ -36,6 +37,7 @@ export async function POST(req: NextRequest) {
     const { error } = await admin.from("suscripciones").upsert({
       empresa_id: empresaId,
       estado: "activa",
+      prueba_hasta: null,
     }, { onConflict: "empresa_id" });
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
     return NextResponse.json({ ok: true, tipo: "cargo_manual_mensual" });

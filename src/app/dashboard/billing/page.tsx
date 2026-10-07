@@ -4,6 +4,7 @@ import Script from "next/script";
 import { useEffect, useState } from "react";
 import { crearClienteBrowser } from "@/lib/supabase/client";
 import { empresaDelUsuario } from "@/lib/sesion";
+import { tieneSuscripcionActiva } from "@/lib/suscripcion";
 
 declare global {
   interface Window {
@@ -17,6 +18,7 @@ export default function BillingPage() {
   const [scriptListo, setScriptListo] = useState(false);
   const [empresaId, setEmpresaId] = useState<string | null>(null);
   const [planActivo, setPlanActivo] = useState<boolean | null>(null);
+  const [pruebaHasta, setPruebaHasta] = useState<string | null>(null);
   const [cancelando, setCancelando] = useState(false);
   const [confirmando, setConfirmando] = useState(false);
 
@@ -25,8 +27,9 @@ export default function BillingPage() {
     const sesion = await empresaDelUsuario(supabase);
     if (!sesion.ok) return;
     setEmpresaId(sesion.empresaId);
-    const { data } = await supabase.from("suscripciones").select("estado").eq("empresa_id", sesion.empresaId).single();
-    setPlanActivo(data?.estado === "activa");
+    setPlanActivo(await tieneSuscripcionActiva(supabase, sesion.empresaId));
+    const { data } = await supabase.from("suscripciones").select("prueba_hasta").eq("empresa_id", sesion.empresaId).single();
+    setPruebaHasta(data?.prueba_hasta ?? null);
   }
 
   useEffect(() => {
@@ -73,7 +76,10 @@ export default function BillingPage() {
       });
       const body = await res.json();
       setMensaje(res.ok ? "Suscripción activada." : body.error);
-      if (res.ok) setPlanActivo(true);
+      if (res.ok) {
+        setPlanActivo(true);
+        setPruebaHasta(null);
+      }
     };
 
     window.Culqi.publicKey = process.env.NEXT_PUBLIC_CULQI_PUBLIC_KEY;
@@ -103,7 +109,11 @@ export default function BillingPage() {
 
         {planActivo ? (
           <>
-            <p className="suave pequeno" style={{ margin: "0 0 10px" }}>Ya tienes este plan activo.</p>
+            <p className="suave pequeno" style={{ margin: "0 0 10px" }}>
+              {pruebaHasta
+                ? `Estás en tu prueba gratis de 3 meses, hasta el ${new Date(pruebaHasta).toLocaleDateString("es-PE", { day: "2-digit", month: "long", year: "numeric" })}. Después, si no activas el pago, pasas al plan gratis automáticamente.`
+                : "Ya tienes este plan activo."}
+            </p>
             {!confirmando ? (
               <button type="button" className="btn btn-secundario btn-bloque" onClick={() => setConfirmando(true)}>
                 Cambiar a plan gratis
