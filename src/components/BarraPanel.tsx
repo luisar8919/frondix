@@ -12,6 +12,7 @@ const enlaces = [
   { href: "/dashboard/upload", texto: "Subir Excel" },
   { href: "/dashboard/seguimiento", texto: "Seguimiento" },
   { href: "/dashboard/reportes", texto: "Reportes" },
+  { href: "/dashboard/calendario", texto: "Calendario" },
   { href: "/dashboard/team", texto: "Equipo" },
 ];
 

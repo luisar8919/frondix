@@ -19,6 +19,7 @@ interface Modulo {
   totalesPorMes: TotalMes[] | null;
   topProducto: RankingItem[] | null;
   topCliente: RankingItem[] | null;
+  topProveedor: RankingItem[] | null;
   sumaTotal: number | null;
   flujoCaja: FlujoCaja | null;
   metas: ProgresoMeta[] | null;
@@ -349,6 +350,26 @@ export default function ReportesPage() {
                         maximo={max}
                         etiqueta={c.clave.length > 12 ? c.clave.slice(0, 11) + "…" : c.clave}
                         texto={c.total > 0 ? soles(c.total) : `${c.veces}x`}
+                      />
+                    ));
+                  })()}
+                </div>
+              </div>
+            )}
+
+            {m.topProveedor && m.topProveedor.length > 0 && (
+              <div className="tarjeta" style={{ marginTop: 14, padding: 14 }}>
+                <strong>Top 5 proveedores</strong>
+                <div style={{ marginTop: 10 }}>
+                  {(() => {
+                    const max = Math.max(1, ...m.topProveedor.map((x) => x.total || x.veces));
+                    return m.topProveedor.map((p) => (
+                      <Barra
+                        key={p.clave}
+                        valor={p.total || p.veces}
+                        maximo={max}
+                        etiqueta={p.clave.length > 12 ? p.clave.slice(0, 11) + "…" : p.clave}
+                        texto={p.total > 0 ? soles(p.total) : `${p.veces}x`}
                       />
                     ));
                   })()}

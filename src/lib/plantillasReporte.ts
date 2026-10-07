@@ -18,6 +18,7 @@ export const PLANTILLAS_REPORTE: PlantillaReporte[] = [
   { id: "ventas_mensuales", nombre: "Ventas por mes", descripcion: "Cuánto vendiste cada mes, en una barra.", rolesNecesarios: ["monto", "fecha"] },
   { id: "top_productos", nombre: "Productos más vendidos", descripcion: "Ranking de tus productos o conceptos.", rolesNecesarios: ["producto"] },
   { id: "top_clientes", nombre: "Mejores clientes", descripcion: "Ranking de tus clientes.", rolesNecesarios: ["cliente"] },
+  { id: "top_proveedores", nombre: "Proveedores por monto", descripcion: "A quién le compras más.", rolesNecesarios: ["proveedor"] },
   { id: "total_simple", nombre: "Total sumado", descripcion: "Suma general, para módulos de caja sin fecha.", rolesNecesarios: ["monto"] },
 ];
 

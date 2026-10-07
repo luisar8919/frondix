@@ -35,6 +35,14 @@ assert.strictEqual(clientes.telefono_del_cliente, "telefono");
 assert.strictEqual(clientes.nombre, "cliente");
 assert.strictEqual(clientes.fecha_de_compra, "fecha");
 
+// Compras: "proveedor" se reconoce, y no se cruza con cliente aunque ambos
+// patrones incluyan "nombre" (proveedor va primero en las reglas)
+const compras = sugerirRoles([
+  { key: "nombre_del_proveedor", label: "Nombre del proveedor", tipo: "texto" },
+  { key: "monto", label: "Monto", tipo: "numero" },
+]);
+assert.strictEqual(compras.nombre_del_proveedor, "proveedor");
+
 // Una fecha guardada como texto no se marca como fecha (el usuario la elige a mano)
 const fechaTexto = sugerirRoles([{ key: "fecha", label: "Fecha", tipo: "texto" }]);
 assert.strictEqual(fechaTexto.fecha, undefined);
