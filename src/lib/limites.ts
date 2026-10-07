@@ -35,3 +35,21 @@ export async function limitesDelUsuario(supabase: SupabaseClient, userId: string
   const limites = pagado ? LIMITES_PAGO : LIMITES_GRATIS;
   return { ...limites, propias: propias.length, invitado: invitado.length, pagado };
 }
+
+// Tope de módulos (datasets) por EMPRESA: 10 en el plan gratis, 30 en el pago
+// (acá "pagado" sí es de la empresa, no del usuario -- cada empresa paga su
+// propio plan). Usado tanto al subir un Excel (/api/upload/auto) como al crear
+// un módulo manual desde una plantilla (/api/datasets/crear).
+export interface LimiteModulos {
+  actuales: number;
+  limite: number;
+}
+
+const LIMITE_MODULOS_GRATIS = 10;
+const LIMITE_MODULOS_PAGO = 30;
+
+export async function limiteModulos(supabase: SupabaseClient, empresaId: string): Promise<LimiteModulos> {
+  const { count } = await supabase.from("datasets").select("id", { count: "exact", head: true }).eq("empresa_id", empresaId);
+  const limite = (await tieneSuscripcionActiva(supabase, empresaId)) ? LIMITE_MODULOS_PAGO : LIMITE_MODULOS_GRATIS;
+  return { actuales: count ?? 0, limite };
+}

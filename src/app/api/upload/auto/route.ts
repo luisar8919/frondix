@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { crearClienteServidor } from "@/lib/supabase/server";
 import { agruparHojas, type Columna } from "@/lib/excel-parser";
 import { insertarRegistros, deshacerTabla, MAX_FILAS_IMPORTACION } from "@/lib/insertar";
-import { tieneSuscripcionActiva } from "@/lib/suscripcion";
+import { limiteModulos } from "@/lib/limites";
 
 // El asistente de importación ya mostró los grupos (vía /api/upload/grupos) y el
 // usuario eligió cuáles quedarse, con nombre y roles ya confirmados/editados. Aquí se
@@ -15,11 +15,6 @@ interface SeleccionGrupo {
   // cree un módulo "Stock" (Producto + Cantidad en 0) a partir de sus productos.
   crearStock?: boolean;
 }
-
-// Tope de módulos por empresa: evita que una empresa (sobre todo gratis) acumule
-// decenas de tablas de prueba/abandonadas. Se revisa antes de crear nada (todo o nada).
-const LIMITE_MODULOS_GRATIS = 10;
-const LIMITE_MODULOS_PAGO = 30;
 
 export async function POST(request: NextRequest) {
   const supabase = await crearClienteServidor();
@@ -77,13 +72,10 @@ export async function POST(request: NextRequest) {
   }
 
   const modulosNuevos = gruposAImportar.length + gruposAImportar.filter(({ sel }) => sel?.crearStock).length;
-  const { count: modulosActuales } = await supabase.from("datasets").select("id", { count: "exact", head: true }).eq("empresa_id", empresaId);
-  const limite = (await tieneSuscripcionActiva(supabase, empresaId)) ? LIMITE_MODULOS_PAGO : LIMITE_MODULOS_GRATIS;
-  if ((modulosActuales ?? 0) + modulosNuevos > limite) {
+  const { actuales: modulosActuales, limite } = await limiteModulos(supabase, empresaId);
+  if (modulosActuales + modulosNuevos > limite) {
     return NextResponse.json(
-      {
-        error: `Tu plan permite hasta ${limite} módulos y ya tienes ${modulosActuales}. Esto crearía ${modulosNuevos} más. Borra algún módulo que no uses${limite === LIMITE_MODULOS_GRATIS ? ", o activa el plan pago para hasta " + LIMITE_MODULOS_PAGO : ""}.`,
-      },
+      { error: `Tu plan permite hasta ${limite} módulos y ya tienes ${modulosActuales}. Esto crearía ${modulosNuevos} más. Borra algún módulo que no uses, o activa el plan pago para hasta 30.` },
       { status: 422 }
     );
   }

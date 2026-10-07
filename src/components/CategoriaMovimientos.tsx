@@ -35,37 +35,47 @@ const nombreMes = (clave: string) => {
 // módulo nuevo -- son los mismos módulos de siempre, vistos por separado.
 export default function CategoriaMovimientos({ tipo }: { tipo: TipoModulo }) {
   const [cargando, setCargando] = useState(true);
+  const [empresaId, setEmpresaId] = useState<string | null>(null);
   const [modulos, setModulos] = useState<{ datasetId: string; nombre: string; columnas: Columna[]; reporte?: ModuloReporte }[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [registrando, setRegistrando] = useState<string | null>(null);
   const [mensajeRegistro, setMensajeRegistro] = useState<Record<string, string>>({});
 
+  const [creandoTabla, setCreandoTabla] = useState(false);
+  const [nombreTabla, setNombreTabla] = useState("");
+  const [errorTabla, setErrorTabla] = useState<string | null>(null);
+  const [enviandoTabla, setEnviandoTabla] = useState(false);
+
+  async function cargar() {
+    const supabase = crearClienteBrowser();
+    const sesion = await empresaDelUsuario(supabase);
+    if (!sesion.ok) {
+      setError(sesion.error);
+      return setCargando(false);
+    }
+    setEmpresaId(sesion.empresaId);
+
+    const { data: datasets } = await supabase.from("datasets").select("id, nombre, columnas").eq("empresa_id", sesion.empresaId);
+    const delTipo = (datasets ?? []).filter((d) => tipoModulo((d.columnas as Columna[]).map((c) => c.rol)) === tipo);
+
+    const resReportes = await fetch("/api/reportes");
+    const bodyReportes = await resReportes.json();
+    const reportesPorId = new Map<string, ModuloReporte>((bodyReportes.modulos ?? []).map((m: ModuloReporte) => [m.datasetId, m]));
+
+    setModulos(
+      delTipo.map((d) => ({
+        datasetId: d.id,
+        nombre: d.nombre,
+        columnas: d.columnas as Columna[],
+        reporte: reportesPorId.get(d.id),
+      }))
+    );
+    setCargando(false);
+  }
+
   useEffect(() => {
-    (async () => {
-      const supabase = crearClienteBrowser();
-      const sesion = await empresaDelUsuario(supabase);
-      if (!sesion.ok) {
-        setError(sesion.error);
-        return setCargando(false);
-      }
-
-      const { data: datasets } = await supabase.from("datasets").select("id, nombre, columnas").eq("empresa_id", sesion.empresaId);
-      const delTipo = (datasets ?? []).filter((d) => tipoModulo((d.columnas as Columna[]).map((c) => c.rol)) === tipo);
-
-      const resReportes = await fetch("/api/reportes");
-      const bodyReportes = await resReportes.json();
-      const reportesPorId = new Map<string, ModuloReporte>((bodyReportes.modulos ?? []).map((m: ModuloReporte) => [m.datasetId, m]));
-
-      setModulos(
-        delTipo.map((d) => ({
-          datasetId: d.id,
-          nombre: d.nombre,
-          columnas: d.columnas as Columna[],
-          reporte: reportesPorId.get(d.id),
-        }))
-      );
-      setCargando(false);
-    })();
+    cargar();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tipo]);
 
   async function registrar(datasetId: string, valores: Record<string, unknown>): Promise<string | null> {
@@ -78,6 +88,25 @@ export default function CategoriaMovimientos({ tipo }: { tipo: TipoModulo }) {
     if (!res.ok) return body.error ?? "No se pudo guardar";
     setMensajeRegistro((m) => ({ ...m, [datasetId]: "Guardado." }));
     return null;
+  }
+
+  async function crearTabla(e: React.FormEvent) {
+    e.preventDefault();
+    if (!empresaId) return;
+    setErrorTabla(null);
+    setEnviandoTabla(true);
+    const res = await fetch("/api/datasets/crear", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ empresaId, tipo, nombre: nombreTabla }),
+    });
+    const body = await res.json();
+    setEnviandoTabla(false);
+    if (!res.ok) return setErrorTabla(body.error ?? "No se pudo crear la tabla");
+    setCreandoTabla(false);
+    setNombreTabla("");
+    setCargando(true);
+    cargar();
   }
 
   if (cargando) return null;
@@ -104,10 +133,46 @@ export default function CategoriaMovimientos({ tipo }: { tipo: TipoModulo }) {
           <h2 style={{ fontSize: 22 }}>Todavía no hay módulos de {titulo.toLowerCase()}</h2>
           <p>
             Sube un Excel y marca una columna como {tipo === "compras" ? "Proveedor" : "Cliente"} en &quot;Editar
-            tabla y campos&quot; para que aparezca acá.
+            tabla y campos&quot;, o arma una tabla en blanco con los campos ya listos para empezar a registrar a mano.
           </p>
-          <Link href="/dashboard/upload" className="btn btn-primario">Subir Excel</Link>
+          <div className="centrado" style={{ display: "flex", gap: 10, justifyContent: "center", flexWrap: "wrap" }}>
+            <Link href="/dashboard/upload" className="btn btn-secundario">Subir Excel</Link>
+            <button type="button" className="btn btn-primario" onClick={() => setCreandoTabla(true)}>
+              Crear tabla de {titulo} desde plantilla
+            </button>
+          </div>
         </div>
+      )}
+
+      {!error && modulos.length > 0 && !creandoTabla && (
+        <button type="button" className="btn btn-fantasma" style={{ marginBottom: 16 }} onClick={() => setCreandoTabla(true)}>
+          + Otra tabla de {titulo} desde plantilla
+        </button>
+      )}
+
+      {creandoTabla && (
+        <form onSubmit={crearTabla} className="tarjeta" style={{ marginBottom: 20, maxWidth: 420 }}>
+          <h3 style={{ marginTop: 0 }}>Nueva tabla de {titulo}</h3>
+          <p className="suave pequeno" style={{ marginBottom: 10 }}>
+            Arranca con las columnas típicas de {tipo === "compras" ? "una compra" : "una venta"}
+            {" "}(Fecha, {tipo === "compras" ? "Proveedor" : "Cliente"}, Producto, Monto
+            {tipo === "ventas" ? ", Costo" : ""}): puedes agregar, quitar o renombrar columnas después, en
+            &quot;Editar tabla y campos&quot;.
+          </p>
+          <div className="campo" style={{ marginBottom: 10 }}>
+            <label htmlFor="nombre-tabla">Nombre (opcional)</label>
+            <input id="nombre-tabla" value={nombreTabla} onChange={(e) => setNombreTabla(e.target.value)} placeholder={titulo} />
+          </div>
+          {errorTabla && <p className="alerta alerta-error" role="alert">{errorTabla}</p>}
+          <div style={{ display: "flex", gap: 8 }}>
+            <button type="submit" className="btn btn-primario" disabled={enviandoTabla}>
+              {enviandoTabla ? "Creando..." : "Crear tabla"}
+            </button>
+            <button type="button" className="btn btn-fantasma" onClick={() => setCreandoTabla(false)} disabled={enviandoTabla}>
+              Cancelar
+            </button>
+          </div>
+        </form>
       )}
 
       {modulos.map((m) => {
