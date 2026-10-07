@@ -1,6 +1,6 @@
 // "Rol" = qué significa una columna para el negocio (no solo su tipo de dato).
 // El asistente lo necesita para saber, por ejemplo, cuál es el monto de una venta.
-export type RolColumna = "monto" | "fecha" | "cliente" | "producto" | "telefono" | "costo" | "proveedor" | "gastos";
+export type RolColumna = "monto" | "fecha" | "cliente" | "producto" | "telefono" | "costo" | "proveedor" | "gastos" | "tipo_movimiento";
 
 export const ROLES: { valor: RolColumna; etiqueta: string }[] = [
   { valor: "monto", etiqueta: "Monto (importe de la venta o movimiento)" },
@@ -11,6 +11,7 @@ export const ROLES: { valor: RolColumna; etiqueta: string }[] = [
   { valor: "proveedor", etiqueta: "Proveedor (a quién le compras)" },
   { valor: "producto", etiqueta: "Producto o concepto" },
   { valor: "telefono", etiqueta: "Teléfono (para WhatsApp)" },
+  { valor: "tipo_movimiento", etiqueta: "Tipo de movimiento (si cada fila dice si es venta o compra)" },
 ];
 
 // El orden importa: "Teléfono del cliente" debe caer en telefono, no en cliente,
@@ -25,6 +26,7 @@ export const ROLES: { valor: RolColumna; etiqueta: string }[] = [
 const REGLAS: { rol: RolColumna; patron: RegExp; tipo?: string }[] = [
   { rol: "telefono", patron: /tel|cel|whats|movil|fono/ },
   { rol: "fecha", patron: /fecha|date/, tipo: "fecha" },
+  { rol: "tipo_movimiento", patron: /^tipo$|tipo.*(movim|transac|registro)/, tipo: "texto" },
   { rol: "monto", patron: /monto|venta|importe|total|precio|ingreso|entrada/, tipo: "numero" },
   { rol: "costo", patron: /costo|gasto|egreso/, tipo: "numero" },
   { rol: "producto", patron: /producto|juego|item|articulo|descripcion|concepto|detalle/, tipo: "texto" },
@@ -32,8 +34,18 @@ const REGLAS: { rol: RolColumna; patron: RegExp; tipo?: string }[] = [
   { rol: "cliente", patron: /cliente|comprador|nombre/, tipo: "texto" },
 ];
 
-function normalizar(s: string): string {
+export function normalizar(s: string): string {
   return s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
+}
+
+// Para la columna "Tipo de movimiento": a qué lado (venta/compra) cae cada
+// valor de fila, usado por el divisor automático (ver lib/divisor.ts).
+export function esVenta(valor: unknown): boolean {
+  return /venta|ingreso|entrada/.test(normalizar(String(valor ?? "")));
+}
+
+export function esCompra(valor: unknown): boolean {
+  return /compra|egreso|salida/.test(normalizar(String(valor ?? "")));
 }
 
 // Propone un rol por columna (máximo una columna por rol). Es solo una

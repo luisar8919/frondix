@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { crearClienteServidor } from "@/lib/supabase/server";
 import { agruparHojas, type Columna } from "@/lib/excel-parser";
 import { insertarRegistros, deshacerTabla, MAX_FILAS_IMPORTACION } from "@/lib/insertar";
 import { limiteModulos } from "@/lib/limites";
+import { dividirVentasYCompras } from "@/lib/divisor";
 
 // El asistente de importación ya mostró los grupos (vía /api/upload/grupos) y el
 // usuario eligió cuáles quedarse, con nombre y roles ya confirmados/editados. Aquí se
@@ -14,6 +16,46 @@ interface SeleccionGrupo {
   // Si esta tabla tiene columna de Producto, el usuario pudo pedir que además se
   // cree un módulo "Stock" (Producto + Cantidad en 0) a partir de sus productos.
   crearStock?: boolean;
+  // Si esta tabla tiene columna de Tipo de movimiento, el usuario pudo pedir que
+  // se divida en Ventas y Compras en vez de un solo módulo mixto.
+  dividir?: boolean;
+}
+
+// Crea un módulo: completa la fecha si falta (igual que antes, ver abajo),
+// inserta el dataset y sus filas. Reusado tanto para el camino normal como
+// para cada mitad de un grupo dividido en Ventas/Compras.
+async function crearModulo(
+  supabase: SupabaseClient,
+  empresaId: string,
+  nombre: string,
+  columnasBase: Columna[],
+  filasBase: Record<string, unknown>[]
+): Promise<{ datasetId: string; nombre: string; filasImportadas: number } | { error: string }> {
+  // Los reportes/highlights dependen de tener una fecha (tendencia mensual,
+  // "últimos 50 registros"). Si no hay ninguna columna de fecha, se agrega una
+  // con la fecha de hoy como referencia en vez de dejarlo sin fecha.
+  let columnas = columnasBase;
+  let filas = filasBase;
+  if (!columnas.some((c) => c.rol === "fecha")) {
+    const hoy = new Date().toISOString().slice(0, 10);
+    columnas = [...columnas, { key: "fecha_carga", label: "Fecha de carga", tipo: "fecha", rol: "fecha", sospechosa: false }];
+    filas = filasBase.map((f) => ({ ...f, fecha_carga: hoy }));
+  }
+
+  const { data: dataset, error: errorDataset } = await supabase
+    .from("datasets")
+    .insert({ empresa_id: empresaId, nombre, columnas })
+    .select()
+    .single();
+  if (errorDataset || !dataset) return { error: errorDataset?.message ?? "No se pudo crear uno de los módulos" };
+
+  const errorInsertar = await insertarRegistros(supabase, dataset.id, filas);
+  if (errorInsertar) {
+    await deshacerTabla(supabase, dataset.id);
+    return { error: `No se pudo importar "${nombre}": ${errorInsertar}` };
+  }
+
+  return { datasetId: dataset.id, nombre, filasImportadas: filas.length };
 }
 
 export async function POST(request: NextRequest) {
@@ -71,7 +113,11 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const modulosNuevos = gruposAImportar.length + gruposAImportar.filter(({ sel }) => sel?.crearStock).length;
+  // Dividir reemplaza 1 módulo por 2 (Ventas + Compras): +1 neto por cada grupo dividido.
+  const modulosNuevos =
+    gruposAImportar.length +
+    gruposAImportar.filter(({ sel }) => sel?.crearStock).length +
+    gruposAImportar.filter(({ sel }) => sel?.dividir).length;
   const { actuales: modulosActuales, limite } = await limiteModulos(supabase, empresaId);
   if (modulosActuales + modulosNuevos > limite) {
     return NextResponse.json(
@@ -81,54 +127,67 @@ export async function POST(request: NextRequest) {
   }
 
   const creados: { datasetId: string; nombre: string; hojas: string[]; filasImportadas: number }[] = [];
+  const avisos: string[] = [];
 
   for (const { grupo, sel } of gruposAImportar) {
     const nombreDataset = sel?.nombre?.trim() || (grupo.hojas.length > 1 ? `${grupo.hojas[0]} y otras` : grupo.hojas[0]);
 
     // Solo se toman label/rol de la selección del usuario; key y tipo los sigue
     // decidiendo el parser, para no desalinear los datos ya extraídos del Excel.
-    let columnas: Columna[] = grupo.columnas.map((c) => {
+    const columnas: Columna[] = grupo.columnas.map((c) => {
       const edicion = sel?.columnas?.find((e) => e.key === c.key);
       return edicion ? { ...c, label: edicion.label || c.label, rol: (edicion.rol as Columna["rol"]) ?? null } : c;
     });
 
-    // Los reportes/highlights dependen de tener una fecha (tendencia mensual,
-    // "últimos 50 registros"). Si el Excel no trae ninguna columna de fecha,
-    // se agrega una con la fecha de hoy como referencia en vez de dejarlo sin fecha.
-    let filas = grupo.filas;
-    if (!columnas.some((c) => c.rol === "fecha")) {
-      const hoy = new Date().toISOString().slice(0, 10);
-      columnas = [...columnas, { key: "fecha_carga", label: "Fecha de carga", tipo: "fecha", rol: "fecha", sospechosa: false }];
-      filas = grupo.filas.map((f) => ({ ...f, fecha_carga: hoy }));
+    const cTipo = sel?.dividir ? columnas.find((c) => c.rol === "tipo_movimiento") : undefined;
+
+    if (cTipo) {
+      // Divide las filas en Ventas/Compras según esa columna, y completa el costo
+      // de cada venta con el monto de compra más reciente del mismo producto (ver
+      // lib/divisor.ts). La columna de tipo no viaja a ninguno de los dos módulos:
+      // ya quedó implícita en a cuál fue a parar cada fila.
+      const cProducto = columnas.find((c) => c.rol === "producto");
+      const cMonto = columnas.find((c) => c.rol === "monto");
+      const cFecha = columnas.find((c) => c.rol === "fecha");
+      let cCosto = columnas.find((c) => c.rol === "costo");
+
+      const sinTipo = columnas.filter((c) => c.key !== cTipo.key);
+      let columnasVentas = sinTipo;
+      if (!cCosto) {
+        cCosto = { key: "costo", label: "Costo", tipo: "numero", rol: "costo", sospechosa: false };
+        columnasVentas = [...sinTipo, cCosto];
+      }
+      // La misma columna de "contraparte" significa Cliente en la mitad de Ventas
+      // y Proveedor en la de Compras -- se reasigna el rol, nunca se duplica la columna.
+      const columnasCompras = sinTipo.map((c) => (c.rol === "cliente" ? { ...c, rol: "proveedor" as const } : c));
+
+      const { ventas, compras, sinClasificar } = dividirVentasYCompras(grupo.filas, cTipo.key, {
+        claveProducto: cProducto?.key,
+        claveMonto: cMonto?.key,
+        claveFecha: cFecha?.key,
+        claveCosto: cCosto.key,
+      });
+
+      if (ventas.length > 0) {
+        const r = await crearModulo(supabase, empresaId, `${nombreDataset} - Ventas`, columnasVentas, ventas);
+        if ("error" in r) return NextResponse.json({ error: r.error, creadosHastaAhora: creados }, { status: 500 });
+        creados.push({ ...r, hojas: grupo.hojas });
+      }
+      if (compras.length > 0) {
+        const r = await crearModulo(supabase, empresaId, `${nombreDataset} - Compras`, columnasCompras, compras);
+        if ("error" in r) return NextResponse.json({ error: r.error, creadosHastaAhora: creados }, { status: 500 });
+        creados.push({ ...r, hojas: grupo.hojas });
+      }
+      if (sinClasificar > 0) {
+        avisos.push(`${sinClasificar} fila(s) de "${nombreDataset}" no decían claramente si eran venta o compra y se dejaron fuera.`);
+      }
+      continue;
     }
 
-    const { data: dataset, error: errorDataset } = await supabase
-      .from("datasets")
-      .insert({ empresa_id: empresaId, nombre: nombreDataset, columnas })
-      .select()
-      .single();
-    if (errorDataset || !dataset) {
-      return NextResponse.json(
-        { error: errorDataset?.message ?? "No se pudo crear uno de los módulos", creadosHastaAhora: creados },
-        { status: 500 }
-      );
-    }
-
-    const errorInsertar = await insertarRegistros(supabase, dataset.id, filas);
-    if (errorInsertar) {
-      await deshacerTabla(supabase, dataset.id);
-      return NextResponse.json(
-        { error: `No se pudo importar "${nombreDataset}": ${errorInsertar}`, creadosHastaAhora: creados },
-        { status: 500 }
-      );
-    }
-
-    creados.push({
-      datasetId: dataset.id,
-      nombre: nombreDataset,
-      hojas: grupo.hojas,
-      filasImportadas: grupo.filas.length,
-    });
+    const r = await crearModulo(supabase, empresaId, nombreDataset, columnas, grupo.filas);
+    if ("error" in r) return NextResponse.json({ error: r.error, creadosHastaAhora: creados }, { status: 500 });
+    creados.push({ ...r, hojas: grupo.hojas });
+    const dataset = { id: r.datasetId };
 
     // Módulo Stock opcional: Producto (enlazado al producto de este módulo) + Cantidad
     // en 0, una fila por cada producto distinto que aparece en lo que se acaba de
@@ -140,7 +199,7 @@ export async function POST(request: NextRequest) {
       if (colProducto) {
         const vistos = new Set<string>();
         const productos: string[] = [];
-        for (const f of filas) {
+        for (const f of grupo.filas) {
           const texto = f[colProducto.key] === null || f[colProducto.key] === undefined ? "" : String(f[colProducto.key]).trim();
           if (texto && !vistos.has(texto)) {
             vistos.add(texto);
@@ -171,5 +230,5 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  return NextResponse.json({ tablas: creados, hojasOmitidas });
+  return NextResponse.json({ tablas: creados, hojasOmitidas, avisos });
 }

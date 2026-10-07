@@ -29,6 +29,9 @@ interface EdicionGrupo {
   // Si esta tabla tiene columna de Producto, el usuario puede pedir que además se
   // cree un módulo "Stock" (Producto + Cantidad en 0, una fila por producto distinto).
   crearStock: boolean;
+  // Si esta tabla tiene columna de Tipo de movimiento, el usuario puede pedir que
+  // se divida en dos módulos (Ventas y Compras) en vez de uno mixto.
+  dividir: boolean;
 }
 
 interface ModuloCreado {
@@ -52,6 +55,7 @@ const aEdicion = (g: GrupoDetectado): EdicionGrupo => ({
   nombre: g.nombreSugerido,
   columnas: g.columnas.map((c) => ({ key: c.key, label: c.label, rol: (c.rol ?? "") as RolColumna | "" })),
   crearStock: false,
+  dividir: false,
 });
 
 export default function UploadPage() {
@@ -63,7 +67,7 @@ export default function UploadPage() {
   const [ediciones, setEdiciones] = useState<EdicionGrupo[]>([]);
   const [pestanaActiva, setPestanaActiva] = useState(0);
   const [sugiriendoIA, setSugiriendoIA] = useState<number | null>(null);
-  const [resultado, setResultado] = useState<{ tablas: ModuloCreado[] } | null>(null);
+  const [resultado, setResultado] = useState<{ tablas: ModuloCreado[]; avisos?: string[] } | null>(null);
   const [empresaId, setEmpresaId] = useState<string | null>(null);
   const [planActivo, setPlanActivo] = useState<boolean | null>(null);
 
@@ -157,6 +161,7 @@ export default function UploadPage() {
             nombre: e.nombre,
             columnas: e.columnas.map((c) => ({ key: c.key, label: c.label, rol: c.rol || null })),
             crearStock: e.crearStock,
+            dividir: e.dividir,
           }))
         )
       );
@@ -288,6 +293,24 @@ export default function UploadPage() {
                 Detectamos una pestaña de Stock. También se puede armar cruzando los productos que ya vendiste
                 en tus módulos de Ventas (cuántas unidades de cada uno).
               </p>
+            )}
+
+            {ed.incluir && ed.columnas.some((c) => c.rol === "tipo_movimiento") && (
+              <div className="alerta alerta-aviso" style={{ marginTop: 14 }}>
+                <p style={{ margin: 0 }}>
+                  Esta tabla parece mezclar ventas y compras en las mismas filas. Se puede dividir en dos módulos
+                  (Ventas y Compras) en vez de uno solo -- de paso, a cada venta le completamos el costo con el
+                  monto de la compra más reciente del mismo producto, cuando la venta no traía uno propio.
+                </p>
+                <button
+                  type="button"
+                  className={`btn ${ed.dividir ? "btn-primario" : "btn-secundario"}`}
+                  style={{ marginTop: 10, padding: "4px 14px" }}
+                  onClick={() => cambiarGrupo(pestanaActiva, { dividir: !ed.dividir })}
+                >
+                  {ed.dividir ? "✓ Se va a dividir en Ventas y Compras" : "Dividir en Ventas y Compras"}
+                </button>
+              </div>
             )}
 
             {ed.incluir && !pareceReporte(g.hojas) && !pareceStock(g.hojas) && ed.columnas.some((c) => c.rol === "producto") && (
@@ -434,6 +457,11 @@ export default function UploadPage() {
           <h2 style={{ fontSize: 22 }}>
             Listo: se {resultado.tablas.length === 1 ? "creó 1 módulo" : `crearon ${resultado.tablas.length} módulos`}
           </h2>
+          {resultado.avisos && resultado.avisos.length > 0 && (
+            <div style={{ marginTop: 10 }}>
+              {resultado.avisos.map((a, i) => <p key={i} className="alerta alerta-aviso">{a}</p>)}
+            </div>
+          )}
           <div className="grilla-tablas" style={{ marginTop: 14 }}>
             {resultado.tablas.map((t) => (
               <Link key={t.datasetId} href={`/dashboard/${t.datasetId}`} className="tarjeta tarjeta-tabla">
