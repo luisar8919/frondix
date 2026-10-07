@@ -12,7 +12,11 @@ export async function GET(req: NextRequest) {
 
   const host = req.headers.get("x-forwarded-host") ?? req.nextUrl.host;
   const proto = req.headers.get("x-forwarded-proto") ?? req.nextUrl.protocol.replace(":", "");
-  const response = NextResponse.redirect(`${proto}://${host}/auth/completar`);
+  // "invite" se manda a /auth/completar para que pida crear una contraseña --
+  // quien llega por invitación nunca pasó por el formulario de signup, que es
+  // donde normalmente se define.
+  const destino = type === "invite" ? "/auth/completar?type=invite" : "/auth/completar";
+  const response = NextResponse.redirect(`${proto}://${host}${destino}`);
 
   if (tokenHash && type) {
     const supabase = createServerClient(

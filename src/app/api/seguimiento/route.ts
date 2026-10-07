@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { crearClienteServidor } from "@/lib/supabase/server";
+import { empresaDelUsuarioServidor } from "@/lib/sesionServidor";
 import { claveValida } from "@/lib/enlaces";
 import { tieneSuscripcionActiva } from "@/lib/suscripcion";
 import {
@@ -37,22 +38,14 @@ const columnaConRol = (columnas: Columna[], rol: string) => columnas.find((c) =>
 
 export async function GET(req: NextRequest) {
   const supabase = await crearClienteServidor();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ error: "No autenticado" }, { status: 401 });
+  const sesion = await empresaDelUsuarioServidor(supabase);
+  if (!sesion.ok) return NextResponse.json({ error: sesion.error }, { status: 401 });
 
   const dias = Math.min(365, Math.max(1, parseInt(req.nextUrl.searchParams.get("dias") ?? "30", 10) || 30));
   const ahora = new Date();
 
-  const { data: miembro } = await supabase
-    .from("miembros")
-    .select("empresa_id, empresas(nombre)")
-    .eq("user_id", user.id)
-    .limit(1)
-    .single();
-  if (!miembro) return NextResponse.json({ error: "No tienes una empresa asociada" }, { status: 404 });
-
-  const empresaId = miembro.empresa_id as string;
-  const negocio = (miembro.empresas as unknown as { nombre: string } | null)?.nombre ?? "";
+  const empresaId = sesion.empresaId;
+  const negocio = sesion.empresas.find((e) => e.empresaId === empresaId)?.nombre ?? "";
   const plan = (await tieneSuscripcionActiva(supabase, empresaId)) ? "activo" : "gratis";
 
   const { data: datasets, error: errorDatasets } = await supabase

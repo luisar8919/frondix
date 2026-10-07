@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { crearClienteServidor } from "@/lib/supabase/server";
+import { empresaDelUsuarioServidor } from "@/lib/sesionServidor";
 import { crearClienteAdmin } from "@/lib/supabase/admin";
 import { calcularModulosReporte, resumenConLibresParaIA, huellaModulos } from "@/lib/datosReportes";
 import { generarHighlights } from "@/lib/gemini";
@@ -16,12 +17,9 @@ const UN_DIA_MS = 24 * 60 * 60 * 1000;
 // "¿cambió algo?" (eso sería gastar una llamada para decidir si gastar otra llamada).
 export async function GET() {
   const supabase = await crearClienteServidor();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ error: "No autenticado" }, { status: 401 });
-
-  const { data: miembro } = await supabase.from("miembros").select("empresa_id").eq("user_id", user.id).limit(1).single();
-  if (!miembro) return NextResponse.json({ error: "No tienes una empresa asociada" }, { status: 404 });
-  const empresaId = miembro.empresa_id;
+  const sesion = await empresaDelUsuarioServidor(supabase);
+  if (!sesion.ok) return NextResponse.json({ error: sesion.error }, { status: 401 });
+  const empresaId = sesion.empresaId;
 
   if (!(await tieneSuscripcionActiva(supabase, empresaId))) {
     return NextResponse.json(

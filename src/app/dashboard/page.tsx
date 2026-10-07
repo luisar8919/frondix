@@ -1,26 +1,21 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { crearClienteServidor } from "@/lib/supabase/server";
+import { empresaDelUsuarioServidor } from "@/lib/sesionServidor";
 
 export default async function DashboardPage() {
   const supabase = await crearClienteServidor();
-  const { data: { user } } = await supabase.auth.getUser();
   // El middleware no corre en Azure Static Web Apps: la página misma exige la sesión.
-  if (!user) redirect("/login");
-
-  const { data: miembro } = await supabase
-    .from("miembros")
-    .select("empresa_id, empresas(nombre)")
-    .eq("user_id", user.id)
-    .single();
+  const sesion = await empresaDelUsuarioServidor(supabase);
+  if (!sesion.ok) redirect("/login");
 
   const { data: datasets } = await supabase
     .from("datasets")
     .select("id, nombre, created_at")
-    .eq("empresa_id", miembro?.empresa_id)
+    .eq("empresa_id", sesion.empresaId)
     .order("created_at", { ascending: false });
 
-  const empresa = (miembro?.empresas as any)?.nombre ?? "tu negocio";
+  const empresa = sesion.empresas.find((e) => e.empresaId === sesion.empresaId)?.nombre ?? "tu negocio";
   const hayModulos = !!datasets && datasets.length > 0;
 
   return (

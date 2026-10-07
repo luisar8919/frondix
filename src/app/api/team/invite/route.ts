@@ -42,7 +42,14 @@ export async function POST(req: NextRequest) {
   let invitadoId = existentes?.users.find((u) => u.email === email)?.id;
 
   if (!invitadoId) {
-    const { data: invitado, error: errorInvite } = await admin.auth.admin.inviteUserByEmail(email);
+    // Mismo patrón que /auth/callback y /auth/confirm: nunca confiar en req.url
+    // directo (Azure pone el dominio real en estos headers), para que el enlace
+    // del correo apunte al dominio que el usuario realmente está usando.
+    const host = req.headers.get("x-forwarded-host") ?? req.nextUrl.host;
+    const proto = req.headers.get("x-forwarded-proto") ?? req.nextUrl.protocol.replace(":", "");
+    const { data: invitado, error: errorInvite } = await admin.auth.admin.inviteUserByEmail(email, {
+      redirectTo: `${proto}://${host}/auth/confirm`,
+    });
     if (errorInvite || !invitado.user) {
       return NextResponse.json({ error: errorInvite?.message ?? "No se pudo invitar" }, { status: 500 });
     }
