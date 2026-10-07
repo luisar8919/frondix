@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { crearClienteServidor } from "@/lib/supabase/server";
 import { crearClienteAdmin } from "@/lib/supabase/admin";
 import { tieneSuscripcionActiva } from "@/lib/suscripcion";
+import { limitesDelUsuario } from "@/lib/limites";
 
 // Invita por email a un miembro de la empresa. Solo dueno/admin puede hacerlo
 // (la policy RLS de "miembros" ya lo exige, pero lo validamos antes también
@@ -54,6 +55,17 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: errorInvite?.message ?? "No se pudo invitar" }, { status: 500 });
     }
     invitadoId = invitado.user.id;
+  }
+
+  // Tope de a cuántas empresas puede sumarse alguien como invitado (no dueño) en
+  // TODA la plataforma, no solo en esta empresa -- ver limites.ts. Con el admin
+  // client porque acá se revisa al invitado, no a quien invita.
+  const limites = await limitesDelUsuario(admin, invitadoId);
+  if (limites.invitado >= limites.maxInvitado) {
+    return NextResponse.json(
+      { error: `Esa persona ya es invitada en ${limites.invitado} de ${limites.maxInvitado} empresas que permite su plan.` },
+      { status: 422 }
+    );
   }
 
   const { error: errorMiembro } = await admin

@@ -1,11 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import Logo from "@/components/Logo";
 import { crearClienteBrowser } from "@/lib/supabase/client";
-import { empresaDelUsuario, elegirEmpresaActiva, type EmpresaDeUsuario } from "@/lib/sesion";
 
 const enlaces = [
   { href: "/dashboard", texto: "Mis módulos" },
@@ -13,26 +12,27 @@ const enlaces = [
   { href: "/dashboard/seguimiento", texto: "Seguimiento" },
   { href: "/dashboard/reportes", texto: "Reportes" },
   { href: "/dashboard/team", texto: "Equipo" },
-  { href: "/dashboard/cuenta", texto: "Mi cuenta" },
+];
+
+const itemsMenu = [
+  { href: "/dashboard/cuenta", texto: "Mis datos" },
+  { href: "/dashboard/empresa", texto: "Mi empresa" },
   { href: "/dashboard/billing", texto: "Plan y pagos" },
 ];
 
 export default function BarraPanel() {
   const ruta = usePathname();
   const router = useRouter();
-  const [empresas, setEmpresas] = useState<EmpresaDeUsuario[] | null>(null);
-  const [empresaActual, setEmpresaActual] = useState<string | null>(null);
+  const [menuAbierto, setMenuAbierto] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
 
-  // Casi siempre es 1 sola empresa (no se muestra nada); el selector solo
-  // aparece para quien gestiona más de un negocio (invitado a otro, además del suyo).
+  // Cierra el menú al tocar afuera.
   useEffect(() => {
-    (async () => {
-      const sesion = await empresaDelUsuario(crearClienteBrowser());
-      if (sesion.ok && sesion.empresas.length > 1) {
-        setEmpresas(sesion.empresas);
-        setEmpresaActual(sesion.empresaId);
-      }
-    })();
+    function alTocarFuera(e: MouseEvent) {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) setMenuAbierto(false);
+    }
+    document.addEventListener("mousedown", alTocarFuera);
+    return () => document.removeEventListener("mousedown", alTocarFuera);
   }, []);
 
   // "Mis módulos" también queda marcada dentro de un módulo concreto (/dashboard/<id>).
@@ -57,19 +57,29 @@ export default function BarraPanel() {
             </Link>
           ))}
         </nav>
-        {empresas && empresaActual && (
-          <select
-            aria-label="Empresa que estás gestionando"
-            value={empresaActual}
-            onChange={(e) => elegirEmpresaActiva(e.target.value)}
-            style={{ marginRight: 10 }}
+        <div className="menu-cuenta" ref={menuRef}>
+          <button
+            type="button"
+            className="menu-cuenta-boton"
+            aria-haspopup="menu"
+            aria-expanded={menuAbierto}
+            onClick={() => setMenuAbierto((v) => !v)}
           >
-            {empresas.map((e) => (
-              <option key={e.empresaId} value={e.empresaId}>{e.nombre}</option>
-            ))}
-          </select>
-        )}
-        <button type="button" className="btn btn-fantasma" onClick={salir}>Salir</button>
+            Mi cuenta
+          </button>
+          {menuAbierto && (
+            <div className="menu-cuenta-lista" role="menu">
+              {itemsMenu.map((item) => (
+                <Link key={item.href} href={item.href} className="menu-cuenta-item" role="menuitem" onClick={() => setMenuAbierto(false)}>
+                  {item.texto}
+                </Link>
+              ))}
+              <button type="button" className="menu-cuenta-item" role="menuitem" onClick={salir}>
+                Salir
+              </button>
+            </div>
+          )}
+        </div>
       </div>
     </header>
   );
