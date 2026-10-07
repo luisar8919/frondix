@@ -13,6 +13,11 @@ export default function CuentaPage() {
   const [nombreEmpresa, setNombreEmpresa] = useState("");
   const [error, setError] = useState<string | null>(null);
 
+  const [password, setPassword] = useState("");
+  const [passwordConfirmar, setPasswordConfirmar] = useState("");
+  const [mensajePassword, setMensajePassword] = useState<{ tipo: "ok" | "error"; texto: string } | null>(null);
+  const [guardandoPassword, setGuardandoPassword] = useState(false);
+
   useEffect(() => {
     (async () => {
       const supabase = crearClienteBrowser();
@@ -32,6 +37,21 @@ export default function CuentaPage() {
     })();
   }, []);
 
+  async function cambiarPassword(e: React.FormEvent) {
+    e.preventDefault();
+    setMensajePassword(null);
+    if (password !== passwordConfirmar) {
+      return setMensajePassword({ tipo: "error", texto: "Las contraseñas no coinciden." });
+    }
+    setGuardandoPassword(true);
+    const { error: errorPass } = await crearClienteBrowser().auth.updateUser({ password });
+    setGuardandoPassword(false);
+    if (errorPass) return setMensajePassword({ tipo: "error", texto: errorPass.message });
+    setPassword("");
+    setPasswordConfirmar("");
+    setMensajePassword({ tipo: "ok", texto: "Contraseña actualizada." });
+  }
+
   if (cargando) return null;
 
   return (
@@ -45,7 +65,7 @@ export default function CuentaPage() {
 
       {error && <p className="alerta alerta-error" role="alert">{error}</p>}
 
-      <div className="tarjeta" style={{ maxWidth: 460 }}>
+      <div className="tarjeta" style={{ maxWidth: 460, marginBottom: 20 }}>
         <div className="campo">
           <label htmlFor="email-cuenta">Email</label>
           <input id="email-cuenta" value={email} disabled />
@@ -59,6 +79,41 @@ export default function CuentaPage() {
           <input id="rol-cuenta" value={rol ? ETIQUETA_ROL[rol] ?? rol : ""} disabled />
         </div>
       </div>
+
+      <form onSubmit={cambiarPassword} className="tarjeta" style={{ maxWidth: 460 }}>
+        <h3 style={{ marginTop: 0 }}>Cambiar contraseña</h3>
+        <div className="campo">
+          <label htmlFor="password-nueva">Nueva contraseña</label>
+          <input
+            id="password-nueva"
+            type="password"
+            autoComplete="new-password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            required
+            minLength={6}
+          />
+        </div>
+        <div className="campo" style={{ marginBottom: 0 }}>
+          <label htmlFor="password-confirmar">Repetirla</label>
+          <input
+            id="password-confirmar"
+            type="password"
+            autoComplete="new-password"
+            value={passwordConfirmar}
+            onChange={(e) => setPasswordConfirmar(e.target.value)}
+            required
+            minLength={6}
+          />
+          <p className="ayuda">Mínimo 6 caracteres.</p>
+        </div>
+
+        {mensajePassword && <p className={`alerta alerta-${mensajePassword.tipo}`} role="status" style={{ marginTop: 14 }}>{mensajePassword.texto}</p>}
+
+        <button type="submit" className="btn btn-primario" style={{ marginTop: 14 }} disabled={guardandoPassword}>
+          {guardandoPassword ? "Guardando..." : "Cambiar contraseña"}
+        </button>
+      </form>
     </>
   );
 }

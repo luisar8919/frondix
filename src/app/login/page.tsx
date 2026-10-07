@@ -76,6 +76,9 @@ function LoginForm() {
               <label htmlFor="password">Contraseña</label>
               <input id="password" type="password" autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} required />
             </div>
+            <p className="pequeno" style={{ margin: "-6px 0 14px" }}>
+              <Link href="/recuperar">¿Olvidaste tu contraseña?</Link>
+            </p>
             {error && <p className="alerta alerta-error" role="alert">{error}</p>}
             <button type="submit" className="btn btn-primario btn-grande btn-bloque" disabled={enviando}>
               {enviando ? "Ingresando..." : "Ingresar"}

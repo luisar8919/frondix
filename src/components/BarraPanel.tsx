@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import Logo from "@/components/Logo";
 import { crearClienteBrowser } from "@/lib/supabase/client";
+import { COOKIE_EMPRESA_ACTIVA } from "@/lib/sesion";
 
 const enlaces = [
   { href: "/dashboard", texto: "Mis módulos" },
@@ -42,6 +43,10 @@ export default function BarraPanel() {
 
   async function salir() {
     await crearClienteBrowser().auth.signOut();
+    // Si otra persona usa el mismo navegador después, que no herede la empresa
+    // que tenías elegida (no es un problema de seguridad -- RLS igual la filtra
+    // por usuario -- pero sí de confusión).
+    document.cookie = `${COOKIE_EMPRESA_ACTIVA}=; path=/; max-age=0`;
     router.push("/");
     router.refresh();
   }

@@ -5,16 +5,18 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { crearClienteBrowser } from "@/lib/supabase/client";
 import Logo from "@/components/Logo";
 
-// Aterriza aquí cualquier login (Google u otro que se sume después) y también la
-// invitación a un equipo. Tres casos:
+// Aterriza aquí cualquier login (Google u otro que se sume después), la
+// invitación a un equipo y la recuperación de contraseña. Cuatro casos:
 // 1. Primera vez con Google (sin empresa todavía): pide el nombre del negocio,
 //    igual que el signup por email.
 // 2. Invitado (?type=invite, ver /auth/confirm): ya tiene empresa asignada (el
 //    que invita la crea al mandar la invitación) pero nunca puso una contraseña
 //    -- nunca pasó por el formulario de signup, que es donde se define. Se le
 //    pide una antes de entrar.
-// 3. Ya tiene cuenta y empresa (volvió a confirmar un enlace viejo, por ejemplo):
-//    pasa directo al panel.
+// 3. Recuperando su contraseña (?type=recovery, ver /recuperar): mismo paso de
+//    contraseña que el invitado, pero ya tiene cuenta y empresa de antes.
+// 4. Ya tiene cuenta y empresa, sin pedir contraseña (volvió a confirmar un
+//    enlace viejo, por ejemplo): pasa directo al panel.
 export default function CompletarPage() {
   return (
     <Suspense fallback={null}>
@@ -32,7 +34,8 @@ function CompletarForm() {
   const [error, setError] = useState<string | null>(null);
   const [enviando, setEnviando] = useState(false);
   const router = useRouter();
-  const esInvitacion = useSearchParams().get("type") === "invite";
+  const tipo = useSearchParams().get("type");
+  const pidePassword = tipo === "invite" || tipo === "recovery";
 
   useEffect(() => {
     const supabase = crearClienteBrowser();
@@ -50,7 +53,7 @@ function CompletarForm() {
         supabase.from("miembros").select("empresa_id").eq("user_id", session.user.id).limit(1).single()
           .then(({ data: miembro }) => {
             if (!activo) return;
-            if (miembro && esInvitacion) {
+            if (miembro && pidePassword) {
               setPaso("password");
               setCargando(false);
             } else if (miembro) {
@@ -72,7 +75,7 @@ function CompletarForm() {
       activo = false;
       subscription.unsubscribe();
     };
-  }, [router, esInvitacion]);
+  }, [router, pidePassword]);
 
   async function onSubmitEmpresa(e: React.FormEvent) {
     e.preventDefault();
@@ -114,7 +117,11 @@ function CompletarForm() {
           {paso === "password" ? (
             <>
               <h1>Ya casi</h1>
-              <p className="suave">Te invitaron a un equipo en Frondix. Crea una contraseña para poder volver a entrar.</p>
+              <p className="suave">
+                {tipo === "recovery"
+                  ? "Pon tu contraseña nueva."
+                  : "Te invitaron a un equipo en Frondix. Crea una contraseña para poder volver a entrar."}
+              </p>
               <form onSubmit={onSubmitPassword}>
                 <div className="campo">
                   <label htmlFor="password">Contraseña</label>
