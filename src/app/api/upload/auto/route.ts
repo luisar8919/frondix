@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { crearClienteServidor } from "@/lib/supabase/server";
-import { agruparHojas, type Columna } from "@/lib/excel-parser";
+import { agruparHojas, type Columna, type GrupoHojas } from "@/lib/excel-parser";
 import { insertarRegistros, deshacerTabla, MAX_FILAS_IMPORTACION } from "@/lib/insertar";
 import { limiteModulos } from "@/lib/limites";
-import { dividirVentasYCompras } from "@/lib/divisor";
+import { tipoModulo } from "@/lib/roles";
+import { dividirVentasYCompras, preciosDeCompra, combinarPrecios, completarCostos, cantidadesDeStock, type PrecioCompra } from "@/lib/divisor";
 
 // El asistente de importación ya mostró los grupos (vía /api/upload/grupos) y el
 // usuario eligió cuáles quedarse, con nombre y roles ya confirmados/editados. Aquí se
@@ -14,16 +15,16 @@ interface SeleccionGrupo {
   nombre?: string;
   columnas?: { key: string; label: string; rol: string | null }[];
   // Si esta tabla tiene columna de Producto, el usuario pudo pedir que además se
-  // cree un módulo "Stock" (Producto + Cantidad en 0) a partir de sus productos.
+  // cree un módulo "Stock" (Producto + Cantidad) a partir de sus productos.
   crearStock?: boolean;
   // Si esta tabla tiene columna de Tipo de movimiento, el usuario pudo pedir que
   // se divida en Ventas y Compras en vez de un solo módulo mixto.
   dividir?: boolean;
 }
 
-// Crea un módulo: completa la fecha si falta (igual que antes, ver abajo),
-// inserta el dataset y sus filas. Reusado tanto para el camino normal como
-// para cada mitad de un grupo dividido en Ventas/Compras.
+// Crea un módulo: completa la fecha si falta (ver abajo), inserta el dataset
+// y sus filas. Reusado para el camino normal, cada mitad de un grupo
+// dividido, y el módulo Stock.
 async function crearModulo(
   supabase: SupabaseClient,
   empresaId: string,
@@ -56,6 +57,15 @@ async function crearModulo(
   }
 
   return { datasetId: dataset.id, nombre, filasImportadas: filas.length };
+}
+
+// Columnas de un grupo con label/rol ya editados por el usuario -- sin tocar
+// key/tipo, que siguen decidiendo lo que ya extrajo el parser.
+function columnasEditadas(grupo: GrupoHojas, sel: SeleccionGrupo | undefined): Columna[] {
+  return grupo.columnas.map((c) => {
+    const edicion = sel?.columnas?.find((e) => e.key === c.key);
+    return edicion ? { ...c, label: edicion.label || c.label, rol: (edicion.rol as Columna["rol"]) ?? null } : c;
+  });
 }
 
 export async function POST(request: NextRequest) {
@@ -126,60 +136,99 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const creados: { datasetId: string; nombre: string; hojas: string[]; filasImportadas: number }[] = [];
+  // --- Pasada 1: mirar TODO lo que se va a importar junto, antes de crear nada ---
+  // Cada grupo se resuelve una sola vez (columnas editadas, si se divide, a qué
+  // tipo clasifica) para no repetir ese trabajo entre la pasada de "juntar
+  // precios/stock de cualquier pestaña" y la de crear los módulos.
   const avisos: string[] = [];
+  const infos = gruposAImportar.map(({ grupo, sel }) => {
+    const columnas = columnasEditadas(grupo, sel);
+    const cTipo = sel?.dividir ? columnas.find((c) => c.rol === "tipo_movimiento") : undefined;
+    const division = cTipo ? dividirVentasYCompras(grupo.filas, cTipo.key) : undefined;
+    if (division && division.sinClasificar > 0) {
+      const nombre = sel?.nombre?.trim() || grupo.hojas[0];
+      avisos.push(`${division.sinClasificar} fila(s) de "${nombre}" no decían claramente si eran venta o compra y se dejaron fuera.`);
+    }
+    return {
+      grupo,
+      sel,
+      columnas,
+      cTipo,
+      division,
+      tipo: tipoModulo(columnas.map((c) => c.rol)),
+      cProducto: columnas.find((c) => c.rol === "producto"),
+      cMonto: columnas.find((c) => c.rol === "monto"),
+      cFecha: columnas.find((c) => c.rol === "fecha"),
+      cCosto: columnas.find((c) => c.rol === "costo"),
+      cStock: columnas.find((c) => c.rol === "stock"),
+    };
+  });
 
-  for (const { grupo, sel } of gruposAImportar) {
+  // Precio de compra más reciente por producto, juntando TODAS las fuentes del
+  // archivo: una pestaña entera de Compras, o la mitad de compras de cualquier
+  // pestaña dividida -- no solo la que se está procesando en cada momento.
+  const mapasPrecios: Map<string, PrecioCompra>[] = [];
+  for (const info of infos) {
+    if (!info.cProducto || !info.cMonto) continue;
+    if (info.division) mapasPrecios.push(preciosDeCompra(info.division.compras, info.cProducto.key, info.cMonto.key, info.cFecha?.key));
+    else if (info.tipo === "compras") mapasPrecios.push(preciosDeCompra(info.grupo.filas, info.cProducto.key, info.cMonto.key, info.cFecha?.key));
+  }
+  const preciosGlobal = combinarPrecios(mapasPrecios);
+
+  // Cantidad de stock por producto, de cualquier pestaña que tenga columna
+  // Stock marcada -- independiente de si esa pestaña es de ventas o compras.
+  const stockGlobal = new Map<string, number>();
+  for (const info of infos) {
+    if (!info.cProducto || !info.cStock) continue;
+    const filasFuente = info.division ? [...info.division.ventas, ...info.division.compras] : info.grupo.filas;
+    for (const [producto, cantidad] of cantidadesDeStock(filasFuente, info.cProducto.key, info.cStock.key)) {
+      stockGlobal.set(producto, cantidad);
+    }
+  }
+
+  // Completa el costo de las ventas (de cualquier pestaña, dividida o no) con
+  // los precios de compra juntados arriba -- antes de crear nada, para que el
+  // flujo de caja de cada módulo ya salga bien desde la primera vez.
+  if (preciosGlobal.size > 0) {
+    for (const info of infos) {
+      if (!info.cProducto) continue;
+      if (info.division) {
+        // Si la mitad de ventas no tiene columna de costo, la pasada 2 le agrega
+        // una con key "costo" (igual que acá abajo) -- se completa con esa misma key.
+        const claveCosto = info.cCosto?.key ?? "costo";
+        completarCostos(info.division.ventas, preciosGlobal, info.cProducto.key, claveCosto);
+      } else if (info.tipo === "ventas" && info.cCosto) {
+        completarCostos(info.grupo.filas, preciosGlobal, info.cProducto.key, info.cCosto.key);
+      }
+    }
+  }
+
+  // --- Pasada 2: crear los módulos con todo ya resuelto ---
+  const creados: { datasetId: string; nombre: string; hojas: string[]; filasImportadas: number }[] = [];
+
+  for (const info of infos) {
+    const { grupo, sel, columnas, cTipo, division } = info;
     const nombreDataset = sel?.nombre?.trim() || (grupo.hojas.length > 1 ? `${grupo.hojas[0]} y otras` : grupo.hojas[0]);
 
-    // Solo se toman label/rol de la selección del usuario; key y tipo los sigue
-    // decidiendo el parser, para no desalinear los datos ya extraídos del Excel.
-    const columnas: Columna[] = grupo.columnas.map((c) => {
-      const edicion = sel?.columnas?.find((e) => e.key === c.key);
-      return edicion ? { ...c, label: edicion.label || c.label, rol: (edicion.rol as Columna["rol"]) ?? null } : c;
-    });
-
-    const cTipo = sel?.dividir ? columnas.find((c) => c.rol === "tipo_movimiento") : undefined;
-
-    if (cTipo) {
-      // Divide las filas en Ventas/Compras según esa columna, y completa el costo
-      // de cada venta con el monto de compra más reciente del mismo producto (ver
-      // lib/divisor.ts). La columna de tipo no viaja a ninguno de los dos módulos:
-      // ya quedó implícita en a cuál fue a parar cada fila.
-      const cProducto = columnas.find((c) => c.rol === "producto");
-      const cMonto = columnas.find((c) => c.rol === "monto");
-      const cFecha = columnas.find((c) => c.rol === "fecha");
-      let cCosto = columnas.find((c) => c.rol === "costo");
-
+    if (cTipo && division) {
+      // La columna de tipo no viaja a ninguno de los dos módulos: ya quedó
+      // implícita en a cuál fue a parar cada fila.
       const sinTipo = columnas.filter((c) => c.key !== cTipo.key);
       let columnasVentas = sinTipo;
-      if (!cCosto) {
-        cCosto = { key: "costo", label: "Costo", tipo: "numero", rol: "costo", sospechosa: false };
-        columnasVentas = [...sinTipo, cCosto];
-      }
+      if (!info.cCosto) columnasVentas = [...sinTipo, { key: "costo", label: "Costo", tipo: "numero", rol: "costo", sospechosa: false }];
       // La misma columna de "contraparte" significa Cliente en la mitad de Ventas
       // y Proveedor en la de Compras -- se reasigna el rol, nunca se duplica la columna.
       const columnasCompras = sinTipo.map((c) => (c.rol === "cliente" ? { ...c, rol: "proveedor" as const } : c));
 
-      const { ventas, compras, sinClasificar } = dividirVentasYCompras(grupo.filas, cTipo.key, {
-        claveProducto: cProducto?.key,
-        claveMonto: cMonto?.key,
-        claveFecha: cFecha?.key,
-        claveCosto: cCosto.key,
-      });
-
-      if (ventas.length > 0) {
-        const r = await crearModulo(supabase, empresaId, `${nombreDataset} - Ventas`, columnasVentas, ventas);
+      if (division.ventas.length > 0) {
+        const r = await crearModulo(supabase, empresaId, `${nombreDataset} - Ventas`, columnasVentas, division.ventas);
         if ("error" in r) return NextResponse.json({ error: r.error, creadosHastaAhora: creados }, { status: 500 });
         creados.push({ ...r, hojas: grupo.hojas });
       }
-      if (compras.length > 0) {
-        const r = await crearModulo(supabase, empresaId, `${nombreDataset} - Compras`, columnasCompras, compras);
+      if (division.compras.length > 0) {
+        const r = await crearModulo(supabase, empresaId, `${nombreDataset} - Compras`, columnasCompras, division.compras);
         if ("error" in r) return NextResponse.json({ error: r.error, creadosHastaAhora: creados }, { status: 500 });
         creados.push({ ...r, hojas: grupo.hojas });
-      }
-      if (sinClasificar > 0) {
-        avisos.push(`${sinClasificar} fila(s) de "${nombreDataset}" no decían claramente si eran venta o compra y se dejaron fuera.`);
       }
       continue;
     }
@@ -189,11 +238,11 @@ export async function POST(request: NextRequest) {
     creados.push({ ...r, hojas: grupo.hojas });
     const dataset = { id: r.datasetId };
 
-    // Módulo Stock opcional: Producto (enlazado al producto de este módulo) + Cantidad
-    // en 0, una fila por cada producto distinto que aparece en lo que se acaba de
-    // importar. El usuario edita las cantidades a mano después -- esto solo arma el
-    // punto de partida. Si algo falla acá no se revierte el módulo principal, que ya
-    // quedó bien creado.
+    // Módulo Stock opcional: Producto (enlazado al producto de este módulo) +
+    // Cantidad, una fila por cada producto distinto que aparece en lo que se
+    // acaba de importar. Si alguna pestaña del archivo traía una columna Stock
+    // real para ese producto, se usa esa cantidad; si no, empieza en 0 y el
+    // usuario la corrige a mano después.
     if (sel?.crearStock) {
       const colProducto = columnas.find((c) => c.rol === "producto");
       if (colProducto) {
@@ -217,7 +266,7 @@ export async function POST(request: NextRequest) {
             .select()
             .single();
           if (!errorStock && datasetStock) {
-            const filasStock = productos.map((producto) => ({ producto, cantidad: 0 }));
+            const filasStock = productos.map((producto) => ({ producto, cantidad: stockGlobal.get(producto) ?? 0 }));
             const errorInsertarStock = await insertarRegistros(supabase, datasetStock.id, filasStock);
             if (!errorInsertarStock) {
               creados.push({ datasetId: datasetStock.id, nombre: datasetStock.nombre, hojas: [], filasImportadas: filasStock.length });

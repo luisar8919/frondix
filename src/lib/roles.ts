@@ -1,6 +1,6 @@
 // "Rol" = qué significa una columna para el negocio (no solo su tipo de dato).
 // El asistente lo necesita para saber, por ejemplo, cuál es el monto de una venta.
-export type RolColumna = "monto" | "fecha" | "cliente" | "producto" | "telefono" | "costo" | "proveedor" | "gastos" | "tipo_movimiento";
+export type RolColumna = "monto" | "fecha" | "cliente" | "producto" | "telefono" | "costo" | "proveedor" | "gastos" | "tipo_movimiento" | "stock";
 
 export const ROLES: { valor: RolColumna; etiqueta: string }[] = [
   { valor: "monto", etiqueta: "Monto (importe de la venta o movimiento)" },
@@ -12,6 +12,7 @@ export const ROLES: { valor: RolColumna; etiqueta: string }[] = [
   { valor: "producto", etiqueta: "Producto o concepto" },
   { valor: "telefono", etiqueta: "Teléfono (para WhatsApp)" },
   { valor: "tipo_movimiento", etiqueta: "Tipo de movimiento (si cada fila dice si es venta o compra)" },
+  { valor: "stock", etiqueta: "Stock (cuánto tienes ahora de ese producto)" },
 ];
 
 // El orden importa: "Teléfono del cliente" debe caer en telefono, no en cliente,
@@ -27,6 +28,7 @@ const REGLAS: { rol: RolColumna; patron: RegExp; tipo?: string }[] = [
   { rol: "telefono", patron: /tel|cel|whats|movil|fono/ },
   { rol: "fecha", patron: /fecha|date/, tipo: "fecha" },
   { rol: "tipo_movimiento", patron: /^tipo$|tipo.*(movim|transac|registro)/, tipo: "texto" },
+  { rol: "stock", patron: /^stock$|inventario|existencia/, tipo: "numero" },
   { rol: "monto", patron: /monto|venta|importe|total|precio|ingreso|entrada/, tipo: "numero" },
   { rol: "costo", patron: /costo|gasto|egreso/, tipo: "numero" },
   { rol: "producto", patron: /producto|juego|item|articulo|descripcion|concepto|detalle/, tipo: "texto" },
