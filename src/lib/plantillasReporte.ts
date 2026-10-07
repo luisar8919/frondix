@@ -20,6 +20,7 @@ export const PLANTILLAS_REPORTE: PlantillaReporte[] = [
   { id: "top_clientes", nombre: "Mejores clientes", descripcion: "Ranking de tus clientes.", rolesNecesarios: ["cliente"] },
   { id: "top_proveedores", nombre: "Proveedores por monto", descripcion: "A quién le compras más.", rolesNecesarios: ["proveedor"] },
   { id: "total_simple", nombre: "Total sumado", descripcion: "Suma general, para módulos de caja sin fecha.", rolesNecesarios: ["monto"] },
+  { id: "gastos_adicionales", nombre: "Gastos adicionales", descripcion: "Suma de envío, comisión u otro gasto aparte del monto.", rolesNecesarios: ["gastos"] },
 ];
 
 // Qué plantillas quedan armadas con los roles que ya se marcaron en estas columnas.

@@ -1,10 +1,11 @@
 // "Rol" = qué significa una columna para el negocio (no solo su tipo de dato).
 // El asistente lo necesita para saber, por ejemplo, cuál es el monto de una venta.
-export type RolColumna = "monto" | "fecha" | "cliente" | "producto" | "telefono" | "costo" | "proveedor";
+export type RolColumna = "monto" | "fecha" | "cliente" | "producto" | "telefono" | "costo" | "proveedor" | "gastos";
 
 export const ROLES: { valor: RolColumna; etiqueta: string }[] = [
   { valor: "monto", etiqueta: "Monto (importe de la venta o movimiento)" },
   { valor: "costo", etiqueta: "Costo (lo que te costó vender o producir)" },
+  { valor: "gastos", etiqueta: "Gastos adicionales (envío, comisión, etc.)" },
   { valor: "fecha", etiqueta: "Fecha" },
   { valor: "cliente", etiqueta: "Cliente" },
   { valor: "proveedor", etiqueta: "Proveedor (a quién le compras)" },
@@ -17,6 +18,10 @@ export const ROLES: { valor: RolColumna; etiqueta: string }[] = [
 // "cliente" porque si no "Nombre del proveedor" caería en cliente (su patrón
 // incluye "nombre"), y "costo" antes que "monto" no hace falta porque sus
 // patrones no se cruzan (ninguna palabra de costo aparece en el patrón de monto).
+// "gastos" no tiene regla acá a propósito: su significado se superpone con
+// "costo" (que ya reconoce la palabra "gasto") -- se asigna a mano o viene
+// ya puesto en las plantillas de Compras/Ventas (ver plantillasModulo.ts),
+// nunca por detección automática, para no competir con "costo" en Excels reales.
 const REGLAS: { rol: RolColumna; patron: RegExp; tipo?: string }[] = [
   { rol: "telefono", patron: /tel|cel|whats|movil|fono/ },
   { rol: "fecha", patron: /fecha|date/, tipo: "fecha" },

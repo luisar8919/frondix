@@ -1,5 +1,5 @@
 import * as XLSX from "xlsx";
-import { sugerirRoles, type RolColumna } from "./roles.ts";
+import { sugerirRoles, tipoModulo, type RolColumna } from "./roles.ts";
 
 export type TipoColumna = "texto" | "numero" | "fecha";
 
@@ -246,6 +246,17 @@ function mismaFamilia(a: Set<string>, b: Set<string>): boolean {
   return comunes / chica.size >= 0.7;
 }
 
+// Una hoja de Ventas (columna Cliente) y una de Compras (columna Proveedor)
+// pueden compartir Fecha/Producto/Monto y pasar el 70% de mismaFamilia -- pero
+// mezclarlas en una sola tabla es justo lo que no se quiere (dificulta
+// sustentar cada una por separado). Se cortan acá, antes de agrupar, aunque
+// el resto de columnas coincida.
+function tiposIncompatibles(a: Columna[], b: Columna[]): boolean {
+  const tipoA = tipoModulo(a.map((c) => c.rol));
+  const tipoB = tipoModulo(b.map((c) => c.rol));
+  return tipoA !== "otro" && tipoB !== "otro" && tipoA !== tipoB;
+}
+
 // Agrupa las hojas del archivo por estructura parecida y arma hasta `maxGrupos`
 // tablas, cada una usando como esquema el de la hoja con más columnas del grupo
 // (las hojas del grupo con menos columnas completan esos campos como null).
@@ -278,7 +289,9 @@ export function agruparHojas(
   const grupos: HojaParseada[][] = [];
   for (const hoja of hojas) {
     const keysHoja = new Set(hoja.columnas.map((c) => c.key));
-    const grupo = grupos.find((g) => mismaFamilia(keysHoja, new Set(g[0].columnas.map((c) => c.key))));
+    const grupo = grupos.find(
+      (g) => mismaFamilia(keysHoja, new Set(g[0].columnas.map((c) => c.key))) && !tiposIncompatibles(hoja.columnas, g[0].columnas)
+    );
     if (grupo) grupo.push(hoja);
     else grupos.push([hoja]);
   }

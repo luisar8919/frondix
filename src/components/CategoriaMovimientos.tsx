@@ -20,6 +20,7 @@ interface ModuloReporte {
   topCliente: RankingItem[] | null;
   topProveedor: RankingItem[] | null;
   sumaTotal: number | null;
+  sumaGastos: number | null;
   flujoCaja: FlujoCaja | null;
 }
 
@@ -156,8 +157,8 @@ export default function CategoriaMovimientos({ tipo }: { tipo: TipoModulo }) {
           <p className="suave pequeno" style={{ marginBottom: 10 }}>
             Arranca con las columnas típicas de {tipo === "compras" ? "una compra" : "una venta"}
             {" "}(Fecha, {tipo === "compras" ? "Proveedor" : "Cliente"}, Producto, Monto
-            {tipo === "ventas" ? ", Costo" : ""}): puedes agregar, quitar o renombrar columnas después, en
-            &quot;Editar tabla y campos&quot;.
+            {tipo === "ventas" ? ", Costo" : ""}, Gastos de {sustantivo}): puedes agregar, quitar o renombrar
+            columnas después, en &quot;Editar tabla y campos&quot;.
           </p>
           <div className="campo" style={{ marginBottom: 10 }}>
             <label htmlFor="nombre-tabla">Nombre (opcional)</label>
@@ -228,6 +229,14 @@ export default function CategoriaMovimientos({ tipo }: { tipo: TipoModulo }) {
               <div className="tarjeta" style={{ marginTop: 14, padding: 14 }}>
                 <strong>Total</strong>
                 <p style={{ margin: "6px 0 0" }}>{soles(r.sumaTotal)}</p>
+              </div>
+            )}
+
+            {r?.sumaGastos !== null && r?.sumaGastos !== undefined && (
+              <div className="tarjeta" style={{ marginTop: 14, padding: 14 }}>
+                <strong>Gastos adicionales de {sustantivo}</strong>
+                <p className="suave pequeno" style={{ margin: "2px 0 0" }}>Envío, comisión u otro gasto aparte del monto.</p>
+                <p style={{ margin: "6px 0 0", fontWeight: 700 }}>{soles(r.sumaGastos)}</p>
               </div>
             )}
 

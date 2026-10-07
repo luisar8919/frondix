@@ -11,6 +11,7 @@ export function plantillaVentas(): Columna[] {
     { key: "producto", label: "Producto", tipo: "texto", rol: "producto", sospechosa: false },
     { key: "monto", label: "Monto", tipo: "numero", rol: "monto", sospechosa: false },
     { key: "costo", label: "Costo", tipo: "numero", rol: "costo", sospechosa: false },
+    { key: "gastos_venta", label: "Gastos de venta", tipo: "numero", rol: "gastos", sospechosa: false },
   ];
 }
 
@@ -20,5 +21,6 @@ export function plantillaCompras(): Columna[] {
     { key: "proveedor", label: "Proveedor", tipo: "texto", rol: "proveedor", sospechosa: false },
     { key: "producto", label: "Producto o concepto", tipo: "texto", rol: "producto", sospechosa: false },
     { key: "monto", label: "Monto", tipo: "numero", rol: "monto", sospechosa: false },
+    { key: "gastos_compra", label: "Gastos de compra", tipo: "numero", rol: "gastos", sospechosa: false },
   ];
 }

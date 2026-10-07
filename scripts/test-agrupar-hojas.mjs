@@ -33,6 +33,20 @@ assert.strictEqual(ventas.filas.find((f) => f.juegos === "Mario").ganancia, null
 assert.strictEqual(grupos.find((g) => g.hojas.includes("Caja Nov")).hojas.length, 1, "Caja es otra familia");
 assert.strictEqual(hojasOmitidas.length, 0);
 
+// --- Ventas (Cliente) y Compras (Proveedor) comparten Fecha/Producto/Monto
+// (>=70% columnas en común) pero NO se deben fusionar en una sola tabla ---
+const { grupos: grupos2 } = agruparHojas(libro({
+  Ventas: [
+    ["Fecha", "Cliente", "Producto", "Monto"],
+    ["2026-01-01", "Ana", "Polo", 50],
+  ],
+  Compras: [
+    ["Fecha", "Proveedor", "Producto", "Monto"],
+    ["2026-01-02", "Textiles SAC", "Tela", 200],
+  ],
+}), 3);
+assert.strictEqual(grupos2.length, 2, "Ventas y Compras quedan en grupos separados aunque compartan columnas");
+
 // --- más de 3 familias: se omiten las de menos datos ---
 const libro4 = libro(Object.fromEntries(["A", "B", "C", "D"].map((n, i) => [
   n, [[`col_${n}`, "x"], ...Array.from({ length: (4 - i) * 2 }, (_, j) => [`v${j}`, j])],

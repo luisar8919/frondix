@@ -22,6 +22,7 @@ interface Modulo {
   topCliente: RankingItem[] | null;
   topProveedor: RankingItem[] | null;
   sumaTotal: number | null;
+  sumaGastos: number | null;
   flujoCaja: FlujoCaja | null;
   metas: ProgresoMeta[] | null;
 }
@@ -242,6 +243,14 @@ export default function ReportesPage() {
                   {soles(m.sumaTotal)}
                   <span className="suave pequeno" style={{ marginLeft: 6 }}>(no tiene columna de fecha para mostrarlo por mes)</span>
                 </p>
+              </div>
+            )}
+
+            {m.sumaGastos !== null && (
+              <div className="tarjeta" style={{ marginTop: 14, padding: 14 }}>
+                <strong>Gastos adicionales</strong>
+                <p className="suave pequeno" style={{ margin: "2px 0 0" }}>Envío, comisión u otro gasto aparte del monto.</p>
+                <p style={{ margin: "6px 0 0", fontWeight: 700 }}>{soles(m.sumaGastos)}</p>
               </div>
             )}
 

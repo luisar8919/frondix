@@ -38,6 +38,7 @@ export interface ModuloReporte {
   topCliente: ReturnType<typeof topPor> | null;
   topProveedor: ReturnType<typeof topPor> | null;
   sumaTotal: number | null;
+  sumaGastos: number | null;
   flujoCaja: ReturnType<typeof flujoCaja> | null;
   metas: (ReturnType<typeof progresoMetas>[number] & { id: string })[] | null;
 }
@@ -65,6 +66,7 @@ export async function calcularModulosReporte(supabase: SupabaseClient, empresaId
     const cProducto = columnaConRol(columnas, "producto");
     const cCliente = columnaConRol(columnas, "cliente");
     const cProveedor = columnaConRol(columnas, "proveedor");
+    const cGastos = columnaConRol(columnas, "gastos");
 
     const conTotales = !!(cFecha && cMonto);
     const conTopProducto = !!cProducto;
@@ -72,7 +74,8 @@ export async function calcularModulosReporte(supabase: SupabaseClient, empresaId
     const conTopProveedor = !!cProveedor;
     const conFlujoCaja = !!(cMonto && cCosto);
     const conSumaTotal = !!cMonto && !conTotales && !conFlujoCaja;
-    if (!conTotales && !conTopProducto && !conTopCliente && !conTopProveedor && !conSumaTotal && !conFlujoCaja) continue;
+    const conGastos = !!cGastos;
+    if (!conTotales && !conTopProducto && !conTopCliente && !conTopProveedor && !conSumaTotal && !conFlujoCaja && !conGastos) continue;
 
     const filas = await leerFilas(supabase, d.id, {
       ...(cFecha && { f: cFecha.key }),
@@ -81,6 +84,7 @@ export async function calcularModulosReporte(supabase: SupabaseClient, empresaId
       ...(cProducto && { p: cProducto.key }),
       ...(cCliente && { c: cCliente.key }),
       ...(cProveedor && { pr: cProveedor.key }),
+      ...(cGastos && { g: cGastos.key }),
     });
 
     const plantillas = [
@@ -90,6 +94,7 @@ export async function calcularModulosReporte(supabase: SupabaseClient, empresaId
       conTopCliente && "top_clientes",
       conTopProveedor && "top_proveedores",
       conSumaTotal && "total_simple",
+      conGastos && "gastos_adicionales",
     ].filter((x): x is string => !!x);
 
     let metas: ModuloReporte["metas"] = null;
@@ -111,6 +116,7 @@ export async function calcularModulosReporte(supabase: SupabaseClient, empresaId
       topCliente: conTopCliente ? topPor(filas.map((f) => ({ clave: f.c, m: f.m })), 5) : null,
       topProveedor: conTopProveedor ? topPor(filas.map((f) => ({ clave: f.pr, m: f.m })), 5) : null,
       sumaTotal: conSumaTotal ? sumaMonto(filas) : null,
+      sumaGastos: conGastos ? sumaMonto(filas.map((f) => ({ m: f.g }))) : null,
       flujoCaja: conFlujoCaja ? flujoCaja(filas.map((f) => ({ m: f.m, costo: f.co })), !!d.incluye_igv) : null,
       metas,
     });
@@ -139,6 +145,7 @@ export function resumenParaIA(modulos: ModuloReporte[], opciones?: { omitirNombr
         lineas.push(`  Ventas por mes (últimos ${m.totalesPorMes.length}): ${ultimos}`);
       }
       if (m.sumaTotal !== null) lineas.push(`  Total: S/ ${m.sumaTotal}`);
+      if (m.sumaGastos !== null) lineas.push(`  Gastos adicionales: S/ ${m.sumaGastos}`);
       if (m.topProducto?.length) lineas.push(`  Top productos: ${m.topProducto.map((p) => `${p.clave} (${p.total > 0 ? "S/ " + p.total : p.veces + "x"})`).join(", ")}`);
       if (m.topCliente?.length && !opciones?.omitirNombresCliente) {
         lineas.push(`  Top clientes: ${m.topCliente.map((c) => `${c.clave} (${c.total > 0 ? "S/ " + c.total : c.veces + "x"})`).join(", ")}`);
@@ -232,6 +239,7 @@ export function huellaModulos(modulos: ModuloReporte[]): string {
     topCliente: m.topCliente,
     topProveedor: m.topProveedor,
     sumaTotal: m.sumaTotal,
+    sumaGastos: m.sumaGastos,
     flujoCaja: m.flujoCaja,
     metas: m.metas?.map(({ id, ...resto }) => resto), // el id de la meta es aleatorio, no un dato real
   }));
