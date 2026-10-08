@@ -5,11 +5,14 @@ import { agruparHojas } from "@/lib/excel-parser";
 import { sugerirEstructuraConIA } from "@/lib/sugerencia-ia";
 import { tieneSuscripcionActiva } from "@/lib/suscripcion";
 
-// Cada llamada cuesta dinero real en la API de Claude; este tope evita que una
-// cuenta (comprometida o por error) genere un gasto grande sin que nadie lo note.
-const LIMITE_POR_HORA = 10;
+// Cada llamada cuesta tokens reales de la API de Gemini; este tope es por
+// DOCUMENTO (identificado por su nombre de archivo, ver migracion-13), no por
+// empresa -- así alguien puede seguir pidiendo sugerencias para un Excel
+// distinto el mismo día, pero no insistir sin límite sobre el mismo archivo.
+const LIMITE_POR_DOCUMENTO = 3;
+const UN_DIA_MS = 24 * 60 * 60 * 1000;
 
-// Re-parsea el mismo archivo (no se guarda nada entre pasos) y le pide a Claude una
+// Re-parsea el mismo archivo (no se guarda nada entre pasos) y le pide a Gemini una
 // mejor etiqueta y rol para las columnas de un grupo puntual. Requiere sesión, para
 // no dejar este endpoint (que cuesta dinero por llamada) abierto sin autenticar, y
 // plan pago: cada llamada le cuesta real a Frondix, no solo al usuario.
@@ -33,16 +36,18 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  const documento = archivo.name.slice(0, 200);
   const admin = crearClienteAdmin();
-  const haceUnaHora = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+  const hace1Dia = new Date(Date.now() - UN_DIA_MS).toISOString();
   const { count } = await admin
     .from("ia_llamadas")
     .select("id", { count: "exact", head: true })
     .eq("empresa_id", empresaId)
-    .gte("created_at", haceUnaHora);
-  if ((count ?? 0) >= LIMITE_POR_HORA) {
+    .eq("documento", documento)
+    .gte("created_at", hace1Dia);
+  if ((count ?? 0) >= LIMITE_POR_DOCUMENTO) {
     return NextResponse.json(
-      { error: `Ya usaste las ${LIMITE_POR_HORA} sugerencias por IA que permite tu empresa esta hora. Intenta de nuevo más tarde.` },
+      { error: `Ya usaste las ${LIMITE_POR_DOCUMENTO} sugerencias por IA que permite este documento hoy. Prueba de nuevo mañana, o con otro archivo.` },
       { status: 429 }
     );
   }
@@ -63,10 +68,10 @@ export async function POST(request: NextRequest) {
       grupo.columnas.map((c) => ({ key: c.key, labelActual: c.label })),
       grupo.filas
     );
-    await admin.from("ia_llamadas").insert({ empresa_id: empresaId }); // solo se cuenta lo que sí costó
+    await admin.from("ia_llamadas").insert({ empresa_id: empresaId, documento }); // solo se cuenta lo que sí costó
     return NextResponse.json({ columnas });
   } catch (e) {
     const mensaje = e instanceof Error ? e.message : "No se pudo obtener la sugerencia";
-    return NextResponse.json({ error: mensaje }, { status: mensaje.includes("ANTHROPIC_API_KEY") ? 503 : 500 });
+    return NextResponse.json({ error: mensaje }, { status: mensaje.includes("GEMINI_API_KEY") ? 503 : 500 });
   }
 }

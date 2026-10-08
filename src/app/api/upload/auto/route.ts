@@ -179,7 +179,7 @@ export async function POST(request: NextRequest) {
   // tipo clasifica) para no repetir ese trabajo entre la pasada de "juntar
   // precios/stock de cualquier pestaña" y la de crear los módulos.
   const avisos: string[] = [];
-  const infos = gruposAImportar.map(({ grupo, sel }) => {
+  const infosBase = gruposAImportar.map(({ grupo, sel }) => {
     const columnas = columnasEditadas(grupo, sel);
     const cTipo = sel?.dividir ? columnas.find((c) => c.rol === "tipo_movimiento") : undefined;
     const division = cTipo ? dividirVentasYCompras(grupo.filas, cTipo.key) : undefined;
@@ -188,57 +188,69 @@ export async function POST(request: NextRequest) {
       avisos.push(`${division.sinClasificar} fila(s) de "${nombre}" no decían claramente si eran venta o compra y se dejaron fuera.`);
     }
 
-    const cProducto = columnas.find((c) => c.rol === "producto");
-    const cMonto = columnas.find((c) => c.rol === "monto");
-    const cCosto = columnas.find((c) => c.rol === "costo");
-    const cFecha = columnas.find((c) => c.rol === "fecha");
-    const cCliente = columnas.find((c) => c.rol === "cliente");
-    const cProveedor = columnas.find((c) => c.rol === "proveedor");
-    const cCantidad = columnas.find((c) => c.rol === "cantidad");
-
-    // Cada fila ya trae venta Y costo juntos (sin Tipo que las distinga): se
-    // arma una venta y una compra por fila, con columnas normalizadas (ver
-    // separarVentaYCosto). No tiene sentido al mismo tiempo que "dividir".
-    const separacion =
-      sel?.separar && !cTipo && cMonto && cCosto
-        ? separarVentaYCosto(grupo.filas, {
-            claveVenta: cMonto.key,
-            claveCosto: cCosto.key,
-            claveProducto: cProducto?.key,
-            claveCliente: cCliente?.key,
-            claveProveedor: cProveedor?.key,
-            claveCantidad: cCantidad?.key,
-            claveFecha: cFecha?.key,
-          })
-        : undefined;
-
     return {
       grupo,
       sel,
       columnas,
       cTipo,
       division,
-      separacion,
       tipo: tipoModulo(columnas.map((c) => c.rol)),
-      cProducto,
-      cMonto,
-      cFecha,
-      cCosto,
-      cCliente,
-      cProveedor,
+      cProducto: columnas.find((c) => c.rol === "producto"),
+      cMonto: columnas.find((c) => c.rol === "monto"),
+      cFecha: columnas.find((c) => c.rol === "fecha"),
+      cCosto: columnas.find((c) => c.rol === "costo"),
+      cCliente: columnas.find((c) => c.rol === "cliente"),
+      cProveedor: columnas.find((c) => c.rol === "proveedor"),
+      cCantidad: columnas.find((c) => c.rol === "cantidad"),
       cStock: columnas.find((c) => c.rol === "stock"),
     };
   });
 
+  // Precios ya conocidos ANTES de separar nada: una pestaña entera de Compras, o
+  // la mitad de compras de cualquier pestaña dividida por Tipo. Sirven para
+  // completar el costo que le falte a una fila de "Separar" usando lo que ya se
+  // sabe de OTRAS pestañas, además de lo que la propia hoja ya trae.
+  const preciosConocidos = combinarPrecios(
+    infosBase
+      .filter((i) => i.cProducto && i.cMonto && (i.division || i.tipo === "compras"))
+      .map((i) =>
+        preciosDeCompra(i.division ? i.division!.compras : i.grupo.filas, i.cProducto!.key, i.cMonto!.key, i.cFecha?.key)
+      )
+  );
+
+  // Cada fila ya trae venta Y costo juntos (sin Tipo que las distinga): se arma
+  // una venta y una compra por fila (ver separarVentaYCosto). Para que Compras
+  // quede con la MISMA cantidad de filas que Ventas (todo lo vendido se compró
+  // alguna vez), antes de separar se completa el costo que falte con el precio
+  // de compra más reciente del mismo producto -- de esta misma hoja primero
+  // (otro lote del mismo producto que sí trajo costo), y si no, de otra pestaña.
+  const infos = infosBase.map((info) => {
+    if (!info.sel?.separar || info.cTipo || !info.cMonto || !info.cCosto) return { ...info, separacion: undefined };
+
+    if (info.cProducto) {
+      const preciosDeEstaHoja = preciosDeCompra(info.grupo.filas, info.cProducto.key, info.cCosto.key, info.cFecha?.key);
+      const combinados = combinarPrecios([preciosConocidos, preciosDeEstaHoja]);
+      completarCostos(info.grupo.filas, combinados, info.cProducto.key, info.cCosto.key);
+    }
+
+    const separacion = separarVentaYCosto(info.grupo.filas, {
+      claveVenta: info.cMonto.key,
+      claveCosto: info.cCosto.key,
+      claveProducto: info.cProducto?.key,
+      claveCliente: info.cCliente?.key,
+      claveProveedor: info.cProveedor?.key,
+      claveCantidad: info.cCantidad?.key,
+      claveFecha: info.cFecha?.key,
+    });
+    return { ...info, separacion };
+  });
+
   // Precio de compra más reciente por producto, juntando TODAS las fuentes del
-  // archivo: una pestaña entera de Compras, o la mitad de compras de cualquier
-  // pestaña dividida -- no solo la que se está procesando en cada momento.
-  const mapasPrecios: Map<string, PrecioCompra>[] = [];
+  // archivo (ahora incluida la mitad de compras de "Separar") -- para completar
+  // el costo de los módulos de Ventas normales más abajo.
+  const mapasPrecios: Map<string, PrecioCompra>[] = [preciosConocidos];
   for (const info of infos) {
     if (info.separacion) mapasPrecios.push(preciosDeCompra(info.separacion.compras, "producto", "monto", "fecha"));
-    if (!info.cProducto || !info.cMonto) continue;
-    if (info.division) mapasPrecios.push(preciosDeCompra(info.division.compras, info.cProducto.key, info.cMonto.key, info.cFecha?.key));
-    else if (info.tipo === "compras") mapasPrecios.push(preciosDeCompra(info.grupo.filas, info.cProducto.key, info.cMonto.key, info.cFecha?.key));
   }
   const preciosGlobal = combinarPrecios(mapasPrecios);
 

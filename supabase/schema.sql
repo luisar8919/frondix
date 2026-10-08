@@ -183,6 +183,9 @@ grant execute on function public.quitar_columna(uuid, text) to authenticated;
 create table if not exists ia_llamadas (
   id uuid primary key default gen_random_uuid(),
   empresa_id uuid not null references empresas(id) on delete cascade,
+  -- Nombre del archivo, solo para "Sugerir con IA" (limite de 3/dia POR
+  -- documento); null para highlights, que limita por empresa, no por archivo.
+  documento text,
   created_at timestamptz not null default now()
 );
 create index if not exists ia_llamadas_empresa_fecha_idx on ia_llamadas (empresa_id, created_at desc);

@@ -70,6 +70,19 @@ const conCantidad = separarVentaYCosto(
   { claveVenta: "venta", claveCosto: "costo", claveProducto: "producto", claveCantidad: "unidades" }
 );
 assert.strictEqual(conCantidad.ventas[0].cantidad, 3);
+
+// Con columna de fecha: si esta fila la trae vacía, usa hoy; si la trae, la respeta
+const hoy = new Date().toISOString().slice(0, 10);
+const conFecha = separarVentaYCosto(
+  [
+    { producto: "Polo", venta: 50, costo: 20, fecha: "2026-01-15" },
+    { producto: "Short", venta: 35, costo: 15, fecha: "" },
+  ],
+  { claveVenta: "venta", claveCosto: "costo", claveProducto: "producto", claveFecha: "fecha" }
+);
+assert.strictEqual(conFecha.ventas[0].fecha, "2026-01-15");
+assert.strictEqual(conFecha.ventas[1].fecha, hoy, "fila sin fecha propia usa la de hoy");
+assert.strictEqual(conFecha.compras[1].fecha, hoy, "mismo criterio para la compra generada de esa fila");
 assert.strictEqual(conCantidad.compras[0].cantidad, 3);
 
 // --- valoresDistintos: en orden de aparición, sin vacíos ni repetidos ---

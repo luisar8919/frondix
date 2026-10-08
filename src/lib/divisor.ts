@@ -110,13 +110,20 @@ export function separarVentaYCosto(
 ): { ventas: Record<string, unknown>[]; compras: Record<string, unknown>[] } {
   const ventas: Record<string, unknown>[] = [];
   const compras: Record<string, unknown>[] = [];
+  const hoy = new Date().toISOString().slice(0, 10);
 
   for (const fila of filas) {
     const cantidadCruda = claves.claveCantidad ? fila[claves.claveCantidad] : undefined;
     const cantidad = cantidadCruda === undefined || cantidadCruda === null || cantidadCruda === "" ? 1 : cantidadCruda;
     const base: Record<string, unknown> = { cantidad };
     if (claves.claveProducto) base.producto = fila[claves.claveProducto];
-    if (claves.claveFecha) base.fecha = fila[claves.claveFecha];
+    // Si la columna de fecha existe pero ESTA fila la trae vacía, se usa la
+    // fecha de hoy como referencia -- mismo criterio que cuando toda la tabla
+    // no tiene columna de fecha (ver /api/upload/auto), pero fila por fila.
+    if (claves.claveFecha) {
+      const v = fila[claves.claveFecha];
+      base.fecha = v !== undefined && v !== null && v !== "" ? v : hoy;
+    }
 
     const venta = fila[claves.claveVenta];
     if (venta !== undefined && venta !== null && venta !== "") {
