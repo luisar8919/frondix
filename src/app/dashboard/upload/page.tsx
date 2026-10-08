@@ -32,6 +32,10 @@ interface EdicionGrupo {
   // Si esta tabla tiene columna de Tipo de movimiento, el usuario puede pedir que
   // se divida en dos módulos (Ventas y Compras) en vez de uno mixto.
   dividir: boolean;
+  // Si esta tabla tiene columnas de Monto y Costo en la MISMA fila (sin Tipo que
+  // las distinga -- cada venta ya trae su costo de adquisición), el usuario puede
+  // pedir separarla en Ventas y Compras en vez de una venta con un costo adentro.
+  separar: boolean;
 }
 
 interface ModuloCreado {
@@ -56,6 +60,7 @@ const aEdicion = (g: GrupoDetectado): EdicionGrupo => ({
   columnas: g.columnas.map((c) => ({ key: c.key, label: c.label, rol: (c.rol ?? "") as RolColumna | "" })),
   crearStock: false,
   dividir: false,
+  separar: false,
 });
 
 export default function UploadPage() {
@@ -162,6 +167,7 @@ export default function UploadPage() {
             columnas: e.columnas.map((c) => ({ key: c.key, label: c.label, rol: c.rol || null })),
             crearStock: e.crearStock,
             dividir: e.dividir,
+            separar: e.separar,
           }))
         )
       );
@@ -312,6 +318,28 @@ export default function UploadPage() {
                 </button>
               </div>
             )}
+
+            {ed.incluir &&
+              !ed.columnas.some((c) => c.rol === "tipo_movimiento") &&
+              ed.columnas.some((c) => c.rol === "monto") &&
+              ed.columnas.some((c) => c.rol === "costo") && (
+                <div className="alerta alerta-aviso" style={{ marginTop: 14 }}>
+                  <p style={{ margin: 0 }}>
+                    Cada fila de esta tabla trae tanto el monto de venta como el costo de adquisición juntos. Se
+                    puede separar en dos módulos: Ventas (producto, monto, cliente si hay, cantidad) y Compras
+                    (producto, costo como monto, proveedor si hay, cantidad). Sin columna de cantidad, se usa 1
+                    por fila.
+                  </p>
+                  <button
+                    type="button"
+                    className={`btn ${ed.separar ? "btn-primario" : "btn-secundario"}`}
+                    style={{ marginTop: 10, padding: "4px 14px" }}
+                    onClick={() => cambiarGrupo(pestanaActiva, { separar: !ed.separar })}
+                  >
+                    {ed.separar ? "✓ Se va a separar en Ventas y Compras" : "Separar en Ventas y Compras"}
+                  </button>
+                </div>
+              )}
 
             {ed.incluir && !pareceReporte(g.hojas) && !pareceStock(g.hojas) && ed.columnas.some((c) => c.rol === "producto") && (
               <div className="alerta alerta-aviso" style={{ marginTop: 14 }}>

@@ -1,6 +1,6 @@
 // node scripts/test-divisor.mjs
 import assert from "node:assert";
-import { dividirVentasYCompras, preciosDeCompra, combinarPrecios, completarCostos, cantidadesDeStock } from "../src/lib/divisor.ts";
+import { dividirVentasYCompras, preciosDeCompra, combinarPrecios, completarCostos, cantidadesDeStock, separarVentaYCosto, valoresDistintos } from "../src/lib/divisor.ts";
 
 // --- dividirVentasYCompras: solo separa, no toca costos ---
 const filas = [
@@ -48,5 +48,35 @@ const filasStock = [
 const stock = cantidadesDeStock(filasStock, "producto", "stock");
 assert.strictEqual(stock.get("Polo"), 3);
 assert.strictEqual(stock.get("Short"), 12);
+
+// --- separarVentaYCosto: cada fila de origen arma una venta y una compra ---
+const catalogo = [
+  { juego: "Polo", venta: 50, costo: 20, cliente: "Ana" },
+  { juego: "Short", venta: 35, costo: 15, cliente: "Luis" },
+  { juego: "Gorra", venta: 10, costo: "", cliente: "" }, // sin costo -> no genera compra
+];
+const sep = separarVentaYCosto(catalogo, { claveVenta: "venta", claveCosto: "costo", claveProducto: "juego", claveCliente: "cliente" });
+assert.strictEqual(sep.ventas.length, 3);
+assert.strictEqual(sep.compras.length, 2, "Gorra sin costo no genera fila de compra");
+assert.strictEqual(sep.ventas[0].producto, "Polo");
+assert.strictEqual(sep.ventas[0].monto, 50);
+assert.strictEqual(sep.ventas[0].cliente, "Ana");
+assert.strictEqual(sep.ventas[0].cantidad, 1, "sin columna de cantidad, 1 por defecto");
+assert.strictEqual(sep.compras[0].monto, 20, "el costo se vuelve el monto de la compra");
+assert.strictEqual(sep.compras[0].proveedor, undefined, "sin columna de proveedor en el origen, no se inventa");
+
+const conCantidad = separarVentaYCosto(
+  [{ producto: "Polo", venta: 50, costo: 20, unidades: 3 }],
+  { claveVenta: "venta", claveCosto: "costo", claveProducto: "producto", claveCantidad: "unidades" }
+);
+assert.strictEqual(conCantidad.ventas[0].cantidad, 3);
+assert.strictEqual(conCantidad.compras[0].cantidad, 3);
+
+// --- valoresDistintos: en orden de aparición, sin vacíos ni repetidos ---
+const distintos = valoresDistintos(
+  [{ c: "Ana" }, { c: "Luis" }, { c: "Ana" }, { c: "" }, { c: null }],
+  "c"
+);
+assert.deepStrictEqual(distintos, ["Ana", "Luis"]);
 
 console.log("OK: test-divisor (todas las aserciones pasaron)");

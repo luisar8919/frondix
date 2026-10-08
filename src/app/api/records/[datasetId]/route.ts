@@ -1,7 +1,43 @@
 import { NextRequest, NextResponse } from "next/server";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { crearClienteServidor } from "@/lib/supabase/server";
 import { validarEnlaces } from "@/lib/dependientes";
+import { claveValida } from "@/lib/enlaces";
+import { ajustarStockDesdeRegistro } from "@/lib/stock";
 import type { Columna } from "@/lib/excel-parser";
+
+// Si el valor de una columna de Cliente/Proveedor enlazada no existe todavía en
+// la tabla maestra, se crea ahí mismo (en vez de rechazar el registro como con
+// cualquier otro enlace): es justo el punto donde se conoce a un cliente o
+// proveedor nuevo por primera vez. Lo mismo para Producto cuando lo enlazado
+// "parece" un Stock (trae columna "cantidad"): vender o comprar un producto
+// nunca antes visto lo da de alta ahí en vez de rechazar el registro. El
+// resto de enlaces se quedan estrictos, ahí sí hace falta que el valor ya exista.
+async function autoCrearEnlazadosFaltantes(supabase: SupabaseClient, columnas: Columna[], datos: Record<string, unknown>) {
+  for (const c of columnas) {
+    if (!c.enlace) continue;
+    if (c.rol !== "cliente" && c.rol !== "proveedor" && c.rol !== "producto") continue;
+    const valor = datos[c.key];
+    if (valor === null || valor === undefined || valor === "") continue;
+    if (!claveValida(c.enlace.columnaKey)) continue;
+
+    if (c.rol === "producto") {
+      const { data: destino } = await supabase.from("datasets").select("columnas").eq("id", c.enlace.datasetId).single();
+      if (!(destino?.columnas as Columna[] | undefined)?.some((x) => x.key === "cantidad")) continue; // no es un Stock, se queda estricto
+    }
+
+    const { count } = await supabase
+      .from("records")
+      .select("id", { count: "exact", head: true })
+      .eq("dataset_id", c.enlace.datasetId)
+      .eq(`data->>${c.enlace.columnaKey}`, String(valor));
+    if (!count) {
+      const datosNuevo: Record<string, unknown> = { [c.enlace.columnaKey]: String(valor) };
+      if (c.rol === "producto") datosNuevo.cantidad = 0;
+      await supabase.from("records").insert({ dataset_id: c.enlace.datasetId, data: datosNuevo });
+    }
+  }
+}
 
 // RLS ya garantiza que un usuario solo ve/crea records de datasets
 // de una empresa donde es miembro — no hace falta chequearlo a mano aquí.
@@ -63,11 +99,14 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ dat
   }
 
   // Si una columna está enlazada a otra tabla, el valor debe existir allí.
-  const { data: dataset, error: errorDataset } = await supabase.from("datasets").select("columnas").eq("id", datasetId).single();
+  const { data: dataset, error: errorDataset } = await supabase.from("datasets").select("empresa_id, columnas").eq("id", datasetId).single();
   if (errorDataset?.code === "42501") return respuestaError(errorDataset);
   if (!dataset) return NextResponse.json({ error: "Dataset no encontrado" }, { status: 404 });
+  const columnas = dataset.columnas as Columna[];
 
-  const fallo = await validarEnlaces(supabase, dataset.columnas as Columna[], body);
+  await autoCrearEnlazadosFaltantes(supabase, columnas, body);
+
+  const fallo = await validarEnlaces(supabase, columnas, body);
   if (fallo) return NextResponse.json({ error: fallo }, { status: 422 });
 
   const { data, error } = await supabase
@@ -77,5 +116,15 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ dat
     .single();
 
   if (error) return respuestaError(error);
+
+  // El stock se ajusta "mejor esfuerzo": si algo falla acá, el registro ya
+  // quedó bien guardado (lo importante), no vale la pena fallar toda la
+  // petición por un ajuste de stock que el usuario puede corregir a mano.
+  try {
+    await ajustarStockDesdeRegistro(supabase, dataset.empresa_id, columnas, body);
+  } catch {
+    // silencioso a propósito, ver comentario de arriba
+  }
+
   return NextResponse.json({ record: data });
 }

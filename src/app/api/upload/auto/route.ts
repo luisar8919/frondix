@@ -5,7 +5,16 @@ import { agruparHojas, type Columna, type GrupoHojas } from "@/lib/excel-parser"
 import { insertarRegistros, deshacerTabla, MAX_FILAS_IMPORTACION } from "@/lib/insertar";
 import { limiteModulos } from "@/lib/limites";
 import { tipoModulo } from "@/lib/roles";
-import { dividirVentasYCompras, preciosDeCompra, combinarPrecios, completarCostos, cantidadesDeStock, type PrecioCompra } from "@/lib/divisor";
+import {
+  dividirVentasYCompras,
+  preciosDeCompra,
+  combinarPrecios,
+  completarCostos,
+  cantidadesDeStock,
+  separarVentaYCosto,
+  valoresDistintos,
+  type PrecioCompra,
+} from "@/lib/divisor";
 
 // El asistente de importación ya mostró los grupos (vía /api/upload/grupos) y el
 // usuario eligió cuáles quedarse, con nombre y roles ya confirmados/editados. Aquí se
@@ -20,6 +29,32 @@ interface SeleccionGrupo {
   // Si esta tabla tiene columna de Tipo de movimiento, el usuario pudo pedir que
   // se divida en Ventas y Compras en vez de un solo módulo mixto.
   dividir?: boolean;
+  // Si esta tabla tiene Monto y Costo en la MISMA fila (sin Tipo), el usuario
+  // pudo pedir separarla en Ventas y Compras (ver separarVentaYCosto).
+  separar?: boolean;
+}
+
+// Crea una tabla maestra (Clientes/Proveedores) con un valor por fila, para
+// enlazar la columna de Cliente/Proveedor de Ventas/Compras a algo real en
+// vez de texto suelto -- así el registro manual puede elegir de una lista
+// (o crear uno nuevo, ver /api/records/[datasetId]). Si falla, no revienta
+// la importación: el módulo principal ya quedó bien creado sin esto.
+async function crearTablaMaestra(
+  supabase: SupabaseClient,
+  empresaId: string,
+  nombre: string,
+  valores: string[]
+): Promise<{ datasetId: string; columnaKey: string } | null> {
+  if (valores.length === 0) return null;
+  const columnas: Columna[] = [{ key: "nombre", label: "Nombre", tipo: "texto", rol: null, sospechosa: false }];
+  const { data: dataset, error } = await supabase.from("datasets").insert({ empresa_id: empresaId, nombre, columnas }).select().single();
+  if (error || !dataset) return null;
+  const errorInsertar = await insertarRegistros(supabase, dataset.id, valores.map((nombre) => ({ nombre })));
+  if (errorInsertar) {
+    await deshacerTabla(supabase, dataset.id);
+    return null;
+  }
+  return { datasetId: dataset.id, columnaKey: "nombre" };
 }
 
 // Crea un módulo: completa la fecha si falta (ver abajo), inserta el dataset
@@ -123,11 +158,14 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  // Dividir reemplaza 1 módulo por 2 (Ventas + Compras): +1 neto por cada grupo dividido.
+  // Dividir/separar reemplaza 1 módulo por 2 (Ventas + Compras): +1 neto por cada
+  // grupo así. Las tablas maestras de Clientes/Proveedores no se cuentan acá (son
+  // un extra condicionado a que haya datos, como el módulo Stock antes de esto).
   const modulosNuevos =
     gruposAImportar.length +
     gruposAImportar.filter(({ sel }) => sel?.crearStock).length +
-    gruposAImportar.filter(({ sel }) => sel?.dividir).length;
+    gruposAImportar.filter(({ sel }) => sel?.dividir).length +
+    gruposAImportar.filter(({ sel }) => sel?.separar).length;
   const { actuales: modulosActuales, limite } = await limiteModulos(supabase, empresaId);
   if (modulosActuales + modulosNuevos > limite) {
     return NextResponse.json(
@@ -149,17 +187,45 @@ export async function POST(request: NextRequest) {
       const nombre = sel?.nombre?.trim() || grupo.hojas[0];
       avisos.push(`${division.sinClasificar} fila(s) de "${nombre}" no decían claramente si eran venta o compra y se dejaron fuera.`);
     }
+
+    const cProducto = columnas.find((c) => c.rol === "producto");
+    const cMonto = columnas.find((c) => c.rol === "monto");
+    const cCosto = columnas.find((c) => c.rol === "costo");
+    const cFecha = columnas.find((c) => c.rol === "fecha");
+    const cCliente = columnas.find((c) => c.rol === "cliente");
+    const cProveedor = columnas.find((c) => c.rol === "proveedor");
+    const cCantidad = columnas.find((c) => c.rol === "cantidad");
+
+    // Cada fila ya trae venta Y costo juntos (sin Tipo que las distinga): se
+    // arma una venta y una compra por fila, con columnas normalizadas (ver
+    // separarVentaYCosto). No tiene sentido al mismo tiempo que "dividir".
+    const separacion =
+      sel?.separar && !cTipo && cMonto && cCosto
+        ? separarVentaYCosto(grupo.filas, {
+            claveVenta: cMonto.key,
+            claveCosto: cCosto.key,
+            claveProducto: cProducto?.key,
+            claveCliente: cCliente?.key,
+            claveProveedor: cProveedor?.key,
+            claveCantidad: cCantidad?.key,
+            claveFecha: cFecha?.key,
+          })
+        : undefined;
+
     return {
       grupo,
       sel,
       columnas,
       cTipo,
       division,
+      separacion,
       tipo: tipoModulo(columnas.map((c) => c.rol)),
-      cProducto: columnas.find((c) => c.rol === "producto"),
-      cMonto: columnas.find((c) => c.rol === "monto"),
-      cFecha: columnas.find((c) => c.rol === "fecha"),
-      cCosto: columnas.find((c) => c.rol === "costo"),
+      cProducto,
+      cMonto,
+      cFecha,
+      cCosto,
+      cCliente,
+      cProveedor,
       cStock: columnas.find((c) => c.rol === "stock"),
     };
   });
@@ -169,6 +235,7 @@ export async function POST(request: NextRequest) {
   // pestaña dividida -- no solo la que se está procesando en cada momento.
   const mapasPrecios: Map<string, PrecioCompra>[] = [];
   for (const info of infos) {
+    if (info.separacion) mapasPrecios.push(preciosDeCompra(info.separacion.compras, "producto", "monto", "fecha"));
     if (!info.cProducto || !info.cMonto) continue;
     if (info.division) mapasPrecios.push(preciosDeCompra(info.division.compras, info.cProducto.key, info.cMonto.key, info.cFecha?.key));
     else if (info.tipo === "compras") mapasPrecios.push(preciosDeCompra(info.grupo.filas, info.cProducto.key, info.cMonto.key, info.cFecha?.key));
@@ -207,8 +274,77 @@ export async function POST(request: NextRequest) {
   const creados: { datasetId: string; nombre: string; hojas: string[]; filasImportadas: number }[] = [];
 
   for (const info of infos) {
-    const { grupo, sel, columnas, cTipo, division } = info;
+    const { grupo, sel, columnas, cTipo, division, separacion } = info;
     const nombreDataset = sel?.nombre?.trim() || (grupo.hojas.length > 1 ? `${grupo.hojas[0]} y otras` : grupo.hojas[0]);
+
+    if (separacion) {
+      // Columnas fijas: separarVentaYCosto ya normalizó las filas a estas keys
+      // (producto/fecha/monto/cliente|proveedor/cantidad), sin importar cómo se
+      // llamaban en el Excel original.
+      const columnasVentas: Columna[] = [
+        ...(info.cFecha ? [{ key: "fecha", label: "Fecha", tipo: "fecha" as const, rol: "fecha" as const, sospechosa: false }] : []),
+        ...(info.cProducto ? [{ key: "producto", label: info.cProducto.label, tipo: "texto" as const, rol: "producto" as const, sospechosa: false }] : []),
+        ...(info.cCliente ? [{ key: "cliente", label: "Cliente", tipo: "texto" as const, rol: "cliente" as const, sospechosa: false }] : []),
+        { key: "monto", label: info.cMonto?.label ?? "Venta", tipo: "numero", rol: "monto", sospechosa: false },
+        { key: "cantidad", label: "Cantidad", tipo: "numero", rol: "cantidad", sospechosa: false },
+      ];
+      const columnasCompras: Columna[] = [
+        ...(info.cFecha ? [{ key: "fecha", label: "Fecha", tipo: "fecha" as const, rol: "fecha" as const, sospechosa: false }] : []),
+        ...(info.cProducto ? [{ key: "producto", label: info.cProducto.label, tipo: "texto" as const, rol: "producto" as const, sospechosa: false }] : []),
+        // Siempre va, aunque el origen no tuviera proveedor (queda vacía, se
+        // llena después a mano): sin esta columna, tipoModulo no tiene cómo
+        // distinguir esta tabla de una de Ventas (las dos quedarían con
+        // Producto+Monto nomás) y el ajuste de stock sumaría/restaría al revés.
+        { key: "proveedor", label: "Proveedor", tipo: "texto", rol: "proveedor", sospechosa: false },
+        { key: "monto", label: info.cCosto?.label ?? "Costo", tipo: "numero", rol: "monto", sospechosa: false },
+        { key: "cantidad", label: "Cantidad", tipo: "numero", rol: "cantidad", sospechosa: false },
+      ];
+
+      let datasetVentasId: string | null = null;
+      if (separacion.ventas.length > 0) {
+        const r = await crearModulo(supabase, empresaId, `${nombreDataset} - Ventas`, columnasVentas, separacion.ventas);
+        if ("error" in r) return NextResponse.json({ error: r.error, creadosHastaAhora: creados }, { status: 500 });
+        creados.push({ ...r, hojas: grupo.hojas });
+        datasetVentasId = r.datasetId;
+      }
+      let datasetComprasId: string | null = null;
+      if (separacion.compras.length > 0) {
+        const r = await crearModulo(supabase, empresaId, `${nombreDataset} - Compras`, columnasCompras, separacion.compras);
+        if ("error" in r) return NextResponse.json({ error: r.error, creadosHastaAhora: creados }, { status: 500 });
+        creados.push({ ...r, hojas: grupo.hojas });
+        datasetComprasId = r.datasetId;
+      }
+
+      // Tablas maestras de Clientes/Proveedores: un nombre por fila distinta
+      // encontrada, enlazadas desde la columna de Cliente/Proveedor recién
+      // creada -- así el registro manual elige de una lista (o crea uno nuevo
+      // al vuelo, ver /api/records/[datasetId]).
+      if (datasetVentasId && info.cCliente) {
+        const clientes = valoresDistintos(separacion.ventas, "cliente");
+        const maestro = await crearTablaMaestra(supabase, empresaId, `Clientes - ${nombreDataset}`, clientes);
+        if (maestro) {
+          const { data: ds } = await supabase.from("datasets").select("columnas").eq("id", datasetVentasId).single();
+          if (ds) {
+            const cols = (ds.columnas as Columna[]).map((c) => (c.key === "cliente" ? { ...c, enlace: maestro } : c));
+            await supabase.from("datasets").update({ columnas: cols }).eq("id", datasetVentasId);
+          }
+          creados.push({ datasetId: maestro.datasetId, nombre: `Clientes - ${nombreDataset}`, hojas: [], filasImportadas: clientes.length });
+        }
+      }
+      if (datasetComprasId && info.cProveedor) {
+        const proveedores = valoresDistintos(separacion.compras, "proveedor");
+        const maestro = await crearTablaMaestra(supabase, empresaId, `Proveedores - ${nombreDataset}`, proveedores);
+        if (maestro) {
+          const { data: ds } = await supabase.from("datasets").select("columnas").eq("id", datasetComprasId).single();
+          if (ds) {
+            const cols = (ds.columnas as Columna[]).map((c) => (c.key === "proveedor" ? { ...c, enlace: maestro } : c));
+            await supabase.from("datasets").update({ columnas: cols }).eq("id", datasetComprasId);
+          }
+          creados.push({ datasetId: maestro.datasetId, nombre: `Proveedores - ${nombreDataset}`, hojas: [], filasImportadas: proveedores.length });
+        }
+      }
+      continue;
+    }
 
     if (cTipo && division) {
       // La columna de tipo no viaja a ninguno de los dos módulos: ya quedó
@@ -218,7 +354,14 @@ export async function POST(request: NextRequest) {
       if (!info.cCosto) columnasVentas = [...sinTipo, { key: "costo", label: "Costo", tipo: "numero", rol: "costo", sospechosa: false }];
       // La misma columna de "contraparte" significa Cliente en la mitad de Ventas
       // y Proveedor en la de Compras -- se reasigna el rol, nunca se duplica la columna.
-      const columnasCompras = sinTipo.map((c) => (c.rol === "cliente" ? { ...c, rol: "proveedor" as const } : c));
+      let columnasCompras = sinTipo.map((c) => (c.rol === "cliente" ? { ...c, rol: "proveedor" as const } : c));
+      // Si el origen no tenía columna de contraparte, Compras y Ventas quedarían
+      // con los mismos roles (Producto+Monto) y tipoModulo no podría distinguirlas
+      // -- se agrega una Proveedor vacía solo para que la clasificación (y el
+      // ajuste de stock, que depende de ella) no se confundan.
+      if (!columnasCompras.some((c) => c.rol === "proveedor")) {
+        columnasCompras = [...columnasCompras, { key: "proveedor", label: "Proveedor", tipo: "texto", rol: "proveedor", sospechosa: false }];
+      }
 
       if (division.ventas.length > 0) {
         const r = await crearModulo(supabase, empresaId, `${nombreDataset} - Ventas`, columnasVentas, division.ventas);
@@ -270,6 +413,14 @@ export async function POST(request: NextRequest) {
             const errorInsertarStock = await insertarRegistros(supabase, datasetStock.id, filasStock);
             if (!errorInsertarStock) {
               creados.push({ datasetId: datasetStock.id, nombre: datasetStock.nombre, hojas: [], filasImportadas: filasStock.length });
+              // Enlace simétrico: Stock -> este módulo ya quedó arriba (para que
+              // el formulario de Stock autocomplete con los productos ya
+              // vendidos); este otro lado (este módulo -> Stock) es el que
+              // usa el registro manual para saber qué Stock ajustar solo.
+              const colsConEnlace = columnas.map((c) =>
+                c.key === colProducto.key ? { ...c, enlace: { datasetId: datasetStock.id, columnaKey: "producto" } } : c
+              );
+              await supabase.from("datasets").update({ columnas: colsConEnlace }).eq("id", dataset.id);
             } else {
               await deshacerTabla(supabase, datasetStock.id);
             }
