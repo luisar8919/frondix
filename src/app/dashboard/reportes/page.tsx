@@ -47,6 +47,10 @@ const nombreMes = (clave: string) => {
 
 
 const soles0 = (n: number | null) => (n === null ? "-" : `S/ ${n.toLocaleString("es-PE", { maximumFractionDigits: 2 })}`);
+const fechaCorta = (f: string) => {
+  const d = new Date(f.length <= 10 ? `${f}T00:00:00` : f);
+  return Number.isNaN(d.getTime()) ? f : d.toLocaleDateString("es-PE", { day: "2-digit", month: "short" });
+};
 
 export default function ReportesPage() {
   const [modulos, setModulos] = useState<Modulo[] | null>(null);
@@ -224,6 +228,7 @@ export default function ReportesPage() {
             <table>
               <thead>
                 <tr>
+                  <th>Fecha</th>
                   <th>Tipo</th>
                   <th>Producto</th>
                   <th className="num">Monto</th>
@@ -234,6 +239,7 @@ export default function ReportesPage() {
                 {movimientos.map((m) => (
                   <Fragment key={m.id}>
                     <tr>
+                      <td style={{ whiteSpace: "nowrap" }}>{fechaCorta(m.fecha)}</td>
                       <td>
                         <span style={{ fontWeight: 700, color: m.tipo === "venta" ? "var(--verde-700)" : "var(--error)" }}>
                           {m.tipo === "venta" ? "Venta" : "Compra"}
@@ -251,7 +257,7 @@ export default function ReportesPage() {
                     </tr>
                     {sustentoAbierto === m.id && (
                       <tr>
-                        <td colSpan={4} style={{ background: "var(--verde-50)" }}>
+                        <td colSpan={5} style={{ background: "var(--verde-50)" }}>
                           <div style={{ display: "flex", gap: 8, alignItems: "flex-start", flexWrap: "wrap", padding: "6px 0" }}>
                             <textarea
                               value={valorSustento}
