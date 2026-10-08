@@ -34,18 +34,33 @@ export default function BarraPanel() {
   const router = useRouter();
   const [menuAbierto, setMenuAbierto] = useState(false);
   const [reportesAbierto, setReportesAbierto] = useState(false);
+  const [posReportes, setPosReportes] = useState({ top: 0, left: 0 });
   const menuRef = useRef<HTMLDivElement>(null);
-  const reportesRef = useRef<HTMLDivElement>(null);
+  const reportesRef = useRef<HTMLElement>(null);
+  const reportesBotonRef = useRef<HTMLButtonElement>(null);
+  const reportesListaRef = useRef<HTMLDivElement>(null);
 
   // Cierra los menús al tocar afuera.
   useEffect(() => {
     function alTocarFuera(e: MouseEvent) {
       if (menuRef.current && !menuRef.current.contains(e.target as Node)) setMenuAbierto(false);
-      if (reportesRef.current && !reportesRef.current.contains(e.target as Node)) setReportesAbierto(false);
+      const dentroDeReportes =
+        reportesRef.current?.contains(e.target as Node) || reportesListaRef.current?.contains(e.target as Node);
+      if (!dentroDeReportes) setReportesAbierto(false);
     }
     document.addEventListener("mousedown", alTocarFuera);
     return () => document.removeEventListener("mousedown", alTocarFuera);
   }, []);
+
+  function alClickReportes() {
+    // El botón vive dentro de nav-panel (para quedar en su lugar entre las
+    // demás opciones), pero la lista se dibuja con position:fixed medida
+    // desde acá -- así escapa el recorte de overflow de nav-panel sin
+    // sacar el botón de su sitio en el flujo horizontal (ver nav-panel).
+    const r = reportesBotonRef.current?.getBoundingClientRect();
+    if (r) setPosReportes({ top: r.bottom + 8, left: r.left });
+    setReportesAbierto((v) => !v);
+  }
 
   // "Mis módulos" también queda marcada dentro de un módulo concreto (/dashboard/<id>).
   const fijas = [...enlaces.map((e) => e.href), ...reportesSubmenu.map((e) => e.href)];
@@ -67,39 +82,49 @@ export default function BarraPanel() {
     <header className="barra-panel">
       <div className="contenedor barra-fila">
         <Logo href="/dashboard" />
-        <nav className="nav-panel" aria-label="Panel">
-          {enlaces.map((e) => (
+        <nav className="nav-panel" aria-label="Panel" ref={reportesRef}>
+          {enlaces.slice(0, 2).map((e) => (
             <Link key={e.href} href={e.href} className="nav-link" aria-current={activo(e.href) ? "page" : undefined}>
               {e.texto}
             </Link>
           ))}
-        </nav>
-        {/* Fuera de nav-panel a propósito: ese contenedor tiene overflow-x:auto para
-            el scroll horizontal en mobile, y por la regla de CSS el navegador convierte
-            overflow-y en "auto" también -- cualquier desplegable adentro queda recortado
-            e invisible aunque el estado sí cambie (ver nav-panel en globals.css). */}
-        <div className="menu-cuenta" ref={reportesRef}>
           <button
+            ref={reportesBotonRef}
             type="button"
             className="nav-link"
             style={{ background: "transparent", border: "none", cursor: "pointer" }}
             aria-haspopup="menu"
             aria-expanded={reportesAbierto}
             aria-current={activoReportes ? "page" : undefined}
-            onClick={() => setReportesAbierto((v) => !v)}
+            onClick={alClickReportes}
           >
             Reportes
           </button>
-          {reportesAbierto && (
-            <div className="menu-cuenta-lista" role="menu">
-              {reportesSubmenu.map((s) => (
-                <Link key={s.href} href={s.href} className="menu-cuenta-item" role="menuitem" onClick={() => setReportesAbierto(false)}>
-                  {s.texto}
-                </Link>
-              ))}
-            </div>
-          )}
-        </div>
+          {enlaces.slice(2).map((e) => (
+            <Link key={e.href} href={e.href} className="nav-link" aria-current={activo(e.href) ? "page" : undefined}>
+              {e.texto}
+            </Link>
+          ))}
+        </nav>
+        {/* La lista se dibuja fuera de nav-panel y con position:fixed: ese
+            contenedor tiene overflow-x:auto para el scroll horizontal en mobile,
+            y por la regla de CSS el navegador convierte overflow-y en "auto"
+            también -- cualquier desplegable DENTRO queda recortado e invisible
+            aunque el estado sí cambie (ver nav-panel en globals.css). */}
+        {reportesAbierto && (
+          <div
+            ref={reportesListaRef}
+            className="menu-cuenta-lista"
+            role="menu"
+            style={{ position: "fixed", top: posReportes.top, left: posReportes.left, right: "auto" }}
+          >
+            {reportesSubmenu.map((s) => (
+              <Link key={s.href} href={s.href} className="menu-cuenta-item" role="menuitem" onClick={() => setReportesAbierto(false)}>
+                {s.texto}
+              </Link>
+            ))}
+          </div>
+        )}
         <div className="menu-cuenta" ref={menuRef}>
           <button
             type="button"
