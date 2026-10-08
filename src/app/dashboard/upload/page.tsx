@@ -52,16 +52,27 @@ interface ModuloCreado {
 const pareceReporte = (hojas: string[]) => hojas.find((h) => /reporte|resumen|dashboard|kpi/i.test(h));
 const pareceStock = (hojas: string[]) => hojas.find((h) => /stock|inventario/i.test(h));
 
-const aEdicion = (g: GrupoDetectado): EdicionGrupo => ({
-  // Un reporte ya armado no hace falta cargarlo (Frondix arma ese mismo resumen
-  // solo, en Reportes): se deja desmarcado por defecto, el usuario lo puede marcar igual.
-  incluir: !pareceReporte(g.hojas),
-  nombre: g.nombreSugerido,
-  columnas: g.columnas.map((c) => ({ key: c.key, label: c.label, rol: (c.rol ?? "") as RolColumna | "" })),
-  crearStock: false,
-  dividir: false,
-  separar: false,
-});
+const aEdicion = (g: GrupoDetectado): EdicionGrupo => {
+  const roles = g.columnas.map((c) => c.rol);
+  const tieneTipo = roles.includes("tipo_movimiento");
+  const tieneMontoYCosto = roles.includes("monto") && roles.includes("costo");
+  return {
+    // Un reporte ya armado no hace falta cargarlo (Frondix arma ese mismo resumen
+    // solo, en Reportes): se deja desmarcado por defecto, el usuario lo puede marcar igual.
+    incluir: !pareceReporte(g.hojas),
+    nombre: g.nombreSugerido,
+    columnas: g.columnas.map((c) => ({ key: c.key, label: c.label, rol: (c.rol ?? "") as RolColumna | "" })),
+    // Con columna de Producto ya hay con qué armar un Stock enlazado -- se crea
+    // por defecto, el usuario lo puede desmarcar si de verdad no lo necesita.
+    crearStock: roles.includes("producto"),
+    // Si la tabla ya trae de qué distinguir Ventas de Compras (columna Tipo, o
+    // Monto+Costo juntos en la misma fila), separarla por defecto es lo que casi
+    // siempre se quiere -- el usuario lo puede desmarcar si de verdad prefiere un
+    // solo módulo mixto.
+    dividir: tieneTipo,
+    separar: !tieneTipo && tieneMontoYCosto,
+  };
+};
 
 export default function UploadPage() {
   const [archivo, setArchivo] = useState<File | null>(null);

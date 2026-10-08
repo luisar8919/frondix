@@ -57,6 +57,56 @@ async function crearTablaMaestra(
   return { datasetId: dataset.id, columnaKey: "nombre" };
 }
 
+// Crea el módulo Stock opcional (Producto + Cantidad, una fila por producto
+// distinto) y lo enlaza SIMÉTRICAMENTE con cada módulo que lo pidió: Stock ->
+// primer módulo (para que el formulario de Stock autocomplete con productos ya
+// conocidos) y cada módulo -> Stock (para que el registro manual sepa qué
+// Stock ajustar solo, ver lib/stock.ts). Reusado por el camino normal, el
+// dividido por Tipo y el separado por Monto+Costo -- en los dos últimos, un
+// mismo producto puede repetirse en Ventas y Compras, por eso ambos quedan
+// enlazados al mismo Stock en vez de crear uno por mitad.
+async function crearModuloStockSiPedido(
+  supabase: SupabaseClient,
+  empresaId: string,
+  nombreBase: string,
+  productos: string[],
+  stockGlobal: Map<string, number>,
+  datasetsAEnlazar: { datasetId: string; columnaKey: string }[]
+): Promise<{ datasetId: string; nombre: string; filasImportadas: number } | null> {
+  if (productos.length === 0 || datasetsAEnlazar.length === 0) return null;
+
+  const primero = datasetsAEnlazar[0];
+  const columnasStock: Columna[] = [
+    { key: "producto", label: "Producto", tipo: "texto", rol: "producto", sospechosa: false, enlace: { datasetId: primero.datasetId, columnaKey: primero.columnaKey } },
+    { key: "cantidad", label: "Cantidad", tipo: "numero", rol: null, sospechosa: false },
+  ];
+  const { data: datasetStock, error } = await supabase
+    .from("datasets")
+    .insert({ empresa_id: empresaId, nombre: `Stock - ${nombreBase}`, columnas: columnasStock })
+    .select()
+    .single();
+  if (error || !datasetStock) return null;
+
+  const filas = productos.map((producto) => ({ producto, cantidad: stockGlobal.get(producto) ?? 0 }));
+  const errorInsertar = await insertarRegistros(supabase, datasetStock.id, filas);
+  if (errorInsertar) {
+    await deshacerTabla(supabase, datasetStock.id);
+    return null;
+  }
+
+  for (const d of datasetsAEnlazar) {
+    const { data: ds } = await supabase.from("datasets").select("columnas").eq("id", d.datasetId).single();
+    if (ds) {
+      const cols = (ds.columnas as Columna[]).map((c) =>
+        c.key === d.columnaKey ? { ...c, enlace: { datasetId: datasetStock.id, columnaKey: "producto" } } : c
+      );
+      await supabase.from("datasets").update({ columnas: cols }).eq("id", d.datasetId);
+    }
+  }
+
+  return { datasetId: datasetStock.id, nombre: datasetStock.nombre, filasImportadas: filas.length };
+}
+
 // Crea un módulo: completa la fecha si falta (ver abajo), inserta el dataset
 // y sus filas. Reusado para el camino normal, cada mitad de un grupo
 // dividido, y el módulo Stock.
@@ -355,6 +405,16 @@ export async function POST(request: NextRequest) {
           creados.push({ datasetId: maestro.datasetId, nombre: `Proveedores - ${nombreDataset}`, hojas: [], filasImportadas: proveedores.length });
         }
       }
+
+      if (sel?.crearStock && info.cProducto) {
+        const productos = valoresDistintos([...separacion.ventas, ...separacion.compras], "producto");
+        const enlazar = [
+          ...(datasetVentasId ? [{ datasetId: datasetVentasId, columnaKey: "producto" }] : []),
+          ...(datasetComprasId ? [{ datasetId: datasetComprasId, columnaKey: "producto" }] : []),
+        ];
+        const r = await crearModuloStockSiPedido(supabase, empresaId, nombreDataset, productos, stockGlobal, enlazar);
+        if (r) creados.push({ ...r, hojas: [] });
+      }
       continue;
     }
 
@@ -375,15 +435,30 @@ export async function POST(request: NextRequest) {
         columnasCompras = [...columnasCompras, { key: "proveedor", label: "Proveedor", tipo: "texto", rol: "proveedor", sospechosa: false }];
       }
 
+      let datasetVentasId: string | null = null;
       if (division.ventas.length > 0) {
         const r = await crearModulo(supabase, empresaId, `${nombreDataset} - Ventas`, columnasVentas, division.ventas);
         if ("error" in r) return NextResponse.json({ error: r.error, creadosHastaAhora: creados }, { status: 500 });
         creados.push({ ...r, hojas: grupo.hojas });
+        datasetVentasId = r.datasetId;
       }
+      let datasetComprasId: string | null = null;
       if (division.compras.length > 0) {
         const r = await crearModulo(supabase, empresaId, `${nombreDataset} - Compras`, columnasCompras, division.compras);
         if ("error" in r) return NextResponse.json({ error: r.error, creadosHastaAhora: creados }, { status: 500 });
         creados.push({ ...r, hojas: grupo.hojas });
+        datasetComprasId = r.datasetId;
+      }
+
+      if (sel?.crearStock && info.cProducto) {
+        const claveProducto = info.cProducto.key;
+        const productos = valoresDistintos([...division.ventas, ...division.compras], claveProducto);
+        const enlazar = [
+          ...(datasetVentasId ? [{ datasetId: datasetVentasId, columnaKey: claveProducto }] : []),
+          ...(datasetComprasId ? [{ datasetId: datasetComprasId, columnaKey: claveProducto }] : []),
+        ];
+        const r = await crearModuloStockSiPedido(supabase, empresaId, nombreDataset, productos, stockGlobal, enlazar);
+        if (r) creados.push({ ...r, hojas: [] });
       }
       continue;
     }
@@ -391,54 +466,19 @@ export async function POST(request: NextRequest) {
     const r = await crearModulo(supabase, empresaId, nombreDataset, columnas, grupo.filas);
     if ("error" in r) return NextResponse.json({ error: r.error, creadosHastaAhora: creados }, { status: 500 });
     creados.push({ ...r, hojas: grupo.hojas });
-    const dataset = { id: r.datasetId };
 
     // Módulo Stock opcional: Producto (enlazado al producto de este módulo) +
     // Cantidad, una fila por cada producto distinto que aparece en lo que se
     // acaba de importar. Si alguna pestaña del archivo traía una columna Stock
     // real para ese producto, se usa esa cantidad; si no, empieza en 0 y el
     // usuario la corrige a mano después.
-    if (sel?.crearStock) {
-      const colProducto = columnas.find((c) => c.rol === "producto");
-      if (colProducto) {
-        const vistos = new Set<string>();
-        const productos: string[] = [];
-        for (const f of grupo.filas) {
-          const texto = f[colProducto.key] === null || f[colProducto.key] === undefined ? "" : String(f[colProducto.key]).trim();
-          if (texto && !vistos.has(texto)) {
-            vistos.add(texto);
-            productos.push(texto);
-          }
-        }
-        if (productos.length > 0) {
-          const columnasStock: Columna[] = [
-            { key: "producto", label: "Producto", tipo: "texto", rol: "producto", sospechosa: false, enlace: { datasetId: dataset.id, columnaKey: colProducto.key } },
-            { key: "cantidad", label: "Cantidad", tipo: "numero", rol: null, sospechosa: false },
-          ];
-          const { data: datasetStock, error: errorStock } = await supabase
-            .from("datasets")
-            .insert({ empresa_id: empresaId, nombre: `Stock - ${nombreDataset}`, columnas: columnasStock })
-            .select()
-            .single();
-          if (!errorStock && datasetStock) {
-            const filasStock = productos.map((producto) => ({ producto, cantidad: stockGlobal.get(producto) ?? 0 }));
-            const errorInsertarStock = await insertarRegistros(supabase, datasetStock.id, filasStock);
-            if (!errorInsertarStock) {
-              creados.push({ datasetId: datasetStock.id, nombre: datasetStock.nombre, hojas: [], filasImportadas: filasStock.length });
-              // Enlace simétrico: Stock -> este módulo ya quedó arriba (para que
-              // el formulario de Stock autocomplete con los productos ya
-              // vendidos); este otro lado (este módulo -> Stock) es el que
-              // usa el registro manual para saber qué Stock ajustar solo.
-              const colsConEnlace = columnas.map((c) =>
-                c.key === colProducto.key ? { ...c, enlace: { datasetId: datasetStock.id, columnaKey: "producto" } } : c
-              );
-              await supabase.from("datasets").update({ columnas: colsConEnlace }).eq("id", dataset.id);
-            } else {
-              await deshacerTabla(supabase, datasetStock.id);
-            }
-          }
-        }
-      }
+    if (sel?.crearStock && info.cProducto) {
+      const claveProducto = info.cProducto.key;
+      const productos = valoresDistintos(grupo.filas, claveProducto);
+      const stock = await crearModuloStockSiPedido(supabase, empresaId, nombreDataset, productos, stockGlobal, [
+        { datasetId: r.datasetId, columnaKey: claveProducto },
+      ]);
+      if (stock) creados.push({ ...stock, hojas: [] });
     }
   }
 
