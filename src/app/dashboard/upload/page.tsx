@@ -49,7 +49,7 @@ interface ModuloCreado {
 // (Frondix ya arma eso solo, en Reportes) o si parece un inventario (Stock), para
 // sugerir -- sin armarlo automáticamente, es solo un aviso -- que se puede alimentar
 // cruzando los productos que ya se vendieron en Ventas.
-const pareceReporte = (hojas: string[]) => hojas.find((h) => /reporte|resumen|dashboard|kpi/i.test(h));
+const pareceReporte = (hojas: string[]) => hojas.find((h) => /reporte|resumen|dashboard|kpi|caja|flujo/i.test(h));
 const pareceStock = (hojas: string[]) => hojas.find((h) => /stock|inventario/i.test(h));
 
 const aEdicion = (g: GrupoDetectado): EdicionGrupo => {
