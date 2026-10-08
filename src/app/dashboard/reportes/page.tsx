@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
 import Link from "next/link";
 import { PLANTILLAS_REPORTE } from "@/lib/plantillasReporte";
 import { crearClienteBrowser } from "@/lib/supabase/client";
@@ -13,6 +13,16 @@ interface RankingItem { clave: string; total: number; veces: number }
 interface FlujoCaja { ventas: number; costos: number; igv: number; gananciaBruta: number; gananciaNeta: number }
 interface ProgresoMeta { id: string; producto: string; objetivo: number; vendidos: number; faltan: number; porcentaje: number; alcanzada: boolean }
 interface BloqueHighlight { titulo: string; texto: string }
+interface Movimiento {
+  id: string;
+  datasetId: string;
+  datasetNombre: string;
+  tipo: "venta" | "compra";
+  producto: string | null;
+  monto: number | null;
+  fecha: string;
+  sustento: string | null;
+}
 interface Modulo {
   datasetId: string;
   nombre: string;
@@ -36,8 +46,14 @@ const nombreMes = (clave: string) => {
 };
 
 
+const soles0 = (n: number | null) => (n === null ? "-" : `S/ ${n.toLocaleString("es-PE", { maximumFractionDigits: 2 })}`);
+
 export default function ReportesPage() {
   const [modulos, setModulos] = useState<Modulo[] | null>(null);
+  const [movimientos, setMovimientos] = useState<Movimiento[] | null>(null);
+  const [sustentoAbierto, setSustentoAbierto] = useState<string | null>(null);
+  const [valorSustento, setValorSustento] = useState("");
+  const [guardandoSustento, setGuardandoSustento] = useState(false);
   const [error, setError] = useState("");
   const [formMeta, setFormMeta] = useState<Record<string, { producto: string; cantidad: string }>>({});
   const [errorMeta, setErrorMeta] = useState<Record<string, string>>({});
@@ -75,6 +91,7 @@ export default function ReportesPage() {
         const body = await res.json();
         if (!res.ok) return setError(body.error ?? "No se pudieron cargar los reportes");
         setModulos(body.modulos);
+        setMovimientos(body.movimientos);
       })
       .catch(() => setError("No se pudo conectar con el servidor."));
   }
@@ -82,6 +99,24 @@ export default function ReportesPage() {
   useEffect(() => {
     cargarReportes();
   }, []);
+
+  function abrirSustento(m: Movimiento) {
+    setSustentoAbierto(sustentoAbierto === m.id ? null : m.id);
+    setValorSustento(m.sustento ?? "");
+  }
+
+  async function guardarSustento(m: Movimiento) {
+    setGuardandoSustento(true);
+    const res = await fetch(`/api/records/${m.datasetId}/${m.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ sustento: valorSustento }),
+    });
+    setGuardandoSustento(false);
+    if (!res.ok) return;
+    setMovimientos((ms) => (ms ?? []).map((x) => (x.id === m.id ? { ...x, sustento: valorSustento.trim() || null } : x)));
+    setSustentoAbierto(null);
+  }
 
   async function fijarMeta(datasetId: string) {
     const f = formMeta[datasetId];
@@ -178,6 +213,67 @@ export default function ReportesPage() {
           ))}
         </div>
       </details>
+
+      {movimientos && movimientos.length > 0 && (
+        <div className="tarjeta" style={{ marginBottom: 20, padding: 0 }}>
+          <h3 style={{ margin: 0, padding: "16px 16px 0" }}>Últimos {movimientos.length} movimientos</h3>
+          <p className="suave pequeno" style={{ margin: "2px 0 0", padding: "0 16px 14px" }}>
+            Ventas y compras de todos tus módulos juntos, lo más reciente primero.
+          </p>
+          <div className="tabla-envoltura" style={{ border: "none", borderRadius: 0, boxShadow: "none" }}>
+            <table>
+              <thead>
+                <tr>
+                  <th>Tipo</th>
+                  <th>Producto</th>
+                  <th className="num">Monto</th>
+                  <th>Sustento</th>
+                </tr>
+              </thead>
+              <tbody>
+                {movimientos.map((m) => (
+                  <Fragment key={m.id}>
+                    <tr>
+                      <td>
+                        <span style={{ fontWeight: 700, color: m.tipo === "venta" ? "var(--verde-700)" : "var(--error)" }}>
+                          {m.tipo === "venta" ? "Venta" : "Compra"}
+                        </span>
+                      </td>
+                      <td>{m.producto ?? "-"}</td>
+                      <td className="num" style={{ fontWeight: 700, color: m.tipo === "venta" ? "var(--verde-700)" : "var(--error)" }}>
+                        {soles0(m.monto)}
+                      </td>
+                      <td>
+                        <button type="button" className="btn btn-fantasma" onClick={() => abrirSustento(m)}>
+                          {m.sustento ? "✓ Sustento" : "Sustento"}
+                        </button>
+                      </td>
+                    </tr>
+                    {sustentoAbierto === m.id && (
+                      <tr>
+                        <td colSpan={4} style={{ background: "var(--verde-50)" }}>
+                          <div style={{ display: "flex", gap: 8, alignItems: "flex-start", flexWrap: "wrap", padding: "6px 0" }}>
+                            <textarea
+                              value={valorSustento}
+                              onChange={(e) => setValorSustento(e.target.value)}
+                              placeholder="N° de boleta/factura, o cualquier referencia"
+                              rows={2}
+                              style={{ flex: 1, minWidth: 200 }}
+                            />
+                            <button type="button" className="btn btn-primario" disabled={guardandoSustento} onClick={() => guardarSustento(m)}>
+                              {guardandoSustento ? "Guardando..." : "Guardar"}
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                  </Fragment>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
 
       {error && <p className="alerta alerta-error" role="alert">{error}</p>}
       {!modulos && !error && <p className="suave">Cargando...</p>}

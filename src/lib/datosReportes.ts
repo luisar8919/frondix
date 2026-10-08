@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { claveValida } from "./enlaces.ts";
 import { totalesPorMes, topPor, sumaMonto, flujoCaja, progresoMetas } from "./reportes.ts";
+import { tipoModulo } from "./roles.ts";
 import type { Columna } from "./excel-parser.ts";
 
 const PAGINA = 1000; // Supabase corta cada respuesta en 1000 filas
@@ -123,6 +124,66 @@ export async function calcularModulosReporte(supabase: SupabaseClient, empresaId
   }
 
   return modulos;
+}
+
+export interface Movimiento {
+  id: string;
+  datasetId: string;
+  datasetNombre: string;
+  tipo: "venta" | "compra";
+  producto: string | null;
+  monto: number | null;
+  fecha: string;
+  sustento: string | null;
+}
+
+const TOPE_POR_MODULO = 50;
+
+// Para el Balance: los últimos movimientos de TODOS los módulos de Ventas y
+// Compras juntos (no solo uno), ordenados por fecha real si la tabla la tiene,
+// o por cuándo se registró si no. Trae hasta 50 recientes de cada módulo (cota
+// para no leer un módulo entero) y de ahí se queda con los 50 más nuevos en total.
+export async function ultimosMovimientos(supabase: SupabaseClient, empresaId: string, limite = 50): Promise<Movimiento[]> {
+  const { data: datasets, error } = await supabase.from("datasets").select("id, nombre, columnas").eq("empresa_id", empresaId);
+  if (error) throw new Error(error.message);
+
+  const candidatos: Movimiento[] = [];
+  for (const d of datasets ?? []) {
+    const columnas = d.columnas as Columna[];
+    const tipo = tipoModulo(columnas.map((c) => c.rol));
+    if (tipo !== "ventas" && tipo !== "compras") continue;
+    const cMonto = columnaConRol(columnas, "monto");
+    if (!cMonto) continue;
+    const cProducto = columnaConRol(columnas, "producto");
+    const cFecha = columnas.find((c) => c.rol === "fecha" && c.tipo === "fecha" && claveValida(c.key));
+
+    const { data: records, error: errorRecords } = await supabase
+      .from("records")
+      .select("id, data, sustento, created_at")
+      .eq("dataset_id", d.id)
+      .order("created_at", { ascending: false })
+      .limit(TOPE_POR_MODULO);
+    if (errorRecords) throw new Error(errorRecords.message);
+
+    for (const r of records ?? []) {
+      const fila = r.data as Record<string, unknown>;
+      const monto = Number(fila[cMonto.key]);
+      const producto = cProducto ? fila[cProducto.key]?.toString().trim() || null : null;
+      const fechaFila = cFecha ? fila[cFecha.key]?.toString() : null;
+      candidatos.push({
+        id: r.id,
+        datasetId: d.id,
+        datasetNombre: d.nombre,
+        tipo: tipo === "ventas" ? "venta" : "compra",
+        producto,
+        monto: Number.isFinite(monto) ? monto : null,
+        fecha: fechaFila || r.created_at,
+        sustento: r.sustento ?? null,
+      });
+    }
+  }
+
+  return candidatos.sort((a, b) => b.fecha.localeCompare(a.fecha)).slice(0, limite);
 }
 
 // Texto plano con solo los números ya calculados (nunca filas/registros crudos) para
