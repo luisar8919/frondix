@@ -68,39 +68,38 @@ export default function BarraPanel() {
       <div className="contenedor barra-fila">
         <Logo href="/dashboard" />
         <nav className="nav-panel" aria-label="Panel">
-          {enlaces.slice(0, 2).map((e) => (
-            <Link key={e.href} href={e.href} className="nav-link" aria-current={activo(e.href) ? "page" : undefined}>
-              {e.texto}
-            </Link>
-          ))}
-          <div className="menu-cuenta" ref={reportesRef}>
-            <button
-              type="button"
-              className="nav-link"
-              style={{ background: "transparent", border: "none", cursor: "pointer" }}
-              aria-haspopup="menu"
-              aria-expanded={reportesAbierto}
-              aria-current={activoReportes ? "page" : undefined}
-              onClick={() => setReportesAbierto((v) => !v)}
-            >
-              Reportes
-            </button>
-            {reportesAbierto && (
-              <div className="menu-cuenta-lista" role="menu">
-                {reportesSubmenu.map((s) => (
-                  <Link key={s.href} href={s.href} className="menu-cuenta-item" role="menuitem" onClick={() => setReportesAbierto(false)}>
-                    {s.texto}
-                  </Link>
-                ))}
-              </div>
-            )}
-          </div>
-          {enlaces.slice(2).map((e) => (
+          {enlaces.map((e) => (
             <Link key={e.href} href={e.href} className="nav-link" aria-current={activo(e.href) ? "page" : undefined}>
               {e.texto}
             </Link>
           ))}
         </nav>
+        {/* Fuera de nav-panel a propósito: ese contenedor tiene overflow-x:auto para
+            el scroll horizontal en mobile, y por la regla de CSS el navegador convierte
+            overflow-y en "auto" también -- cualquier desplegable adentro queda recortado
+            e invisible aunque el estado sí cambie (ver nav-panel en globals.css). */}
+        <div className="menu-cuenta" ref={reportesRef}>
+          <button
+            type="button"
+            className="nav-link"
+            style={{ background: "transparent", border: "none", cursor: "pointer" }}
+            aria-haspopup="menu"
+            aria-expanded={reportesAbierto}
+            aria-current={activoReportes ? "page" : undefined}
+            onClick={() => setReportesAbierto((v) => !v)}
+          >
+            Reportes
+          </button>
+          {reportesAbierto && (
+            <div className="menu-cuenta-lista" role="menu">
+              {reportesSubmenu.map((s) => (
+                <Link key={s.href} href={s.href} className="menu-cuenta-item" role="menuitem" onClick={() => setReportesAbierto(false)}>
+                  {s.texto}
+                </Link>
+              ))}
+            </div>
+          )}
+        </div>
         <div className="menu-cuenta" ref={menuRef}>
           <button
             type="button"
