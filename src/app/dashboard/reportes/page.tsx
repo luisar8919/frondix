@@ -115,10 +115,11 @@ export default function ReportesPage() {
     <>
       <div className="panel-cabecera">
         <div>
-          <h1>Reportes generales</h1>
+          <h1>Balance</h1>
           <p className="suave">
-            La foto completa de todos tus módulos juntos (compras y ventas combinadas). Para ver cada uno por
-            separado, con su propio registro rápido, entra a Compras o Ventas.
+            La foto completa de todos tus módulos juntos (compras y ventas combinadas), para ver todos los
+            movimientos que hubo en la empresa. Para ver cada uno por separado, con su propio registro rápido,
+            entra a Reportes → Venta o Reportes → Compras.
           </p>
         </div>
       </div>

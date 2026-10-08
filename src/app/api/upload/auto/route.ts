@@ -346,7 +346,9 @@ export async function POST(request: NextRequest) {
       const columnasVentas: Columna[] = [
         ...(info.cFecha ? [{ key: "fecha", label: "Fecha", tipo: "fecha" as const, rol: "fecha" as const, sospechosa: false }] : []),
         ...(info.cProducto ? [{ key: "producto", label: info.cProducto.label, tipo: "texto" as const, rol: "producto" as const, sospechosa: false }] : []),
-        ...(info.cCliente ? [{ key: "cliente", label: "Cliente", tipo: "texto" as const, rol: "cliente" as const, sospechosa: false }] : []),
+        // Siempre va, aunque el origen no tuviera columna de Cliente (queda
+        // vacía, se llena después a mano o al registrar una venta nueva).
+        { key: "cliente", label: "Cliente", tipo: "texto", rol: "cliente", sospechosa: false },
         { key: "monto", label: info.cMonto?.label ?? "Venta", tipo: "numero", rol: "monto", sospechosa: false },
         { key: "cantidad", label: "Cantidad", tipo: "numero", rol: "cantidad", sospechosa: false },
       ];
@@ -381,7 +383,7 @@ export async function POST(request: NextRequest) {
       // encontrada, enlazadas desde la columna de Cliente/Proveedor recién
       // creada -- así el registro manual elige de una lista (o crea uno nuevo
       // al vuelo, ver /api/records/[datasetId]).
-      if (datasetVentasId && info.cCliente) {
+      if (datasetVentasId) {
         const clientes = valoresDistintos(separacion.ventas, "cliente");
         const maestro = await crearTablaMaestra(supabase, empresaId, `Clientes - ${nombreDataset}`, clientes);
         if (maestro) {
@@ -423,7 +425,12 @@ export async function POST(request: NextRequest) {
       // implícita en a cuál fue a parar cada fila.
       const sinTipo = columnas.filter((c) => c.key !== cTipo.key);
       let columnasVentas = sinTipo;
-      if (!info.cCosto) columnasVentas = [...sinTipo, { key: "costo", label: "Costo", tipo: "numero", rol: "costo", sospechosa: false }];
+      if (!info.cCosto) columnasVentas = [...columnasVentas, { key: "costo", label: "Costo", tipo: "numero", rol: "costo", sospechosa: false }];
+      // Siempre va una columna de Cliente en Ventas, aunque el origen no la
+      // tuviera (queda vacía, se llena después a mano o al registrar una venta).
+      if (!columnasVentas.some((c) => c.rol === "cliente")) {
+        columnasVentas = [...columnasVentas, { key: "cliente", label: "Cliente", tipo: "texto", rol: "cliente", sospechosa: false }];
+      }
       // La misma columna de "contraparte" significa Cliente en la mitad de Ventas
       // y Proveedor en la de Compras -- se reasigna el rol, nunca se duplica la columna.
       let columnasCompras = sinTipo.map((c) => (c.rol === "cliente" ? { ...c, rol: "proveedor" as const } : c));
@@ -463,7 +470,14 @@ export async function POST(request: NextRequest) {
       continue;
     }
 
-    const r = await crearModulo(supabase, empresaId, nombreDataset, columnas, grupo.filas);
+    // Toda tabla de Ventas lleva columna de Cliente, aunque el origen no la
+    // tuviera (queda vacía, se llena después a mano o al registrar una venta).
+    const columnasFinal =
+      info.tipo === "ventas" && !columnas.some((c) => c.rol === "cliente")
+        ? [...columnas, { key: "cliente", label: "Cliente", tipo: "texto" as const, rol: "cliente" as const, sospechosa: false }]
+        : columnas;
+
+    const r = await crearModulo(supabase, empresaId, nombreDataset, columnasFinal, grupo.filas);
     if ("error" in r) return NextResponse.json({ error: r.error, creadosHastaAhora: creados }, { status: 500 });
     creados.push({ ...r, hojas: grupo.hojas });
 
