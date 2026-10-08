@@ -92,7 +92,7 @@ export default function BarraPanel() {
             ref={reportesBotonRef}
             type="button"
             className="nav-link"
-            style={{ background: "transparent", border: "none", cursor: "pointer" }}
+            style={{ background: "transparent", border: "none", cursor: "pointer", fontFamily: "inherit" }}
             aria-haspopup="menu"
             aria-expanded={reportesAbierto}
             aria-current={activoReportes ? "page" : undefined}
