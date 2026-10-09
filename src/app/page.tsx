@@ -1,5 +1,6 @@
 import Link from "next/link";
 import Logo from "@/components/Logo";
+import CalculadoraAhorro from "@/components/CalculadoraAhorro";
 
 // Piloto gratis por WhatsApp directo con el fundador (ver campaña "Primeros 10 talleres").
 const WHATSAPP_FUNDADOR = "998235775";
@@ -72,6 +73,7 @@ export default function Portada() {
 
         <section className="seccion contenedor">
           <div className="seccion-titulo">
+            <span className="eyebrow">El problema</span>
             <h2>Tu Excel funciona perfecto, hasta el día que…</h2>
             <p>Si alguna de estas te suena, esto es para ti.</p>
           </div>
@@ -85,56 +87,69 @@ export default function Portada() {
           </div>
         </section>
 
-        <section id="como-funciona" className="seccion seccion-suave">
+        <section className="seccion seccion-suave">
           <div className="contenedor">
-            <div className="seccion-titulo">
-              <h2>De tu Excel a tus módulos en pocos minutos</h2>
-              <p>Sin cursos, sin instalar nada y sin cambiar tu forma de trabajar.</p>
+            <div className="seccion-titulo seccion-titulo-centrado">
+              <span className="eyebrow">Lo que te está costando</span>
+              <h2>¿Cuánto te cuesta ordenar tu Excel hoy?</h2>
+              <p>Compara con lo que le pagarías a alguien para hacerlo a mano.</p>
             </div>
-            <div className="grilla-3">
-              {pasos.map((p, i) => (
-                <div key={p.titulo} className="tarjeta">
-                  <span className="paso-num">{i + 1}</span>
-                  <h3>{p.titulo}</h3>
-                  <p className="suave" style={{ margin: 0 }}>{p.texto}</p>
-                </div>
-              ))}
-            </div>
+            <CalculadoraAhorro />
           </div>
         </section>
 
-        <section id="precios" className="seccion contenedor">
+        <section id="como-funciona" className="seccion contenedor">
           <div className="seccion-titulo">
-            <h2>Empieza gratis, crece cuando lo necesites</h2>
-            <p>Sin contrato ni letra pequeña.</p>
+            <span className="eyebrow">La solución</span>
+            <h2>De tu Excel a tus módulos en pocos minutos</h2>
+            <p>Sin cursos, sin instalar nada y sin cambiar tu forma de trabajar.</p>
           </div>
-          <div className="precios">
-            <div className="tarjeta precio">
-              <h3>Gratis</h3>
-              <div className="precio-monto">S/ 0</div>
-              <p className="suave pequeno">Para ordenar tus datos tú solo.</p>
-              <ul>
-                <li>Un usuario</li>
-                <li>Todos los módulos que quieras</li>
-                <li>Formulario de carga y buscador</li>
-              </ul>
-              <Link href="/signup" className="btn btn-secundario btn-bloque">Crear cuenta gratis</Link>
+          <div className="grilla-3">
+            {pasos.map((p, i) => (
+              <div key={p.titulo} className="tarjeta">
+                <span className="paso-num">{i + 1}</span>
+                <h3>{p.titulo}</h3>
+                <p className="suave" style={{ margin: 0 }}>{p.texto}</p>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        <section id="precios" className="seccion seccion-suave">
+          <div className="contenedor">
+            <div className="seccion-titulo">
+              <span className="eyebrow">Sin letra pequeña</span>
+              <h2>Empieza gratis, crece cuando lo necesites</h2>
+              <p>Frondix ya funciona gratis para cargar tu Excel y ordenarlo. Pagar no es para empezar, es para cuando quieras subir de nivel la gestión.</p>
             </div>
-            <div className="tarjeta precio precio-destacado">
-              <h3>Completo <span className="insignia" style={{ marginLeft: 6 }}>Recomendado</span></h3>
-              <div className="precio-monto">S/ 35<small> /mes</small></div>
-              <p className="suave pequeno">Para trabajar en equipo.</p>
-              <p className="pequeno" style={{ fontWeight: 700, color: "var(--verde-700)", margin: "2px 0 0" }}>
-                Primer mes gratis. No pedimos tarjeta.
-              </p>
-              <ul>
-                <li>Todo lo del plan gratis</li>
-                <li>Invita a tu equipo con accesos por rol</li>
-                <li>
-                  Seguimiento de clientes por WhatsApp: te avisamos a quién escribirle y el mensaje sale listo <span className="insignia insignia-sol">Envío automático: próximamente</span>
-                </li>
-              </ul>
-              <Link href="/signup" className="btn btn-primario btn-bloque">Empezar ahora</Link>
+            <div className="precios">
+              <div className="tarjeta precio">
+                <h3>Gratis</h3>
+                <div className="precio-monto">S/ 0</div>
+                <p className="suave pequeno">Para ordenar tus datos tú solo.</p>
+                <ul>
+                  <li>Un usuario</li>
+                  <li>Todos los módulos que quieras</li>
+                  <li>Formulario de carga y buscador</li>
+                </ul>
+                <Link href="/signup" className="btn btn-secundario btn-bloque">Crear cuenta gratis</Link>
+              </div>
+              <div className="tarjeta precio precio-destacado">
+                <h3>Completo <span className="insignia" style={{ marginLeft: 6 }}>Recomendado</span></h3>
+                <div className="precio-monto">S/ 35<small> /mes</small></div>
+                <p className="suave pequeno">Para trabajar en equipo.</p>
+                <p className="pequeno" style={{ fontWeight: 700, color: "var(--verde-700)", margin: "2px 0 0" }}>
+                  Primer mes gratis. No pedimos tarjeta.
+                </p>
+                <ul>
+                  <li>Todo lo del plan gratis</li>
+                  <li>Invita a tu equipo con accesos por rol</li>
+                  <li>
+                    Seguimiento de clientes por WhatsApp: te avisamos a quién escribirle y el mensaje sale listo <span className="insignia insignia-sol">Envío automático: próximamente</span>
+                  </li>
+                </ul>
+                <Link href="/signup" className="btn btn-primario btn-bloque">Empezar ahora</Link>
+              </div>
             </div>
           </div>
         </section>

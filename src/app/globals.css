@@ -137,10 +137,26 @@ th.num, td.num { text-align: right; font-variant-numeric: tabular-nums; }
 .maqueta-cuerpo { padding: 16px; }
 .maqueta-buscar { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 10px 14px; border: 1px solid var(--linea-fuerte); border-radius: var(--radio-sm); color: var(--suave); font-size: 14px; margin-bottom: 12px; }
 .maqueta table { font-size: 13px; }
+
+.calculadora-ahorro { max-width: 520px; margin: 0 auto; }
+.calculadora-beneficios { background: var(--crema); border-radius: var(--radio-sm); padding: 12px 14px; margin-top: 4px; }
+.calculadora-beneficio-fila { display: flex; justify-content: space-between; gap: 10px; align-items: baseline; font-size: 14px; padding: 4px 0; }
+.calculadora-nota-gratis { margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--linea); text-align: center; }
+.calculadora-barras { display: grid; gap: 14px; margin-top: 22px; }
+.calculadora-barra-fila { display: grid; grid-template-columns: 110px 1fr auto; align-items: center; gap: 10px; }
+.calculadora-barra-etiqueta { font-size: 13px; font-weight: 600; color: var(--suave); }
+.calculadora-barra-pista { background: var(--verde-50); border-radius: 999px; height: 14px; overflow: hidden; }
+.calculadora-barra { height: 100%; border-radius: 999px; transition: width 0.2s; }
+.calculadora-barra-roja { background: var(--error); }
+.calculadora-barra-verde { background: var(--verde-600); }
+.calculadora-barra-valor { font-weight: 700; font-size: 14px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.calculadora-resultado { margin-top: 22px; padding-top: 18px; border-top: 1px solid var(--linea); text-align: center; }
+.calculadora-resultado-monto { font-size: 34px; font-weight: 800; color: var(--verde-700); margin: 2px 0 0; }
 .maqueta th, .maqueta td { padding: 10px 12px; }
 
 .seccion { padding-block: 56px; }
 .seccion-titulo { max-width: 640px; margin-bottom: 32px; }
+.seccion-titulo-centrado { max-width: none; margin-left: auto; margin-right: auto; text-align: center; }
 .seccion-titulo p { color: var(--suave); font-size: 17px; }
 .grilla-3 { display: grid; gap: 16px; grid-template-columns: repeat(3, 1fr); }
 .grilla-4 { display: grid; gap: 16px; grid-template-columns: repeat(4, 1fr); }
@@ -149,7 +165,7 @@ th.num, td.num { text-align: right; font-variant-numeric: tabular-nums; }
 .dolor p { color: var(--suave); margin: 0; }
 .paso-num { display: inline-flex; align-items: center; justify-content: center; width: 40px; height: 40px; margin-bottom: 14px; border-radius: 50%; background: var(--verde-600); color: #fff; font-weight: 800; }
 .seccion-suave { background: var(--verde-50); border-block: 1px solid var(--verde-100); }
-.precios { display: grid; gap: 20px; grid-template-columns: repeat(2, 1fr); max-width: 780px; }
+.precios { display: grid; gap: 20px; grid-template-columns: repeat(2, 1fr); max-width: 780px; margin: 0 auto; }
 .precio { display: flex; flex-direction: column; }
 .precio-destacado { border: 2px solid var(--verde-600); box-shadow: var(--sombra); }
 .precio-monto { font-size: 40px; font-weight: 800; letter-spacing: -0.03em; color: var(--verde-900); margin: 8px 0 4px; }
