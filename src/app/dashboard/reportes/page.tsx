@@ -22,6 +22,15 @@ interface Movimiento {
   monto: number | null;
   fecha: string;
   sustento: string | null;
+  incluyeIgv: boolean;
+}
+interface ResumenTributario {
+  mes: string;
+  ventasGravadas: number;
+  igvVentas: number;
+  comprasConCredito: number;
+  igvCompras: number;
+  igvAPagar: number;
 }
 interface Modulo {
   datasetId: string;
@@ -51,10 +60,34 @@ const fechaCorta = (f: string) => {
   const d = new Date(f.length <= 10 ? `${f}T00:00:00` : f);
   return Number.isNaN(d.getTime()) ? f : d.toLocaleDateString("es-PE", { day: "2-digit", month: "short" });
 };
+const mesActual = () => new Date().toISOString().slice(0, 7);
+const nombreMesLargo = (clave: string) => {
+  const [anio, mes] = clave.split("-").map(Number);
+  return new Date(Date.UTC(anio, mes - 1, 1)).toLocaleDateString("es-PE", { month: "long", year: "numeric" });
+};
+
+async function exportarMovimientosExcel(movimientos: Movimiento[], mes: string) {
+  const XLSX = await import("xlsx");
+  const filas = movimientos.map((m) => ({
+    Fecha: m.fecha.slice(0, 10),
+    Tipo: m.tipo === "venta" ? "Venta" : "Compra",
+    Producto: m.producto ?? "",
+    Monto: m.monto ?? "",
+    Modulo: m.datasetNombre,
+    Sustento: m.sustento ?? "",
+  }));
+  const hoja = XLSX.utils.json_to_sheet(filas);
+  const libro = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(libro, hoja, "Movimientos");
+  XLSX.writeFile(libro, `movimientos-${mes}.xlsx`);
+}
 
 export default function ReportesPage() {
   const [modulos, setModulos] = useState<Modulo[] | null>(null);
   const [movimientos, setMovimientos] = useState<Movimiento[] | null>(null);
+  const [resumen, setResumen] = useState<ResumenTributario | null>(null);
+  const [mes, setMes] = useState(mesActual());
+  const [cargandoMovimientos, setCargandoMovimientos] = useState(false);
   const [sustentoAbierto, setSustentoAbierto] = useState<string | null>(null);
   const [valorSustento, setValorSustento] = useState("");
   const [guardandoSustento, setGuardandoSustento] = useState(false);
@@ -89,20 +122,24 @@ export default function ReportesPage() {
     })();
   }, []);
 
-  async function cargarReportes() {
-    return fetch("/api/reportes")
+  async function cargarReportes(mesQuery: string) {
+    setCargandoMovimientos(true);
+    return fetch(`/api/reportes?mes=${mesQuery}`)
       .then(async (res) => {
         const body = await res.json();
         if (!res.ok) return setError(body.error ?? "No se pudieron cargar los reportes");
         setModulos(body.modulos);
         setMovimientos(body.movimientos);
+        setResumen(body.resumen);
       })
-      .catch(() => setError("No se pudo conectar con el servidor."));
+      .catch(() => setError("No se pudo conectar con el servidor."))
+      .finally(() => setCargandoMovimientos(false));
   }
 
   useEffect(() => {
-    cargarReportes();
-  }, []);
+    cargarReportes(mes);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mes]);
 
   function abrirSustento(m: Movimiento) {
     setSustentoAbierto(sustentoAbierto === m.id ? null : m.id);
@@ -139,7 +176,7 @@ export default function ReportesPage() {
     }
     // Recarga todo: el progreso real depende de contar ventas en todo el módulo, no
     // solo el top 5 que ya tenemos en pantalla, así que no se puede calcular a mano aquí.
-    await cargarReportes();
+    await cargarReportes(mes);
     setGuardandoMeta(null);
     setFormMeta((f) => ({ ...f, [datasetId]: { producto: "", cantidad: "" } }));
   }
@@ -218,13 +255,68 @@ export default function ReportesPage() {
         </div>
       </details>
 
-      {movimientos && movimientos.length > 0 && (
-        <div className="tarjeta" style={{ marginBottom: 20, padding: 0 }}>
-          <h3 style={{ margin: 0, padding: "16px 16px 0" }}>Últimos {movimientos.length} movimientos</h3>
-          <p className="suave pequeno" style={{ margin: "2px 0 0", padding: "0 16px 14px" }}>
-            Ventas y compras de todos tus módulos juntos, lo más reciente primero.
+      <div className="tarjeta" style={{ marginBottom: 20 }}>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 12, alignItems: "flex-end", justifyContent: "space-between" }}>
+          <div>
+            <h3 style={{ margin: 0 }}>Movimientos y declaración</h3>
+            <p className="suave pequeno" style={{ margin: "2px 0 0" }}>
+              Ventas y compras de todos tus módulos juntos, de un mes a la vez — para que te sirva de respaldo o
+              para declarar.
+            </p>
+          </div>
+          <div className="campo" style={{ margin: 0 }}>
+            <label htmlFor="mes-movimientos" className="pequeno">Mes</label>
+            <input id="mes-movimientos" type="month" value={mes} max={mesActual()} onChange={(e) => setMes(e.target.value)} />
+          </div>
+        </div>
+
+        {resumen && (
+          <div className="tarjeta" style={{ marginTop: 14, padding: 14 }}>
+            <strong>Resumen para declarar — {nombreMesLargo(resumen.mes)}</strong>
+            <p className="suave pequeno" style={{ margin: "2px 0 10px" }}>
+              Mismos campos que pide el Formulario Virtual 621 IGV-Renta Mensual de SUNAT (Declara Fácil). Revisa y
+              ajusta antes de presentar — esto no se envía a SUNAT por ti.
+            </p>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 10 }}>
+              <div>
+                <p className="suave pequeno" style={{ margin: 0 }}>Ventas gravadas</p>
+                <p style={{ margin: 0, fontWeight: 600 }}>{soles0(resumen.ventasGravadas)}</p>
+              </div>
+              <div>
+                <p className="suave pequeno" style={{ margin: 0 }}>IGV de ventas</p>
+                <p style={{ margin: 0, fontWeight: 600 }}>{soles0(resumen.igvVentas)}</p>
+              </div>
+              <div>
+                <p className="suave pequeno" style={{ margin: 0 }}>Compras con crédito fiscal</p>
+                <p style={{ margin: 0, fontWeight: 600 }}>{soles0(resumen.comprasConCredito)}</p>
+              </div>
+              <div>
+                <p className="suave pequeno" style={{ margin: 0 }}>IGV de compras</p>
+                <p style={{ margin: 0, fontWeight: 600 }}>{soles0(resumen.igvCompras)}</p>
+              </div>
+              <div>
+                <p className="suave pequeno" style={{ margin: 0 }}>{resumen.igvAPagar >= 0 ? "IGV a pagar" : "Saldo a favor"}</p>
+                <p style={{ margin: 0, fontWeight: 700, color: resumen.igvAPagar >= 0 ? "var(--error)" : "var(--verde-700)" }}>
+                  {soles0(Math.abs(resumen.igvAPagar))}
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 18, marginBottom: 4 }}>
+          <p className="suave pequeno" style={{ margin: 0 }}>
+            {cargandoMovimientos ? "Cargando..." : `${movimientos?.length ?? 0} movimiento(s) de ${nombreMesLargo(mes)}`}
           </p>
-          <div className="tabla-envoltura" style={{ border: "none", borderRadius: 0, boxShadow: "none" }}>
+          {movimientos && movimientos.length > 0 && (
+            <button type="button" className="btn btn-secundario" onClick={() => exportarMovimientosExcel(movimientos, mes)}>
+              Exportar a Excel
+            </button>
+          )}
+        </div>
+
+        {movimientos && movimientos.length > 0 && (
+          <div className="tabla-envoltura" style={{ marginTop: 10 }}>
             <table>
               <thead>
                 <tr>
@@ -278,8 +370,8 @@ export default function ReportesPage() {
               </tbody>
             </table>
           </div>
-        </div>
-      )}
+        )}
+      </div>
 
       {error && <p className="alerta alerta-error" role="alert">{error}</p>}
       {!modulos && !error && <p className="suave">Cargando...</p>}
