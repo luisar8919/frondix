@@ -23,6 +23,10 @@ interface Movimiento {
   fecha: string;
   sustento: string | null;
   incluyeIgv: boolean;
+  documento: string | null;
+  tipoComprobante: string | null;
+  serieComprobante: string | null;
+  numeroComprobante: string | null;
 }
 interface ResumenTributario {
   mes: string;
@@ -66,16 +70,34 @@ const nombreMesLargo = (clave: string) => {
   return new Date(Date.UTC(anio, mes - 1, 1)).toLocaleDateString("es-PE", { month: "long", year: "numeric" });
 };
 
+// Redondea a 2 decimales, misma fórmula que resumenTributarioMes (lib/datosReportes.ts)
+// para que la base imponible y el IGV de cada fila sumen igual que el resumen de arriba.
+const redondear = (n: number) => Math.round(n * 100) / 100;
+
+// Para que el Excel sirva de base real al declarar: además de lo que ya se ve en
+// pantalla, incluye los campos que pide SUNAT (RUC/documento, tipo/serie/número de
+// comprobante, y la base imponible + IGV ya separados del monto total).
 async function exportarMovimientosExcel(movimientos: Movimiento[], mes: string) {
   const XLSX = await import("xlsx");
-  const filas = movimientos.map((m) => ({
-    Fecha: m.fecha.slice(0, 10),
-    Tipo: m.tipo === "venta" ? "Venta" : "Compra",
-    Producto: m.producto ?? "",
-    Monto: m.monto ?? "",
-    Modulo: m.datasetNombre,
-    Sustento: m.sustento ?? "",
-  }));
+  const filas = movimientos.map((m) => {
+    const monto = m.monto ?? 0;
+    const base = m.incluyeIgv ? redondear(monto * (100 / 118)) : monto;
+    const igv = m.incluyeIgv ? redondear(monto * (18 / 118)) : redondear(monto * 0.18);
+    return {
+      Fecha: m.fecha.slice(0, 10),
+      Tipo: m.tipo === "venta" ? "Venta" : "Compra",
+      "Tipo de comprobante": m.tipoComprobante ?? "",
+      Serie: m.serieComprobante ?? "",
+      Número: m.numeroComprobante ?? "",
+      [m.tipo === "venta" ? "RUC/DNI cliente" : "RUC/DNI proveedor"]: m.documento ?? "",
+      Producto: m.producto ?? "",
+      "Base imponible": m.monto !== null ? base : "",
+      IGV: m.monto !== null ? igv : "",
+      "Importe total": m.monto ?? "",
+      Módulo: m.datasetNombre,
+      Sustento: m.sustento ?? "",
+    };
+  });
   const hoja = XLSX.utils.json_to_sheet(filas);
   const libro = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(libro, hoja, "Movimientos");
@@ -322,6 +344,8 @@ export default function ReportesPage() {
                 <tr>
                   <th>Fecha</th>
                   <th>Tipo</th>
+                  <th>Comprobante</th>
+                  <th>RUC/Doc.</th>
                   <th>Producto</th>
                   <th className="num">Monto</th>
                   <th>Sustento</th>
@@ -337,6 +361,12 @@ export default function ReportesPage() {
                           {m.tipo === "venta" ? "Venta" : "Compra"}
                         </span>
                       </td>
+                      <td style={{ whiteSpace: "nowrap" }}>
+                        {m.tipoComprobante || m.serieComprobante || m.numeroComprobante
+                          ? `${m.tipoComprobante ?? ""} ${[m.serieComprobante, m.numeroComprobante].filter(Boolean).join("-")}`.trim()
+                          : "-"}
+                      </td>
+                      <td>{m.documento ?? "-"}</td>
                       <td>{m.producto ?? "-"}</td>
                       <td className="num" style={{ fontWeight: 700, color: m.tipo === "venta" ? "var(--verde-700)" : "var(--error)" }}>
                         {soles0(m.monto)}
@@ -349,7 +379,7 @@ export default function ReportesPage() {
                     </tr>
                     {sustentoAbierto === m.id && (
                       <tr>
-                        <td colSpan={5} style={{ background: "var(--verde-50)" }}>
+                        <td colSpan={7} style={{ background: "var(--verde-50)" }}>
                           <div style={{ display: "flex", gap: 8, alignItems: "flex-start", flexWrap: "wrap", padding: "6px 0" }}>
                             <textarea
                               value={valorSustento}

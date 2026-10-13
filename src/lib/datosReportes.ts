@@ -136,6 +136,12 @@ export interface Movimiento {
   fecha: string;
   sustento: string | null;
   incluyeIgv: boolean;
+  // Para declarar ante SUNAT (ver roles ruc_proveedor/documento_cliente y
+  // tipo/serie/numero_comprobante): null si el módulo no marcó esas columnas.
+  documento: string | null; // RUC o DNI del proveedor (compra) o cliente (venta)
+  tipoComprobante: string | null;
+  serieComprobante: string | null;
+  numeroComprobante: string | null;
 }
 
 const TOPE_POR_MODULO = 50;
@@ -166,6 +172,10 @@ export async function ultimosMovimientos(
     if (!cMonto) continue;
     const cProducto = columnaConRol(columnas, "producto");
     const cFecha = columnas.find((c) => c.rol === "fecha" && c.tipo === "fecha" && claveValida(c.key));
+    const cDocumento = columnaConRol(columnas, tipo === "ventas" ? "documento_cliente" : "ruc_proveedor");
+    const cTipoCp = columnaConRol(columnas, "tipo_comprobante");
+    const cSerieCp = columnaConRol(columnas, "serie_comprobante");
+    const cNumeroCp = columnaConRol(columnas, "numero_comprobante");
 
     const { data: records, error: errorRecords } = await supabase
       .from("records")
@@ -175,10 +185,11 @@ export async function ultimosMovimientos(
       .limit(opciones?.mes ? TOPE_POR_MODULO_MES : TOPE_POR_MODULO);
     if (errorRecords) throw new Error(errorRecords.message);
 
+    const texto = (c: typeof cProducto, fila: Record<string, unknown>) => (c ? fila[c.key]?.toString().trim() || null : null);
+
     for (const r of records ?? []) {
       const fila = r.data as Record<string, unknown>;
       const monto = Number(fila[cMonto.key]);
-      const producto = cProducto ? fila[cProducto.key]?.toString().trim() || null : null;
       const fechaFila = cFecha ? fila[cFecha.key]?.toString() : null;
       const fecha = fechaFila || r.created_at;
       if (opciones?.mes && !fecha.startsWith(opciones.mes)) continue;
@@ -187,11 +198,15 @@ export async function ultimosMovimientos(
         datasetId: d.id,
         datasetNombre: d.nombre,
         tipo: tipo === "ventas" ? "venta" : "compra",
-        producto,
+        producto: texto(cProducto, fila),
         monto: Number.isFinite(monto) ? monto : null,
         fecha,
         sustento: r.sustento ?? null,
         incluyeIgv: !!d.incluye_igv,
+        documento: texto(cDocumento, fila),
+        tipoComprobante: texto(cTipoCp, fila),
+        serieComprobante: texto(cSerieCp, fila),
+        numeroComprobante: texto(cNumeroCp, fila),
       });
     }
   }
