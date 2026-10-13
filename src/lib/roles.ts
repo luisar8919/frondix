@@ -1,6 +1,6 @@
 // "Rol" = qué significa una columna para el negocio (no solo su tipo de dato).
 // El asistente lo necesita para saber, por ejemplo, cuál es el monto de una venta.
-export type RolColumna = "monto" | "fecha" | "cliente" | "producto" | "telefono" | "costo" | "proveedor" | "gastos" | "tipo_movimiento" | "stock" | "cantidad";
+export type RolColumna = "monto" | "fecha" | "cliente" | "producto" | "telefono" | "costo" | "proveedor" | "gastos" | "tipo_movimiento" | "stock" | "cantidad" | "ruc_proveedor" | "tipo_comprobante" | "serie_comprobante" | "numero_comprobante";
 
 export const ROLES: { valor: RolColumna; etiqueta: string }[] = [
   { valor: "monto", etiqueta: "Monto (importe de la venta o movimiento)" },
@@ -10,6 +10,10 @@ export const ROLES: { valor: RolColumna; etiqueta: string }[] = [
   { valor: "fecha", etiqueta: "Fecha" },
   { valor: "cliente", etiqueta: "Cliente" },
   { valor: "proveedor", etiqueta: "Proveedor (a quién le compras)" },
+  { valor: "ruc_proveedor", etiqueta: "RUC o DNI del proveedor (para declarar compras ante SUNAT)" },
+  { valor: "tipo_comprobante", etiqueta: "Tipo de comprobante (factura, boleta, etc.)" },
+  { valor: "serie_comprobante", etiqueta: "Serie del comprobante (ej. F001)" },
+  { valor: "numero_comprobante", etiqueta: "Número del comprobante" },
   { valor: "producto", etiqueta: "Producto o concepto" },
   { valor: "telefono", etiqueta: "Teléfono (para WhatsApp)" },
   { valor: "tipo_movimiento", etiqueta: "Tipo de movimiento (si cada fila dice si es venta o compra)" },
@@ -34,6 +38,10 @@ const REGLAS: { rol: RolColumna; patron: RegExp; tipo?: string }[] = [
   { rol: "monto", patron: /monto|venta|importe|total|precio|ingreso|entrada/, tipo: "numero" },
   { rol: "costo", patron: /costo|gasto|egreso/, tipo: "numero" },
   { rol: "producto", patron: /producto|juego|item|articulo|descripcion|concepto|detalle/, tipo: "texto" },
+  { rol: "ruc_proveedor", patron: /ruc|doc(umento)?.*proveedor/, tipo: "texto" },
+  { rol: "tipo_comprobante", patron: /tipo.*comprobante/, tipo: "texto" },
+  { rol: "serie_comprobante", patron: /^serie$|serie.*comprobante/, tipo: "texto" },
+  { rol: "numero_comprobante", patron: /n[uú]mero.*comprobante|^nro\.?\s*comprobante$|^n[uú]m\.?\s*cp$/, tipo: "texto" },
   { rol: "proveedor", patron: /proveedor|vendedor|distribuidor/, tipo: "texto" },
   { rol: "cliente", patron: /cliente|comprador|nombre/, tipo: "texto" },
 ];

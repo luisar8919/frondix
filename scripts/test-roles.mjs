@@ -43,6 +43,22 @@ const compras = sugerirRoles([
 ]);
 assert.strictEqual(compras.nombre_del_proveedor, "proveedor");
 
+// Campos de comprobante para declarar ante SUNAT: "RUC proveedor" cae en
+// ruc_proveedor (no en proveedor, aunque ambos patrones podrían matchear) y los
+// de comprobante se reconocen cada uno por separado.
+const comprobante = sugerirRoles([
+  { key: "nombre_proveedor", label: "Nombre del proveedor", tipo: "texto" },
+  { key: "ruc_proveedor", label: "RUC proveedor", tipo: "texto" },
+  { key: "tipo_cp", label: "Tipo de comprobante", tipo: "texto" },
+  { key: "serie", label: "Serie", tipo: "texto" },
+  { key: "numero_cp", label: "Número de comprobante", tipo: "texto" },
+]);
+assert.strictEqual(comprobante.nombre_proveedor, "proveedor");
+assert.strictEqual(comprobante.ruc_proveedor, "ruc_proveedor", "'RUC proveedor' va a ruc_proveedor, no a proveedor");
+assert.strictEqual(comprobante.tipo_cp, "tipo_comprobante");
+assert.strictEqual(comprobante.serie, "serie_comprobante");
+assert.strictEqual(comprobante.numero_cp, "numero_comprobante");
+
 // Una fecha guardada como texto no se marca como fecha (el usuario la elige a mano)
 const fechaTexto = sugerirRoles([{ key: "fecha", label: "Fecha", tipo: "texto" }]);
 assert.strictEqual(fechaTexto.fecha, undefined);
