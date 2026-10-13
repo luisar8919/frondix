@@ -59,6 +59,14 @@ assert.strictEqual(comprobante.tipo_cp, "tipo_comprobante");
 assert.strictEqual(comprobante.serie, "serie_comprobante");
 assert.strictEqual(comprobante.numero_cp, "numero_comprobante");
 
+// "RUC cliente" (ventas) va a documento_cliente, no se cruza con cliente
+const ventaConDoc = sugerirRoles([
+  { key: "nombre_cliente", label: "Nombre del cliente", tipo: "texto" },
+  { key: "ruc_cliente", label: "RUC cliente", tipo: "texto" },
+]);
+assert.strictEqual(ventaConDoc.nombre_cliente, "cliente");
+assert.strictEqual(ventaConDoc.ruc_cliente, "documento_cliente");
+
 // Una fecha guardada como texto no se marca como fecha (el usuario la elige a mano)
 const fechaTexto = sugerirRoles([{ key: "fecha", label: "Fecha", tipo: "texto" }]);
 assert.strictEqual(fechaTexto.fecha, undefined);
