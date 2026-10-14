@@ -80,6 +80,52 @@ export function tipoModulo(roles: (RolColumna | null | "")[]): TipoModulo {
   return "otro";
 }
 
+// Roles que, SI la tabla tiene una columna marcada así, no se puede dejar en blanco
+// al registrar (a mano o editando) -- sin esto se guardaban ventas/compras sin
+// monto ni producto ni contraparte, que después ni Reportes ni Seguimiento pueden
+// usar. No son los únicos campos del módulo, solo los mínimos para que el registro
+// tenga sentido de negocio; "otro" (una tabla sin clasificar) no obliga nada.
+const OBLIGATORIOS_POR_TIPO: Record<TipoModulo, RolColumna[]> = {
+  ventas: ["monto", "producto", "cliente"],
+  compras: ["monto", "producto", "proveedor"],
+  otro: [],
+};
+
+export function camposObligatorios(tipo: TipoModulo): RolColumna[] {
+  return OBLIGATORIOS_POR_TIPO[tipo];
+}
+
+// Roles numéricos donde un valor negativo no tiene sentido de negocio (un monto,
+// un costo o una cantidad negativa es casi siempre un error de tipeo, no una
+// operación real) -- "stock" queda afuera a propósito: negativo ahí SÍ es válido
+// (se vendió algo antes de registrar que se compró, ver lib/stock.ts).
+const ROLES_SIN_NEGATIVOS = new Set<RolColumna>(["monto", "costo", "gastos", "cantidad"]);
+
+export function admiteNegativos(rol: RolColumna | null | ""): boolean {
+  return !rol || !ROLES_SIN_NEGATIVOS.has(rol);
+}
+
+// Mismas reglas que el formulario (ver DynamicForm.tsx), del lado del servidor --
+// el formulario ya las aplica, pero POST/PATCH de /api/records se pueden llamar
+// directo sin pasar por él, así que no alcanza con validar solo en el cliente.
+export function validarCamposRegistro(
+  columnas: { key: string; label: string; rol: RolColumna | null; tipo: string }[],
+  datos: Record<string, unknown>
+): string | null {
+  const obligatorios = new Set(camposObligatorios(tipoModulo(columnas.map((c) => c.rol))));
+  for (const c of columnas) {
+    if (!c.rol || !obligatorios.has(c.rol)) continue;
+    const v = datos[c.key];
+    if (v === null || v === undefined || String(v).trim() === "") return `Falta completar "${c.label}".`;
+  }
+  for (const c of columnas) {
+    if (c.tipo !== "numero" || admiteNegativos(c.rol)) continue;
+    const v = datos[c.key];
+    if (v !== null && v !== undefined && Number(v) < 0) return `"${c.label}" no puede ser negativo.`;
+  }
+  return null;
+}
+
 // Una tabla es "confusa" para las reglas de arriba cuando no reconocieron nada, o cuando
 // muchas columnas quedaron marcadas "sospechosa" (el encabezado en realidad era un dato).
 // En ese caso conviene ofrecer la sugerencia por IA en vez de dejar todo en blanco.

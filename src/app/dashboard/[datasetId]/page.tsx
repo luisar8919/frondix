@@ -44,6 +44,9 @@ export default function DatasetPage({
   const [busqueda, setBusqueda] = useState("");
   const [editando, setEditando] = useState<Registro | null>(null);
   const [errorAccion, setErrorAccion] = useState("");
+  // Para el botón "Deshacer" de la edición rápida por doble clic (ver guardarCelda):
+  // guarda el valor de ANTES del último cambio, para poder volver a escribirlo.
+  const [ultimoCambio, setUltimoCambio] = useState<{ registroId: string; columnaKey: string; columnaLabel: string; valorAnterior: unknown } | null>(null);
 
   async function cargar() {
     let acumulados: Registro[] = [];
@@ -107,6 +110,10 @@ export default function DatasetPage({
     // gastaría transferencia (el plan gratis de Supabase da 5 GB al mes).
     setRegistros((anteriores) => [body.record, ...anteriores]);
     setTotal((t) => t + 1);
+    // Si el registro trajo un cliente/proveedor/producto nuevo (el formulario deja
+    // elegir "+ Agregar nuevo"), ese valor recién se creó en la tabla enlazada --
+    // sin esto, el desplegable no lo mostraría hasta recargar toda la página.
+    cargarOpciones(dataset!.columnas);
     return null;
   }
 
@@ -121,14 +128,26 @@ export default function DatasetPage({
 
   // Edición rápida de un solo campo con doble clic, directo en la tabla (sin abrir
   // el formulario de arriba) -- útil para corregir muchos registros sueltos después
-  // de una carga con columnas confusas.
-  async function guardarCelda(r: Registro, columna: Columna, nuevoValor: unknown): Promise<string | null> {
+  // de una carga con columnas confusas. `guardarUndo=false` cuando la llamada es el
+  // propio botón Deshacer, para no generar un "deshacer del deshacer" en cadena.
+  async function guardarCelda(r: Registro, columna: Columna, nuevoValor: unknown, guardarUndo = true): Promise<string | null> {
+    const valorAnterior = r.data[columna.key];
     const datos = { ...r.data, [columna.key]: nuevoValor };
     const res = await enviarConfirmando(`/api/records/${datasetId}/${r.id}`, "PATCH", { data: datos });
     if (res.cancelado) return null;
     if (!res.ok) return res.body.error ?? "No se pudo guardar el cambio";
     setRegistros((rs) => rs.map((x) => (x.id === res.body.record.id ? { ...x, data: res.body.record.data, updated_by: res.body.record.updated_by, updated_at: res.body.record.updated_at } : x)));
+    if (guardarUndo) setUltimoCambio({ registroId: r.id, columnaKey: columna.key, columnaLabel: columna.label, valorAnterior });
     return null;
+  }
+
+  async function deshacerUltimoCambio() {
+    if (!ultimoCambio) return;
+    const r = registros.find((x) => x.id === ultimoCambio.registroId);
+    const columna = dataset?.columnas.find((c) => c.key === ultimoCambio.columnaKey);
+    if (!r || !columna) return setUltimoCambio(null);
+    await guardarCelda(r, columna, ultimoCambio.valorAnterior, false);
+    setUltimoCambio(null);
   }
 
   // Sustento contable (boleta/factura, etc.): campo propio del registro, aparte
@@ -275,6 +294,14 @@ export default function DatasetPage({
       )}
 
       {errorAccion && <p className="alerta alerta-error" role="alert">{errorAccion}</p>}
+      {ultimoCambio && (
+        <p className="alerta alerta-ok" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10 }}>
+          <span>Cambiaste &quot;{ultimoCambio.columnaLabel}&quot;.</span>
+          <button type="button" className="btn btn-fantasma" style={{ padding: "2px 10px" }} onClick={deshacerUltimoCambio}>
+            Deshacer
+          </button>
+        </p>
+      )}
       <p className="suave pequeno" style={{ marginBottom: 10 }}>
         Doble clic en una celda para corregirla rápido, sin abrir el formulario.
       </p>

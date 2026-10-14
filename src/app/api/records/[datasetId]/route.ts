@@ -4,6 +4,7 @@ import { crearClienteServidor } from "@/lib/supabase/server";
 import { validarEnlaces } from "@/lib/dependientes";
 import { claveValida } from "@/lib/enlaces";
 import { ajustarStockDesdeRegistro } from "@/lib/stock";
+import { validarCamposRegistro } from "@/lib/roles";
 import type { Columna } from "@/lib/excel-parser";
 
 // Si el valor de una columna de Cliente/Proveedor enlazada no existe todavía en
@@ -104,6 +105,9 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ dat
   if (errorDataset?.code === "42501") return respuestaError(errorDataset);
   if (!dataset) return NextResponse.json({ error: "Dataset no encontrado" }, { status: 404 });
   const columnas = dataset.columnas as Columna[];
+
+  const faltaCampo = validarCamposRegistro(columnas, body);
+  if (faltaCampo) return NextResponse.json({ error: faltaCampo }, { status: 422 });
 
   await autoCrearEnlazadosFaltantes(supabase, columnas, body);
 

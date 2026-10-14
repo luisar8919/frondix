@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { crearClienteServidor } from "@/lib/supabase/server";
 import { advertenciasDeRegistro, validarEnlaces } from "@/lib/dependientes";
 import { revertirStockDesdeRegistro } from "@/lib/stock";
+import { validarCamposRegistro } from "@/lib/roles";
 import type { Columna } from "@/lib/excel-parser";
 
 // Editar o eliminar un registro. Si otras tablas dependen de su valor, la primera llamada
@@ -45,6 +46,9 @@ export async function PATCH(req: NextRequest, ctx: Ctx) {
     if (!dataset) return NextResponse.json({ error: "Tabla no encontrada" }, { status: 404 });
     columnas = dataset.columnas as Columna[];
     empresaId = dataset.empresa_id;
+
+    const faltaCampo = validarCamposRegistro(columnas, data);
+    if (faltaCampo) return NextResponse.json({ error: faltaCampo }, { status: 422 });
 
     const fallo = await validarEnlaces(supabase, columnas, data);
     if (fallo) return NextResponse.json({ error: fallo }, { status: 422 });

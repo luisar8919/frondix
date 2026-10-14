@@ -1,7 +1,7 @@
 // Chequeo de sugerirRoles: node scripts/test-roles.mjs
 // Importa el .ts real (Node 22.18+/24 quita los tipos solo), sin duplicar la lógica.
 import assert from "node:assert";
-import { sugerirRoles, estructuraConfusa, tipoModulo } from "../src/lib/roles.ts";
+import { sugerirRoles, estructuraConfusa, tipoModulo, camposObligatorios, admiteNegativos, validarCamposRegistro } from "../src/lib/roles.ts";
 
 // Ventas del Excel real
 const ventas = sugerirRoles([
@@ -83,5 +83,30 @@ assert.strictEqual(tipoModulo(["cliente", "producto"]), "ventas");
 assert.strictEqual(tipoModulo(["producto", "monto"]), "ventas", "producto+monto sin cliente ni proveedor, igual es venta");
 assert.strictEqual(tipoModulo(["producto"]), "otro", "solo producto, sin monto ni cliente, no alcanza");
 assert.strictEqual(tipoModulo([null, "", "telefono"]), "otro");
+
+// --- camposObligatorios / admiteNegativos ---
+assert.deepStrictEqual(camposObligatorios("ventas"), ["monto", "producto", "cliente"]);
+assert.deepStrictEqual(camposObligatorios("compras"), ["monto", "producto", "proveedor"]);
+assert.deepStrictEqual(camposObligatorios("otro"), []);
+assert.strictEqual(admiteNegativos("monto"), false);
+assert.strictEqual(admiteNegativos("costo"), false);
+assert.strictEqual(admiteNegativos("cantidad"), false);
+assert.strictEqual(admiteNegativos("gastos"), false);
+assert.strictEqual(admiteNegativos("stock"), true, "el stock SI puede quedar negativo (venta antes de registrar la compra)");
+assert.strictEqual(admiteNegativos(null), true);
+
+// --- validarCamposRegistro: mismas reglas, del lado del servidor ---
+const columnasVenta = [
+  { key: "p", label: "Producto", rol: "producto", tipo: "texto" },
+  { key: "m", label: "Monto", rol: "monto", tipo: "numero" },
+  { key: "c", label: "Cliente", rol: "cliente", tipo: "texto" },
+];
+assert.strictEqual(validarCamposRegistro(columnasVenta, { p: "Zelda", m: 50, c: "Ana" }), null, "todo completo, pasa");
+assert.ok(validarCamposRegistro(columnasVenta, { p: "Zelda", m: 50, c: "" })?.includes("Cliente"), "cliente vacio, falla con el nombre del campo");
+assert.ok(validarCamposRegistro(columnasVenta, { p: "Zelda", m: -10, c: "Ana" })?.includes("negativo"), "monto negativo, falla");
+assert.strictEqual(validarCamposRegistro(columnasVenta, { p: "Zelda", m: 0, c: "Ana" }), null, "monto en 0 no es negativo, pasa");
+
+const columnasOtro = [{ key: "x", label: "Lo que sea", rol: null, tipo: "texto" }];
+assert.strictEqual(validarCamposRegistro(columnasOtro, { x: "" }), null, "una tabla sin clasificar (ni venta ni compra) no obliga nada");
 
 console.log("OK: test-roles (todas las aserciones pasaron)");
