@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Frondix</string>
+    <string name="title_activity_main">Frondix</string>
+    <string name="package_name">com.frondix.app</string>
+    <string name="custom_url_scheme">com.frondix.app</string>
+</resources>
