@@ -135,32 +135,16 @@ export interface Movimiento {
   monto: number | null;
   fecha: string;
   sustento: string | null;
-  incluyeIgv: boolean;
-  // Para declarar ante SUNAT (ver roles ruc_proveedor/documento_cliente y
-  // tipo/serie/numero_comprobante): null si el módulo no marcó esas columnas.
-  documento: string | null; // RUC o DNI del proveedor (compra) o cliente (venta)
-  tipoComprobante: string | null;
-  serieComprobante: string | null;
-  numeroComprobante: string | null;
 }
 
 const TOPE_POR_MODULO = 50;
-const TOPE_POR_MODULO_MES = 5000; // filtrando por mes, un módulo normal no llega a esto
 
-// Para el Balance: los movimientos de TODOS los módulos de Ventas y Compras
-// juntos (no solo uno), ordenados por fecha real si la tabla la tiene, o por
-// cuándo se registró si no.
-// Sin `mes`: trae los últimos 50 en total (vista rápida, cota por módulo para
-// no leer uno entero). Con `mes` (formato "2026-10"): trae TODOS los
-// movimientos de ese mes calendario -- se necesita el total exacto para que
-// el resumen tributario (ver resumenTributarioMes) sea correcto, no solo una
-// muestra.
-export async function ultimosMovimientos(
-  supabase: SupabaseClient,
-  empresaId: string,
-  opciones?: { limite?: number; mes?: string }
-): Promise<Movimiento[]> {
-  const { data: datasets, error } = await supabase.from("datasets").select("id, nombre, columnas, incluye_igv").eq("empresa_id", empresaId);
+// Para el Balance: los últimos movimientos de TODOS los módulos de Ventas y
+// Compras juntos (no solo uno), ordenados por fecha real si la tabla la tiene,
+// o por cuándo se registró si no. Trae hasta 50 recientes de cada módulo (cota
+// para no leer un módulo entero) y de ahí se queda con los 50 más nuevos en total.
+export async function ultimosMovimientos(supabase: SupabaseClient, empresaId: string, limite = 50): Promise<Movimiento[]> {
+  const { data: datasets, error } = await supabase.from("datasets").select("id, nombre, columnas").eq("empresa_id", empresaId);
   if (error) throw new Error(error.message);
 
   const candidatos: Movimiento[] = [];
@@ -172,81 +156,34 @@ export async function ultimosMovimientos(
     if (!cMonto) continue;
     const cProducto = columnaConRol(columnas, "producto");
     const cFecha = columnas.find((c) => c.rol === "fecha" && c.tipo === "fecha" && claveValida(c.key));
-    const cDocumento = columnaConRol(columnas, tipo === "ventas" ? "documento_cliente" : "ruc_proveedor");
-    const cTipoCp = columnaConRol(columnas, "tipo_comprobante");
-    const cSerieCp = columnaConRol(columnas, "serie_comprobante");
-    const cNumeroCp = columnaConRol(columnas, "numero_comprobante");
 
     const { data: records, error: errorRecords } = await supabase
       .from("records")
       .select("id, data, sustento, created_at")
       .eq("dataset_id", d.id)
       .order("created_at", { ascending: false })
-      .limit(opciones?.mes ? TOPE_POR_MODULO_MES : TOPE_POR_MODULO);
+      .limit(TOPE_POR_MODULO);
     if (errorRecords) throw new Error(errorRecords.message);
-
-    const texto = (c: typeof cProducto, fila: Record<string, unknown>) => (c ? fila[c.key]?.toString().trim() || null : null);
 
     for (const r of records ?? []) {
       const fila = r.data as Record<string, unknown>;
       const monto = Number(fila[cMonto.key]);
+      const producto = cProducto ? fila[cProducto.key]?.toString().trim() || null : null;
       const fechaFila = cFecha ? fila[cFecha.key]?.toString() : null;
-      const fecha = fechaFila || r.created_at;
-      if (opciones?.mes && !fecha.startsWith(opciones.mes)) continue;
       candidatos.push({
         id: r.id,
         datasetId: d.id,
         datasetNombre: d.nombre,
         tipo: tipo === "ventas" ? "venta" : "compra",
-        producto: texto(cProducto, fila),
+        producto,
         monto: Number.isFinite(monto) ? monto : null,
-        fecha,
+        fecha: fechaFila || r.created_at,
         sustento: r.sustento ?? null,
-        incluyeIgv: !!d.incluye_igv,
-        documento: texto(cDocumento, fila),
-        tipoComprobante: texto(cTipoCp, fila),
-        serieComprobante: texto(cSerieCp, fila),
-        numeroComprobante: texto(cNumeroCp, fila),
       });
     }
   }
 
-  candidatos.sort((a, b) => b.fecha.localeCompare(a.fecha));
-  return opciones?.mes ? candidatos : candidatos.slice(0, opciones?.limite ?? 50);
-}
-
-export interface ResumenTributarioMes {
-  mes: string;
-  ventasGravadas: number;
-  igvVentas: number;
-  comprasConCredito: number;
-  igvCompras: number;
-  igvAPagar: number; // negativo = saldo a favor
-}
-
-// Los mismos números que pide el Formulario Virtual 621 IGV-Renta Mensual de
-// SUNAT (Declara Fácil): base imponible e IGV, separados en ventas y compras.
-// Por movimiento (no por módulo): cada uno respeta el incluyeIgv de SU propio
-// módulo de origen, porque un negocio puede tener un módulo con precios que
-// ya incluyen IGV y otro que no.
-export function resumenTributarioMes(movimientos: Movimiento[], mes: string): ResumenTributarioMes {
-  let ventasGravadas = 0, igvVentas = 0, comprasConCredito = 0, igvCompras = 0;
-  for (const m of movimientos) {
-    if (m.monto === null) continue;
-    const base = m.incluyeIgv ? m.monto * (100 / 118) : m.monto;
-    const igv = m.incluyeIgv ? m.monto * (18 / 118) : m.monto * 0.18;
-    if (m.tipo === "venta") { ventasGravadas += base; igvVentas += igv; }
-    else { comprasConCredito += base; igvCompras += igv; }
-  }
-  const redondear = (n: number) => Math.round(n * 100) / 100;
-  return {
-    mes,
-    ventasGravadas: redondear(ventasGravadas),
-    igvVentas: redondear(igvVentas),
-    comprasConCredito: redondear(comprasConCredito),
-    igvCompras: redondear(igvCompras),
-    igvAPagar: redondear(igvVentas - igvCompras),
-  };
+  return candidatos.sort((a, b) => b.fecha.localeCompare(a.fecha)).slice(0, limite);
 }
 
 // Texto plano con solo los números ya calculados (nunca filas/registros crudos) para

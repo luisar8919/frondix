@@ -34,12 +34,6 @@ que no estén en la muestra.
 
 Roles válidos: ${ROLES_VALIDOS.join(", ")}, o "ninguno" si no aplica ninguno.
 
-Ojo con los roles de RUC/documento: "ruc_proveedor" es el documento de a quién le COMPRAS
-(úsalo solo si hay o parece haber una columna de Proveedor en esta misma tabla).
-"documento_cliente" es el documento de a quién le VENDES (úsalo solo si hay o parece haber
-una columna de Cliente). Si la tabla tiene Cliente pero no Proveedor, un RUC o DNI suelto es
-documento_cliente, nunca ruc_proveedor, y viceversa.
-
 Columnas (clave interna: nombre actual):
 ${columnas.map((c) => `- ${c.key}: "${c.labelActual}"`).join("\n")}
 

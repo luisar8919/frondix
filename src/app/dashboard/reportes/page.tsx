@@ -22,19 +22,6 @@ interface Movimiento {
   monto: number | null;
   fecha: string;
   sustento: string | null;
-  incluyeIgv: boolean;
-  documento: string | null;
-  tipoComprobante: string | null;
-  serieComprobante: string | null;
-  numeroComprobante: string | null;
-}
-interface ResumenTributario {
-  mes: string;
-  ventasGravadas: number;
-  igvVentas: number;
-  comprasConCredito: number;
-  igvCompras: number;
-  igvAPagar: number;
 }
 interface Modulo {
   datasetId: string;
@@ -64,52 +51,10 @@ const fechaCorta = (f: string) => {
   const d = new Date(f.length <= 10 ? `${f}T00:00:00` : f);
   return Number.isNaN(d.getTime()) ? f : d.toLocaleDateString("es-PE", { day: "2-digit", month: "short" });
 };
-const mesActual = () => new Date().toISOString().slice(0, 7);
-const nombreMesLargo = (clave: string) => {
-  const [anio, mes] = clave.split("-").map(Number);
-  return new Date(Date.UTC(anio, mes - 1, 1)).toLocaleDateString("es-PE", { month: "long", year: "numeric" });
-};
-
-// Redondea a 2 decimales, misma fórmula que resumenTributarioMes (lib/datosReportes.ts)
-// para que la base imponible y el IGV de cada fila sumen igual que el resumen de arriba.
-const redondear = (n: number) => Math.round(n * 100) / 100;
-
-// Para que el Excel sirva de base real al declarar: además de lo que ya se ve en
-// pantalla, incluye los campos que pide SUNAT (RUC/documento, tipo/serie/número de
-// comprobante, y la base imponible + IGV ya separados del monto total).
-async function exportarMovimientosExcel(movimientos: Movimiento[], mes: string) {
-  const XLSX = await import("xlsx");
-  const filas = movimientos.map((m) => {
-    const monto = m.monto ?? 0;
-    const base = m.incluyeIgv ? redondear(monto * (100 / 118)) : monto;
-    const igv = m.incluyeIgv ? redondear(monto * (18 / 118)) : redondear(monto * 0.18);
-    return {
-      Fecha: m.fecha.slice(0, 10),
-      Tipo: m.tipo === "venta" ? "Venta" : "Compra",
-      "Tipo de comprobante": m.tipoComprobante ?? "",
-      Serie: m.serieComprobante ?? "",
-      Número: m.numeroComprobante ?? "",
-      [m.tipo === "venta" ? "RUC/DNI cliente" : "RUC/DNI proveedor"]: m.documento ?? "",
-      Producto: m.producto ?? "",
-      "Base imponible": m.monto !== null ? base : "",
-      IGV: m.monto !== null ? igv : "",
-      "Importe total": m.monto ?? "",
-      Módulo: m.datasetNombre,
-      Sustento: m.sustento ?? "",
-    };
-  });
-  const hoja = XLSX.utils.json_to_sheet(filas);
-  const libro = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(libro, hoja, "Movimientos");
-  XLSX.writeFile(libro, `movimientos-${mes}.xlsx`);
-}
 
 export default function ReportesPage() {
   const [modulos, setModulos] = useState<Modulo[] | null>(null);
   const [movimientos, setMovimientos] = useState<Movimiento[] | null>(null);
-  const [resumen, setResumen] = useState<ResumenTributario | null>(null);
-  const [mes, setMes] = useState(mesActual());
-  const [cargandoMovimientos, setCargandoMovimientos] = useState(false);
   const [sustentoAbierto, setSustentoAbierto] = useState<string | null>(null);
   const [valorSustento, setValorSustento] = useState("");
   const [guardandoSustento, setGuardandoSustento] = useState(false);
@@ -144,24 +89,20 @@ export default function ReportesPage() {
     })();
   }, []);
 
-  async function cargarReportes(mesQuery: string) {
-    setCargandoMovimientos(true);
-    return fetch(`/api/reportes?mes=${mesQuery}`)
+  async function cargarReportes() {
+    return fetch("/api/reportes")
       .then(async (res) => {
         const body = await res.json();
         if (!res.ok) return setError(body.error ?? "No se pudieron cargar los reportes");
         setModulos(body.modulos);
         setMovimientos(body.movimientos);
-        setResumen(body.resumen);
       })
-      .catch(() => setError("No se pudo conectar con el servidor."))
-      .finally(() => setCargandoMovimientos(false));
+      .catch(() => setError("No se pudo conectar con el servidor."));
   }
 
   useEffect(() => {
-    cargarReportes(mes);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mes]);
+    cargarReportes();
+  }, []);
 
   function abrirSustento(m: Movimiento) {
     setSustentoAbierto(sustentoAbierto === m.id ? null : m.id);
@@ -198,7 +139,7 @@ export default function ReportesPage() {
     }
     // Recarga todo: el progreso real depende de contar ventas en todo el módulo, no
     // solo el top 5 que ya tenemos en pantalla, así que no se puede calcular a mano aquí.
-    await cargarReportes(mes);
+    await cargarReportes();
     setGuardandoMeta(null);
     setFormMeta((f) => ({ ...f, [datasetId]: { producto: "", cantidad: "" } }));
   }
@@ -277,75 +218,18 @@ export default function ReportesPage() {
         </div>
       </details>
 
-      <div className="tarjeta" style={{ marginBottom: 20 }}>
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 12, alignItems: "flex-end", justifyContent: "space-between" }}>
-          <div>
-            <h3 style={{ margin: 0 }}>Movimientos y declaración</h3>
-            <p className="suave pequeno" style={{ margin: "2px 0 0" }}>
-              Ventas y compras de todos tus módulos juntos, de un mes a la vez — para que te sirva de respaldo o
-              para declarar.
-            </p>
-          </div>
-          <div className="campo" style={{ margin: 0 }}>
-            <label htmlFor="mes-movimientos" className="pequeno">Mes</label>
-            <input id="mes-movimientos" type="month" value={mes} max={mesActual()} onChange={(e) => setMes(e.target.value)} />
-          </div>
-        </div>
-
-        {resumen && (
-          <div className="tarjeta" style={{ marginTop: 14, padding: 14 }}>
-            <strong>Resumen para declarar — {nombreMesLargo(resumen.mes)}</strong>
-            <p className="suave pequeno" style={{ margin: "2px 0 10px" }}>
-              Mismos campos que pide el Formulario Virtual 621 IGV-Renta Mensual de SUNAT (Declara Fácil). Revisa y
-              ajusta antes de presentar — esto no se envía a SUNAT por ti.
-            </p>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 10 }}>
-              <div>
-                <p className="suave pequeno" style={{ margin: 0 }}>Ventas gravadas</p>
-                <p style={{ margin: 0, fontWeight: 600 }}>{soles0(resumen.ventasGravadas)}</p>
-              </div>
-              <div>
-                <p className="suave pequeno" style={{ margin: 0 }}>IGV de ventas</p>
-                <p style={{ margin: 0, fontWeight: 600 }}>{soles0(resumen.igvVentas)}</p>
-              </div>
-              <div>
-                <p className="suave pequeno" style={{ margin: 0 }}>Compras con crédito fiscal</p>
-                <p style={{ margin: 0, fontWeight: 600 }}>{soles0(resumen.comprasConCredito)}</p>
-              </div>
-              <div>
-                <p className="suave pequeno" style={{ margin: 0 }}>IGV de compras</p>
-                <p style={{ margin: 0, fontWeight: 600 }}>{soles0(resumen.igvCompras)}</p>
-              </div>
-              <div>
-                <p className="suave pequeno" style={{ margin: 0 }}>{resumen.igvAPagar >= 0 ? "IGV a pagar" : "Saldo a favor"}</p>
-                <p style={{ margin: 0, fontWeight: 700, color: resumen.igvAPagar >= 0 ? "var(--error)" : "var(--verde-700)" }}>
-                  {soles0(Math.abs(resumen.igvAPagar))}
-                </p>
-              </div>
-            </div>
-          </div>
-        )}
-
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 18, marginBottom: 4 }}>
-          <p className="suave pequeno" style={{ margin: 0 }}>
-            {cargandoMovimientos ? "Cargando..." : `${movimientos?.length ?? 0} movimiento(s) de ${nombreMesLargo(mes)}`}
+      {movimientos && movimientos.length > 0 && (
+        <div className="tarjeta" style={{ marginBottom: 20, padding: 0 }}>
+          <h3 style={{ margin: 0, padding: "16px 16px 0" }}>Últimos {movimientos.length} movimientos</h3>
+          <p className="suave pequeno" style={{ margin: "2px 0 0", padding: "0 16px 14px" }}>
+            Ventas y compras de todos tus módulos juntos, lo más reciente primero.
           </p>
-          {movimientos && movimientos.length > 0 && (
-            <button type="button" className="btn btn-secundario" onClick={() => exportarMovimientosExcel(movimientos, mes)}>
-              Exportar a Excel
-            </button>
-          )}
-        </div>
-
-        {movimientos && movimientos.length > 0 && (
-          <div className="tabla-envoltura" style={{ marginTop: 10 }}>
+          <div className="tabla-envoltura" style={{ border: "none", borderRadius: 0, boxShadow: "none" }}>
             <table>
               <thead>
                 <tr>
                   <th>Fecha</th>
                   <th>Tipo</th>
-                  <th>Comprobante</th>
-                  <th>RUC/Doc.</th>
                   <th>Producto</th>
                   <th className="num">Monto</th>
                   <th>Sustento</th>
@@ -361,12 +245,6 @@ export default function ReportesPage() {
                           {m.tipo === "venta" ? "Venta" : "Compra"}
                         </span>
                       </td>
-                      <td style={{ whiteSpace: "nowrap" }}>
-                        {m.tipoComprobante || m.serieComprobante || m.numeroComprobante
-                          ? `${m.tipoComprobante ?? ""} ${[m.serieComprobante, m.numeroComprobante].filter(Boolean).join("-")}`.trim()
-                          : "-"}
-                      </td>
-                      <td>{m.documento ?? "-"}</td>
                       <td>{m.producto ?? "-"}</td>
                       <td className="num" style={{ fontWeight: 700, color: m.tipo === "venta" ? "var(--verde-700)" : "var(--error)" }}>
                         {soles0(m.monto)}
@@ -379,7 +257,7 @@ export default function ReportesPage() {
                     </tr>
                     {sustentoAbierto === m.id && (
                       <tr>
-                        <td colSpan={7} style={{ background: "var(--verde-50)" }}>
+                        <td colSpan={5} style={{ background: "var(--verde-50)" }}>
                           <div style={{ display: "flex", gap: 8, alignItems: "flex-start", flexWrap: "wrap", padding: "6px 0" }}>
                             <textarea
                               value={valorSustento}
@@ -400,8 +278,8 @@ export default function ReportesPage() {
               </tbody>
             </table>
           </div>
-        )}
-      </div>
+        </div>
+      )}
 
       {error && <p className="alerta alerta-error" role="alert">{error}</p>}
       {!modulos && !error && <p className="suave">Cargando...</p>}
