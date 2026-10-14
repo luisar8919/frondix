@@ -15,6 +15,7 @@ import {
   valoresDistintos,
   type PrecioCompra,
 } from "@/lib/divisor";
+import { clasificarVentaCompraConIA } from "@/lib/sugerencia-ia";
 
 // El asistente de importación ya mostró los grupos (vía /api/upload/grupos) y el
 // usuario eligió cuáles quedarse, con nombre y roles ya confirmados/editados. Aquí se
@@ -229,16 +230,47 @@ export async function POST(request: NextRequest) {
   // tipo clasifica) para no repetir ese trabajo entre la pasada de "juntar
   // precios/stock de cualquier pestaña" y la de crear los módulos.
   const avisos: string[] = [];
-  const infosBase = gruposAImportar.map(({ grupo, sel }) => {
+  const infosBase = [];
+  for (const { grupo, sel } of gruposAImportar) {
     const columnas = columnasEditadas(grupo, sel);
     const cTipo = sel?.dividir ? columnas.find((c) => c.rol === "tipo_movimiento") : undefined;
     const division = cTipo ? dividirVentasYCompras(grupo.filas, cTipo.key) : undefined;
-    if (division && division.sinClasificar > 0) {
+    if (division && division.sinClasificar.length > 0) {
       const nombre = sel?.nombre?.trim() || grupo.hojas[0];
-      avisos.push(`${division.sinClasificar} fila(s) de "${nombre}" no decían claramente si eran venta o compra y se dejaron fuera.`);
+
+      // La herramienta no sabe a qué lado cae esta fila (el valor de Tipo no es
+      // ni venta ni compra reconocida): en vez de solo avisar y descartarla, si
+      // hay con qué comparar (al menos un lado ya tiene filas), se le pide a
+      // Gemini que la clasifique usando de ejemplo lo que SÍ se reconoció en
+      // esta misma hoja. Nunca se inventa sola -- si Gemini no está configurado,
+      // falla, o de verdad no puede decidir, sigue el camino de siempre: avisar
+      // y dejarla fuera.
+      if (process.env.GEMINI_API_KEY && (division.ventas.length > 0 || division.compras.length > 0)) {
+        try {
+          const clasificaciones = await clasificarVentaCompraConIA(cTipo!.key, division.ventas, division.compras, division.sinClasificar);
+          const quedanSinClasificar: Record<string, unknown>[] = [];
+          clasificaciones.forEach((tipo, i) => {
+            const fila = division.sinClasificar[i];
+            if (tipo === "venta") division.ventas.push(fila);
+            else if (tipo === "compra") division.compras.push(fila);
+            else quedanSinClasificar.push(fila);
+          });
+          const clasificadasPorIA = division.sinClasificar.length - quedanSinClasificar.length;
+          division.sinClasificar = quedanSinClasificar;
+          if (clasificadasPorIA > 0) {
+            avisos.push(`${clasificadasPorIA} fila(s) de "${nombre}" no decían claramente si eran venta o compra -- Gemini las clasificó por contexto, revísalas.`);
+          }
+        } catch {
+          // Gemini falló: se sigue abajo con el camino normal (avisar y dejar fuera)
+        }
+      }
+
+      if (division.sinClasificar.length > 0) {
+        avisos.push(`${division.sinClasificar.length} fila(s) de "${nombre}" no decían claramente si eran venta o compra y se dejaron fuera.`);
+      }
     }
 
-    return {
+    infosBase.push({
       grupo,
       sel,
       columnas,
@@ -253,8 +285,8 @@ export async function POST(request: NextRequest) {
       cProveedor: columnas.find((c) => c.rol === "proveedor"),
       cCantidad: columnas.find((c) => c.rol === "cantidad"),
       cStock: columnas.find((c) => c.rol === "stock"),
-    };
-  });
+    });
+  }
 
   // Precios ya conocidos ANTES de separar nada: una pestaña entera de Compras, o
   // la mitad de compras de cualquier pestaña dividida por Tipo. Sirven para

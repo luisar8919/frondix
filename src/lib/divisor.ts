@@ -3,26 +3,31 @@ import { esVenta, esCompra } from "./roles.ts";
 export interface ResultadoDivision {
   ventas: Record<string, unknown>[];
   compras: Record<string, unknown>[];
-  sinClasificar: number;
+  // Filas (no solo la cuenta) que no matchearon ni esVenta ni esCompra -- se
+  // conservan para que /api/upload/auto pueda ofrecerle a Gemini que las
+  // clasifique usando de ejemplo las filas de esta misma hoja que sí se
+  // reconocieron, en vez de solo avisar que se dejaron fuera.
+  sinClasificar: Record<string, unknown>[];
 }
 
 // Divide las filas de una hoja mixta (ventas y compras juntas) en dos grupos,
 // según el valor de la columna de tipo (ver roles.ts: esVenta/esCompra). Las
 // filas que no matchean ninguno de los dos patrones no se pierden -- se
-// cuentan en sinClasificar para avisarle al usuario, nunca se adivinan.
+// devuelven en sinClasificar, nunca se adivinan acá (ver clasificarConIA en
+// sugerencia-ia.ts para el camino que sí intenta adivinar, con IA y revisión).
 // Solo separa: completar el costo de las ventas es un paso aparte (ver
 // preciosDeCompra/completarCostos abajo), para poder juntar precios de
 // compra de CUALQUIER pestaña del archivo, no solo de la que se divide.
 export function dividirVentasYCompras(filas: Record<string, unknown>[], claveTipo: string): ResultadoDivision {
   const ventas: Record<string, unknown>[] = [];
   const compras: Record<string, unknown>[] = [];
-  let sinClasificar = 0;
+  const sinClasificar: Record<string, unknown>[] = [];
 
   for (const fila of filas) {
     const tipo = fila[claveTipo];
     if (esVenta(tipo)) ventas.push(fila);
     else if (esCompra(tipo)) compras.push(fila);
-    else sinClasificar++;
+    else sinClasificar.push(fila);
   }
 
   return { ventas, compras, sinClasificar };

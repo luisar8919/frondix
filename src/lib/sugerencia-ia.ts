@@ -77,3 +77,71 @@ columna, en el mismo orden que te las di):
     };
   });
 }
+
+// Cuando una hoja tiene columna de Tipo de movimiento pero algunas filas traen
+// un valor que ni esVenta ni esCompra reconocen (ver dividirVentasYCompras en
+// divisor.ts), en vez de solo avisar que se dejaron fuera, se le muestran a
+// Gemini hasta 5 filas YA clasificadas de cada lado (de esta misma hoja, el
+// mejor contexto posible) como ejemplo, y hasta 10 filas ambiguas para que
+// proponga dónde caen. Es una SUGERENCIA: el llamador decide si las agrega o
+// las deja fuera -- nunca se inventan ventas/compras sin que algo las revise.
+export async function clasificarVentaCompraConIA(
+  claveTipo: string,
+  ejemplosVenta: Record<string, unknown>[],
+  ejemplosCompra: Record<string, unknown>[],
+  filasAmbiguas: Record<string, unknown>[]
+): Promise<("venta" | "compra" | null)[]> {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) throw new Error("Falta configurar GEMINI_API_KEY para usar la sugerencia por IA.");
+
+  const muestra = (filas: Record<string, unknown>[]) => filas.slice(0, 5);
+  const ambiguas = filasAmbiguas.slice(0, 10);
+
+  const prompt = `Ayudas a un pequeño negocio a cargar un Excel a Frondix. Esta hoja tiene una columna "${claveTipo}"
+que debería decir si cada fila es una Venta o una Compra, pero algunas filas traen un valor que no se reconoce
+(vacío, raro, o un texto distinto a los patrones usuales). Te doy ejemplos YA clasificados de esta misma hoja
+(para que notes el patrón: puede ser el valor exacto de "${claveTipo}", o el sentido de las demás columnas, como
+si el proveedor/cliente o el monto son típicos de compra o de venta) y las filas ambiguas, EN EL MISMO ORDEN.
+Para cada fila ambigua responde "venta", "compra", o "ninguno" si de verdad no se puede saber. No inventes,
+usa solo lo que ves en los ejemplos.
+
+Ejemplos de Venta:
+${JSON.stringify(muestra(ejemplosVenta), null, 1)}
+
+Ejemplos de Compra:
+${JSON.stringify(muestra(ejemplosCompra), null, 1)}
+
+Filas ambiguas a clasificar (en este orden):
+${JSON.stringify(ambiguas, null, 1)}
+
+Responde ÚNICAMENTE con JSON válido, sin texto antes ni después, un elemento por fila ambigua en el mismo orden:
+{"filas":[{"tipo":"venta"}]}`;
+
+  const res = await fetch(`${GEMINI_API}?key=${apiKey}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      contents: [{ parts: [{ text: prompt }] }],
+      generationConfig: { temperature: 0.2, maxOutputTokens: 1000, responseMimeType: "application/json" },
+    }),
+  });
+
+  if (!res.ok) {
+    const cuerpo = await res.text().catch(() => "");
+    throw new Error(`Gemini respondió ${res.status}: ${cuerpo.slice(0, 300)}`);
+  }
+
+  const data = await res.json();
+  const texto: string = data.candidates?.[0]?.content?.parts?.[0]?.text ?? "{}";
+  let resultado: { tipo?: string }[] = [];
+  try {
+    resultado = JSON.parse(texto).filas ?? [];
+  } catch {
+    // degrada a "sin clasificar nada" en vez de reventar la importación
+  }
+
+  return ambiguas.map((_, i) => {
+    const tipo = resultado[i]?.tipo;
+    return tipo === "venta" || tipo === "compra" ? tipo : null;
+  });
+}

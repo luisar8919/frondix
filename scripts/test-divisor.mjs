@@ -12,7 +12,8 @@ const filas = [
 const r = dividirVentasYCompras(filas, "tipo");
 assert.strictEqual(r.compras.length, 1);
 assert.strictEqual(r.ventas.length, 2);
-assert.strictEqual(r.sinClasificar, 1);
+assert.strictEqual(r.sinClasificar.length, 1);
+assert.strictEqual(r.sinClasificar[0].producto, "Polo", "la fila sin clasificar se conserva, no solo se cuenta");
 
 // --- preciosDeCompra: el más reciente por producto ---
 const compras1 = [
