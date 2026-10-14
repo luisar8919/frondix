@@ -30,18 +30,20 @@ export default function DynamicForm({
   textoBoton?: string;
   onCancelar?: () => void;
 }) {
-  const [valores, setValores] = useState<Record<string, string>>(() =>
+  // Un registro nuevo (no al editar) arranca con la fecha de hoy: es el dato que más se
+  // olvida cargar, y sin fecha una tabla no puede aparecer en Seguimiento. También se
+  // usa para "limpiar" el formulario tras guardar (ver handleSubmit) -- si no, el
+  // segundo registro de la sesión en adelante perdía este valor por defecto.
+  const valoresIniciales = () =>
     Object.fromEntries(
       columnas.map((c) => {
         const v = inicial?.[c.key];
         if (v !== null && v !== undefined) return [c.key, c.tipo === "fecha" ? String(v).slice(0, 10) : String(v)];
-        // Un registro nuevo (no al editar) arranca con la fecha de hoy: es el dato que más se
-        // olvida cargar, y sin fecha una tabla no puede aparecer en Seguimiento.
         if (!inicial && c.tipo === "fecha" && !c.enlace) return [c.key, new Date().toISOString().slice(0, 10)];
         return [c.key, ""];
       })
-    )
-  );
+    );
+  const [valores, setValores] = useState<Record<string, string>>(valoresIniciales);
   const [enviando, setEnviando] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -61,7 +63,7 @@ export default function DynamicForm({
     setEnviando(false);
     if (fallo) return setError(fallo);
     setError(null);
-    if (!inicial) setValores({});
+    if (!inicial) setValores(valoresIniciales());
   }
 
   return (
