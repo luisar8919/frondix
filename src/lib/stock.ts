@@ -62,11 +62,15 @@ export async function ajustarStock(
 // +cantidad si es compra, -cantidad si es venta (1 por defecto si el
 // registro no trae columna de cantidad). No hace nada si no hay Stock
 // enlazado -- no todos los módulos de Ventas/Compras tienen uno.
+// `signo`: -1 para deshacer el efecto de este registro en vez de aplicarlo
+// (editar/eliminar, ver revertirStockDesdeRegistro) -- misma cuenta, signo
+// invertido, para no duplicar la lógica de qué cantidad corresponde.
 export async function ajustarStockDesdeRegistro(
   supabase: SupabaseClient,
   empresaId: string,
   columnas: Columna[],
-  datos: Record<string, unknown>
+  datos: Record<string, unknown>,
+  signo: 1 | -1 = 1
 ): Promise<void> {
   const tipo = tipoModulo(columnas.map((c) => c.rol));
   if (tipo !== "compras" && tipo !== "ventas") return;
@@ -83,5 +87,23 @@ export async function ajustarStockDesdeRegistro(
   const cantidadCruda = cCantidad ? Number(datos[cCantidad.key]) : NaN;
   const cantidad = Number.isFinite(cantidadCruda) && cantidadCruda > 0 ? cantidadCruda : 1;
 
-  await ajustarStock(supabase, stock.id, stock.claveProducto, producto, tipo === "compras" ? cantidad : -cantidad);
+  await ajustarStock(supabase, stock.id, stock.claveProducto, producto, signo * (tipo === "compras" ? cantidad : -cantidad));
+}
+
+// Al editar un registro: deshace el efecto que tenía en Stock con los datos
+// VIEJOS, y aplica el efecto de los datos NUEVOS -- así un cambio de
+// producto o de cantidad (o pasar de compra a venta, si el módulo tiene
+// Tipo de movimiento) ajusta el stock correctamente en vez de sumar/restar
+// dos veces. Al eliminar un registro: solo deshace (sin aplicar nada nuevo).
+// Igual que ajustarStockDesdeRegistro, es "mejor esfuerzo": si falla, no
+// debe tumbar la edición/eliminación, que ya es lo importante.
+export async function revertirStockDesdeRegistro(
+  supabase: SupabaseClient,
+  empresaId: string,
+  columnas: Columna[],
+  datosViejos: Record<string, unknown>,
+  datosNuevos?: Record<string, unknown>
+): Promise<void> {
+  await ajustarStockDesdeRegistro(supabase, empresaId, columnas, datosViejos, -1);
+  if (datosNuevos) await ajustarStockDesdeRegistro(supabase, empresaId, columnas, datosNuevos, 1);
 }

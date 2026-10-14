@@ -66,7 +66,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ data
   // sin eso, una página podría repetir o saltarse filas.
   const { data: records, count, error } = await supabase
     .from("records")
-    .select("id, data, sustento, created_at", { count: "exact" })
+    .select("id, data, sustento, created_at, updated_at, updated_by", { count: "exact" })
     .eq("dataset_id", datasetId)
     .order("created_at", { ascending: false })
     .order("id")
@@ -92,6 +92,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ data
 export async function POST(req: NextRequest, { params }: { params: Promise<{ datasetId: string }> }) {
   const { datasetId } = await params;
   const supabase = await crearClienteServidor();
+  const { data: { user } } = await supabase.auth.getUser();
   const body = await req.json();
 
   if (!body || typeof body !== "object") {
@@ -111,7 +112,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ dat
 
   const { data, error } = await supabase
     .from("records")
-    .insert({ dataset_id: datasetId, data: body })
+    .insert({ dataset_id: datasetId, data: body, updated_by: user?.email ?? null })
     .select()
     .single();
 

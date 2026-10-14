@@ -27,7 +27,7 @@ export default function DynamicTable({
   onEditarSustento,
 }: {
   columnas: Columna[];
-  registros: { id: string; data: Record<string, unknown>; sustento?: string | null }[];
+  registros: { id: string; data: Record<string, unknown>; sustento?: string | null; updatedBy?: string | null; updatedAt?: string | null }[];
   // otras tablas con una columna enlazada a esta (para ir "hacia atrás")
   relacionadas?: RelacionEntrante[];
   onEditar?: (r: { id: string; data: Record<string, unknown> }) => void;
@@ -160,6 +160,15 @@ export default function DynamicTable({
                 )}
                 {(onEditar || onEliminar || onEditarSustento) && (
                   <td style={{ whiteSpace: "nowrap" }}>
+                    {r.updatedBy && (
+                      <span
+                        className="suave pequeno"
+                        style={{ marginRight: 8 }}
+                        title={`Editado por ${r.updatedBy}${r.updatedAt ? " el " + new Date(r.updatedAt).toLocaleString("es-PE", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }) : ""}`}
+                      >
+                        ✎
+                      </span>
+                    )}
                     {onEditarSustento && (
                       <button type="button" className="btn btn-fantasma" onClick={() => abrirSustento(r)}>
                         {r.sustento ? "✓ Sustento" : "Sustento"}

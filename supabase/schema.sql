@@ -36,7 +36,10 @@ create table records (
   -- columna del Excel, por eso va aparte de "data".
   sustento text,
   created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now()
+  updated_at timestamptz not null default now(),
+  -- Email de quien creó o editó por última vez este registro (historial mínimo:
+  -- "quién cambió esto"). Null en registros creados antes de esta columna.
+  updated_by text
 );
 create index records_dataset_creado_idx on records (dataset_id, created_at desc);
 create index datasets_empresa_idx on datasets (empresa_id);

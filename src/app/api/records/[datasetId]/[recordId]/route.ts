@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { crearClienteServidor } from "@/lib/supabase/server";
 import { advertenciasDeRegistro, validarEnlaces } from "@/lib/dependientes";
+import { revertirStockDesdeRegistro } from "@/lib/stock";
 import type { Columna } from "@/lib/excel-parser";
 
 // Editar o eliminar un registro. Si otras tablas dependen de su valor, la primera llamada
@@ -20,7 +21,7 @@ async function cargar(ctx: Ctx) {
     .eq("dataset_id", datasetId)
     .single();
   if (!registro) return { error: NextResponse.json({ error: "Registro no encontrado" }, { status: 404 }) };
-  return { supabase, datasetId, recordId, registro };
+  return { supabase, datasetId, recordId, registro, email: user.email ?? null };
 }
 
 // `data` reemplaza las columnas del Excel (igual que antes); `sustento` es
@@ -30,18 +31,22 @@ async function cargar(ctx: Ctx) {
 export async function PATCH(req: NextRequest, ctx: Ctx) {
   const c = await cargar(ctx);
   if ("error" in c) return c.error;
-  const { supabase, datasetId, recordId, registro } = c;
+  const { supabase, datasetId, recordId, registro, email } = c;
 
   const { data, confirmar, sustento } = await req.json().catch(() => ({}));
+  let columnas: Columna[] | null = null;
+  let empresaId: string | null = null;
   if (data !== undefined) {
     if (typeof data !== "object" || data === null || Array.isArray(data)) {
       return NextResponse.json({ error: "Body inválido" }, { status: 400 });
     }
 
-    const { data: dataset } = await supabase.from("datasets").select("columnas").eq("id", datasetId).single();
+    const { data: dataset } = await supabase.from("datasets").select("empresa_id, columnas").eq("id", datasetId).single();
     if (!dataset) return NextResponse.json({ error: "Tabla no encontrada" }, { status: 404 });
+    columnas = dataset.columnas as Columna[];
+    empresaId = dataset.empresa_id;
 
-    const fallo = await validarEnlaces(supabase, dataset.columnas as Columna[], data);
+    const fallo = await validarEnlaces(supabase, columnas, data);
     if (fallo) return NextResponse.json({ error: fallo }, { status: 422 });
 
     if (!confirmar) {
@@ -53,16 +58,27 @@ export async function PATCH(req: NextRequest, ctx: Ctx) {
   }
 
   const cambios: Record<string, unknown> = { updated_at: new Date().toISOString() };
-  if (data !== undefined) cambios.data = data;
+  if (data !== undefined) { cambios.data = data; cambios.updated_by = email; }
   if (sustento !== undefined) cambios.sustento = typeof sustento === "string" ? sustento.trim().slice(0, 2000) || null : null;
 
   const { data: actualizado, error } = await supabase
     .from("records")
     .update(cambios)
     .eq("id", recordId)
-    .select("id, data, sustento, created_at")
+    .select("id, data, sustento, created_at, updated_at, updated_by")
     .single();
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+  // Stock "mejor esfuerzo": si el producto o la cantidad cambiaron, deshace el
+  // efecto de los datos viejos y aplica el de los nuevos -- ver revertirStockDesdeRegistro.
+  if (data !== undefined && columnas && empresaId) {
+    try {
+      await revertirStockDesdeRegistro(supabase, empresaId, columnas, registro.data as Record<string, unknown>, data);
+    } catch {
+      // silencioso a propósito, el registro ya quedó bien guardado
+    }
+  }
+
   return NextResponse.json({ record: actualizado });
 }
 
@@ -77,10 +93,21 @@ export async function DELETE(req: NextRequest, ctx: Ctx) {
     if (advertencias.length) return NextResponse.json({ advertencias }, { status: 409 });
   }
 
+  const { data: dataset } = await supabase.from("datasets").select("empresa_id, columnas").eq("id", datasetId).single();
+
   const { data: borrados, error } = await supabase.from("records").delete().eq("id", recordId).select("id");
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   if (!borrados?.length) {
     return NextResponse.json({ error: "No se pudo eliminar (falta ejecutar la migración 04 en Supabase)." }, { status: 403 });
   }
+
+  if (dataset) {
+    try {
+      await revertirStockDesdeRegistro(supabase, dataset.empresa_id, dataset.columnas as Columna[], registro.data as Record<string, unknown>);
+    } catch {
+      // silencioso a propósito, ver comentario de PATCH
+    }
+  }
+
   return NextResponse.json({ ok: true });
 }

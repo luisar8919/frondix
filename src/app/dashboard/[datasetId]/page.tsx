@@ -15,6 +15,8 @@ interface Registro {
   id: string;
   data: Record<string, unknown>;
   sustento?: string | null;
+  updated_by?: string | null;
+  updated_at?: string | null;
 }
 
 // Se traen por tramos de 1000 (el máximo que devuelve Supabase por consulta) hasta este
@@ -112,7 +114,7 @@ export default function DatasetPage({
     const r = await enviarConfirmando(`/api/records/${datasetId}/${editando!.id}`, "PATCH", { data: valores });
     if (r.cancelado) return null;
     if (!r.ok) return r.body.error ?? "No se pudo guardar el registro";
-    setRegistros((rs) => rs.map((x) => (x.id === r.body.record.id ? { ...x, data: r.body.record.data } : x)));
+    setRegistros((rs) => rs.map((x) => (x.id === r.body.record.id ? { ...x, data: r.body.record.data, updated_by: r.body.record.updated_by, updated_at: r.body.record.updated_at } : x)));
     setEditando(null);
     return null;
   }
@@ -125,7 +127,7 @@ export default function DatasetPage({
     const res = await enviarConfirmando(`/api/records/${datasetId}/${r.id}`, "PATCH", { data: datos });
     if (res.cancelado) return null;
     if (!res.ok) return res.body.error ?? "No se pudo guardar el cambio";
-    setRegistros((rs) => rs.map((x) => (x.id === res.body.record.id ? { ...x, data: res.body.record.data } : x)));
+    setRegistros((rs) => rs.map((x) => (x.id === res.body.record.id ? { ...x, data: res.body.record.data, updated_by: res.body.record.updated_by, updated_at: res.body.record.updated_at } : x)));
     return null;
   }
 
@@ -282,7 +284,7 @@ export default function DatasetPage({
         onEditarCelda={guardarCelda}
         onEditarSustento={guardarSustento}
         columnas={dataset.columnas}
-        registros={registrosFiltrados}
+        registros={registrosFiltrados.map((r) => ({ ...r, updatedBy: r.updated_by, updatedAt: r.updated_at }))}
         relacionadas={relacionesEntrantes(otras, datasetId)}
       />
     </>
