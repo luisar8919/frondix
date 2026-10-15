@@ -35,6 +35,15 @@ assert.strictEqual(clientes.telefono_del_cliente, "telefono");
 assert.strictEqual(clientes.nombre, "cliente");
 assert.strictEqual(clientes.fecha_de_compra, "fecha");
 
+// Stock mínimo no se confunde con Stock (cantidad actual)
+const stock = sugerirRoles([
+  { key: "producto", label: "Producto", tipo: "texto" },
+  { key: "stock", label: "Stock", tipo: "numero" },
+  { key: "stock_minimo", label: "Stock mínimo", tipo: "numero" },
+]);
+assert.strictEqual(stock.stock, "stock");
+assert.strictEqual(stock.stock_minimo, "stock_minimo", "'Stock mínimo' no cae en el rol 'stock' genérico");
+
 // Compras: "proveedor" se reconoce, y no se cruza con cliente aunque ambos
 // patrones incluyan "nombre" (proveedor va primero en las reglas)
 const compras = sugerirRoles([

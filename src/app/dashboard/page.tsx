@@ -2,6 +2,8 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { crearClienteServidor } from "@/lib/supabase/server";
 import { empresaDelUsuarioServidor } from "@/lib/sesionServidor";
+import AlertasStock from "@/components/AlertasStock";
+import ReporteBalance from "@/components/ReporteBalance";
 
 export default async function DashboardPage() {
   const supabase = await crearClienteServidor();
@@ -43,7 +45,7 @@ export default async function DashboardPage() {
       )}
 
       {hayModulos && (
-        <div className="grilla-tablas">
+        <div className="grilla-tablas" style={{ marginBottom: 20 }}>
           {datasets!.map((d) => (
             <Link key={d.id} href={`/dashboard/${d.id}`} className="tarjeta tarjeta-tabla">
               <div className="icono" aria-hidden="true">
@@ -60,6 +62,9 @@ export default async function DashboardPage() {
           ))}
         </div>
       )}
+
+      {hayModulos && <AlertasStock />}
+      {hayModulos && <ReporteBalance />}
     </>
   );
 }

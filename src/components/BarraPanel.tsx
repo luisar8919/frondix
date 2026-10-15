@@ -8,7 +8,7 @@ import { crearClienteBrowser } from "@/lib/supabase/client";
 import { COOKIE_EMPRESA_ACTIVA } from "@/lib/sesion";
 
 const enlaces = [
-  { href: "/dashboard", texto: "Mis módulos" },
+  { href: "/dashboard", texto: "Inicio" },
   { href: "/dashboard/upload", texto: "Subir Excel" },
   { href: "/dashboard/seguimiento", texto: "Seguimiento" },
   { href: "/dashboard/calendario", texto: "Calendario" },
@@ -62,7 +62,7 @@ export default function BarraPanel() {
     setReportesAbierto((v) => !v);
   }
 
-  // "Mis módulos" también queda marcada dentro de un módulo concreto (/dashboard/<id>).
+  // "Inicio" también queda marcada dentro de un módulo concreto (/dashboard/<id>).
   const fijas = [...enlaces.map((e) => e.href), ...reportesSubmenu.map((e) => e.href)];
   const activo = (href: string) =>
     href === "/dashboard" ? ruta === "/dashboard" || !fijas.some((f) => f !== "/dashboard" && ruta.startsWith(f)) : ruta === href;

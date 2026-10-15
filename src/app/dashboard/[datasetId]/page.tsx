@@ -209,7 +209,7 @@ export default function DatasetPage({
     <>
       <div className="panel-cabecera">
         <div>
-          <Link href="/dashboard" className="migas">&larr; Mis módulos</Link>
+          <Link href="/dashboard" className="migas">&larr; Inicio</Link>
           <h1>{dataset.nombre}</h1>
           <p className="suave">
             {total.toLocaleString("es-PE")} {total === 1 ? "registro" : "registros"}

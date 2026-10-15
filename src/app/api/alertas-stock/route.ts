@@ -1,0 +1,19 @@
+import { NextResponse } from "next/server";
+import { crearClienteServidor } from "@/lib/supabase/server";
+import { empresaDelUsuarioServidor } from "@/lib/sesionServidor";
+import { alertasStock } from "@/lib/alertasStock";
+
+// Productos de cualquier módulo de Stock cuya cantidad ya bajó de su mínimo
+// configurado (columna con rol "Stock mínimo", por producto). Se muestran en Inicio.
+export async function GET() {
+  const supabase = await crearClienteServidor();
+  const sesion = await empresaDelUsuarioServidor(supabase);
+  if (!sesion.ok) return NextResponse.json({ error: sesion.error }, { status: 401 });
+
+  try {
+    const alertas = await alertasStock(supabase, sesion.empresaId);
+    return NextResponse.json({ alertas });
+  } catch (e) {
+    return NextResponse.json({ error: e instanceof Error ? e.message : "No se pudieron calcular las alertas de stock" }, { status: 500 });
+  }
+}
