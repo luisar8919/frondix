@@ -97,13 +97,20 @@ const CATALOGO: Patron[] = [
   } satisfies Patron<{ modulo: ModuloReporte; porcentaje: number }>,
 ];
 
+export interface RecomendacionSugerida {
+  patronId: string;
+  texto: string;
+}
+
 // Recorre el catálogo por prioridad y devuelve la primera recomendación que calce con
 // los datos de la empresa, o null si ninguna aplica (en ese caso el bloque
-// "Recomendación" lo sigue redactando Gemini como antes, sin reemplazo).
-export function sugerirRecomendacion(modulos: ModuloReporte[]): string | null {
+// "Recomendación" lo sigue redactando Gemini como antes, sin reemplazo). El patronId
+// va en el resultado para que /api/highlights pueda registrar en recomendacion_usos
+// qué tanto se usa cada patrón frente a Gemini -- ver migracion-15.
+export function sugerirRecomendacion(modulos: ModuloReporte[]): RecomendacionSugerida | null {
   for (const patron of CATALOGO) {
     const hallazgo = patron.detectar(modulos);
-    if (hallazgo !== null) return patron.texto(hallazgo);
+    if (hallazgo !== null) return { patronId: patron.id, texto: patron.texto(hallazgo) };
   }
   return null;
 }

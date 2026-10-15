@@ -205,3 +205,15 @@ create table highlights (
 alter table highlights enable row level security;
 create policy "ver highlights de mi empresa" on highlights for select
   using (empresa_id in (select public.mis_empresas()));
+
+-- Registro de que fuente dio la recomendacion de cada highlights generado -- patron
+-- determinista (y cual) o Gemini (migracion 15). Ver src/lib/patronesRecomendacion.ts.
+create table recomendacion_usos (
+  id uuid primary key default gen_random_uuid(),
+  empresa_id uuid not null references empresas(id) on delete cascade,
+  fuente text not null check (fuente in ('patron', 'gemini')),
+  patron_id text,
+  created_at timestamptz not null default now()
+);
+create index recomendacion_usos_fuente_idx on recomendacion_usos (fuente, patron_id);
+alter table recomendacion_usos enable row level security;

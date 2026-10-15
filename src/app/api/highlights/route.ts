@@ -71,14 +71,21 @@ export async function GET() {
       const bloque = highlights.find((b) =>
         b.titulo.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().startsWith("recomendacion")
       );
-      if (bloque) bloque.texto = recomendacionSugerida;
-      else highlights.push({ titulo: "Recomendacion", texto: recomendacionSugerida });
+      if (bloque) bloque.texto = recomendacionSugerida.texto;
+      else highlights.push({ titulo: "Recomendacion", texto: recomendacionSugerida.texto });
     }
 
     const generadoEl = new Date().toISOString();
 
     await admin.from("highlights").upsert({ empresa_id: empresaId, contenido: highlights, huella: huellaActual, generado_en: generadoEl });
     await admin.from("ia_llamadas").insert({ empresa_id: empresaId });
+    // Para saber con el tiempo si vale la pena sumar mas patrones al catalogo, o si
+    // la mayoria de los casos reales todavia no calzan con ninguno (ver migracion-15).
+    await admin.from("recomendacion_usos").insert({
+      empresa_id: empresaId,
+      fuente: recomendacionSugerida ? "patron" : "gemini",
+      patron_id: recomendacionSugerida?.patronId ?? null,
+    });
 
     return NextResponse.json({ highlights, generadoEl, nuevo: true });
   } catch (e) {
