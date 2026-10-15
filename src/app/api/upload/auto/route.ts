@@ -4,7 +4,7 @@ import { crearClienteServidor } from "@/lib/supabase/server";
 import { agruparHojas, type Columna, type GrupoHojas } from "@/lib/excel-parser";
 import { insertarRegistros, deshacerTabla, MAX_FILAS_IMPORTACION } from "@/lib/insertar";
 import { limiteModulos } from "@/lib/limites";
-import { tipoModulo } from "@/lib/roles";
+import { tipoModulo, validarCamposRegistro } from "@/lib/roles";
 import {
   dividirVentasYCompras,
   preciosDeCompra,
@@ -116,7 +116,8 @@ async function crearModulo(
   empresaId: string,
   nombre: string,
   columnasBase: Columna[],
-  filasBase: Record<string, unknown>[]
+  filasBase: Record<string, unknown>[],
+  avisos: string[]
 ): Promise<{ datasetId: string; nombre: string; filasImportadas: number } | { error: string }> {
   // Los reportes/highlights dependen de tener una fecha (tendencia mensual,
   // "últimos 50 registros"). Si no hay ninguna columna de fecha, se agrega una
@@ -135,6 +136,15 @@ async function crearModulo(
     .select()
     .single();
   if (errorDataset || !dataset) return { error: errorDataset?.message ?? "No se pudo crear uno de los módulos" };
+
+  // Mismas reglas que el alta manual (obligatorios según venta/compra, sin
+  // montos negativos) -- acá solo avisan, nunca bloquean la importación: un
+  // Excel real de cientos de filas no debería fallar entero por unas pocas
+  // mal cargadas, se le avisa al usuario para que las revise ya importadas.
+  const invalidas = filas.filter((f) => validarCamposRegistro(columnas, f) !== null).length;
+  if (invalidas > 0) {
+    avisos.push(`${invalidas} fila(s) de "${nombre}" tienen un campo obligatorio vacío o un monto negativo -- se importaron igual, revísalas.`);
+  }
 
   const errorInsertar = await insertarRegistros(supabase, dataset.id, filas);
   if (errorInsertar) {
@@ -398,14 +408,14 @@ export async function POST(request: NextRequest) {
 
       let datasetVentasId: string | null = null;
       if (separacion.ventas.length > 0) {
-        const r = await crearModulo(supabase, empresaId, `${nombreDataset} - Ventas`, columnasVentas, separacion.ventas);
+        const r = await crearModulo(supabase, empresaId, `${nombreDataset} - Ventas`, columnasVentas, separacion.ventas, avisos);
         if ("error" in r) return NextResponse.json({ error: r.error, creadosHastaAhora: creados }, { status: 500 });
         creados.push({ ...r, hojas: grupo.hojas });
         datasetVentasId = r.datasetId;
       }
       let datasetComprasId: string | null = null;
       if (separacion.compras.length > 0) {
-        const r = await crearModulo(supabase, empresaId, `${nombreDataset} - Compras`, columnasCompras, separacion.compras);
+        const r = await crearModulo(supabase, empresaId, `${nombreDataset} - Compras`, columnasCompras, separacion.compras, avisos);
         if ("error" in r) return NextResponse.json({ error: r.error, creadosHastaAhora: creados }, { status: 500 });
         creados.push({ ...r, hojas: grupo.hojas });
         datasetComprasId = r.datasetId;
@@ -476,14 +486,14 @@ export async function POST(request: NextRequest) {
 
       let datasetVentasId: string | null = null;
       if (division.ventas.length > 0) {
-        const r = await crearModulo(supabase, empresaId, `${nombreDataset} - Ventas`, columnasVentas, division.ventas);
+        const r = await crearModulo(supabase, empresaId, `${nombreDataset} - Ventas`, columnasVentas, division.ventas, avisos);
         if ("error" in r) return NextResponse.json({ error: r.error, creadosHastaAhora: creados }, { status: 500 });
         creados.push({ ...r, hojas: grupo.hojas });
         datasetVentasId = r.datasetId;
       }
       let datasetComprasId: string | null = null;
       if (division.compras.length > 0) {
-        const r = await crearModulo(supabase, empresaId, `${nombreDataset} - Compras`, columnasCompras, division.compras);
+        const r = await crearModulo(supabase, empresaId, `${nombreDataset} - Compras`, columnasCompras, division.compras, avisos);
         if ("error" in r) return NextResponse.json({ error: r.error, creadosHastaAhora: creados }, { status: 500 });
         creados.push({ ...r, hojas: grupo.hojas });
         datasetComprasId = r.datasetId;
@@ -509,7 +519,7 @@ export async function POST(request: NextRequest) {
         ? [...columnas, { key: "cliente", label: "Cliente", tipo: "texto" as const, rol: "cliente" as const, sospechosa: false }]
         : columnas;
 
-    const r = await crearModulo(supabase, empresaId, nombreDataset, columnasFinal, grupo.filas);
+    const r = await crearModulo(supabase, empresaId, nombreDataset, columnasFinal, grupo.filas, avisos);
     if ("error" in r) return NextResponse.json({ error: r.error, creadosHastaAhora: creados }, { status: 500 });
     creados.push({ ...r, hojas: grupo.hojas });
 

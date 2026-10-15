@@ -119,9 +119,11 @@ export function validarCamposRegistro(
     if (v === null || v === undefined || String(v).trim() === "") return `Falta completar "${c.label}".`;
   }
   for (const c of columnas) {
-    if (c.tipo !== "numero" || admiteNegativos(c.rol)) continue;
+    if (c.tipo !== "numero") continue;
     const v = datos[c.key];
-    if (v !== null && v !== undefined && Number(v) < 0) return `"${c.label}" no puede ser negativo.`;
+    if (v === null || v === undefined || v === "") continue;
+    if (Number.isNaN(Number(v))) return `"${c.label}" debe ser un número.`;
+    if (!admiteNegativos(c.rol) && Number(v) < 0) return `"${c.label}" no puede ser negativo.`;
   }
   return null;
 }

@@ -77,14 +77,29 @@ function pareceSinEncabezado(primeraFila: unknown[], columnasConDatos: number): 
   return celdas.length > 0 && celdas.filter(pareceValorDeDato).length / celdas.length > 0.5;
 }
 
+// Por mayoría, no por unanimidad: un Excel real tiene errores de tipeo (un
+// "no especifica" suelto en una columna de montos, una fecha escrita a mano
+// como texto entre puras fechas reales). Exigir el 100% hacía que una sola
+// celda mal escrita le quitara el tipo -- y con él el rol (sugerirRoles exige
+// que el tipo calce) -- a la columna ENTERA, aunque el resto fuera consistente.
 function inferirTipo(valores: unknown[]): TipoColumna {
   const conValor = valores.filter((v) => v !== null && v !== undefined && v !== "");
   if (conValor.length === 0) return "texto";
-  const todosFecha = conValor.every((v) => v instanceof Date);
-  if (todosFecha) return "fecha";
-  const todosNumero = conValor.every((v) => typeof v === "number");
-  if (todosNumero) return "numero";
+  const fechas = conValor.filter((v) => v instanceof Date).length;
+  if (fechas / conValor.length > 0.5) return "fecha";
+  const numeros = conValor.filter((v) => typeof v === "number").length;
+  if (numeros / conValor.length > 0.5) return "numero";
   return "texto";
+}
+
+// Si el tipo se decidió por mayoría, las celdas que no calzan con ese tipo
+// quedan tal cual (texto suelto en una columna "numero", por ejemplo) -- se
+// marca la columna como sospechosa para que el usuario las note y las revise
+// antes de confiar en los reportes/validaciones que dependen de ese tipo.
+function tieneValoresFueraDeTipo(valores: unknown[], tipo: TipoColumna): boolean {
+  if (tipo === "texto") return false;
+  const conValor = valores.filter((v) => v !== null && v !== undefined && v !== "");
+  return conValor.some((v) => (tipo === "fecha" ? !(v instanceof Date) : typeof v !== "number"));
 }
 
 // Un Excel real de negocio suele tener varias hojas (meses, caja, stock, etc.) —
@@ -175,12 +190,13 @@ function parsearHojaDeWorkbook(
   const columnas: (Omit<Columna, "rol"> & { idxOriginal: number })[] = columnasConIndice.map(
     ({ label, idxOriginal }) => {
       const valoresColumna = filasDatos.map((fila) => fila[idxOriginal]);
+      const tipo = inferirTipo(valoresColumna);
       const key = aKey(label, usados);
       return {
         key,
         label: renombres?.[key] ?? label,
-        tipo: inferirTipo(valoresColumna),
-        sospechosa: pareceValorDeDato(filaEncabezados[idxOriginal]),
+        tipo,
+        sospechosa: pareceValorDeDato(filaEncabezados[idxOriginal]) || tieneValoresFueraDeTipo(valoresColumna, tipo),
         idxOriginal,
       };
     }
