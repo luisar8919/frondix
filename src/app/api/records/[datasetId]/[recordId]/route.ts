@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { crearClienteServidor } from "@/lib/supabase/server";
 import { advertenciasDeRegistro, validarEnlaces } from "@/lib/dependientes";
 import { revertirStockDesdeRegistro, registrarAjusteManual } from "@/lib/stock";
-import { validarCamposRegistro } from "@/lib/roles";
+import { validarCamposRegistro, tipoModulo } from "@/lib/roles";
 import type { Columna } from "@/lib/excel-parser";
 
 // Editar o eliminar un registro. Si otras tablas dependen de su valor, la primera llamada
@@ -22,6 +22,17 @@ async function cargar(ctx: Ctx) {
     .eq("dataset_id", datasetId)
     .single();
   if (!registro) return { error: NextResponse.json({ error: "Registro no encontrado" }, { status: 404 }) };
+
+  // Un vendedor no puede editar/borrar un registro de Compras aunque conozca su
+  // ID directo (antes solo se bloqueaba listar/crear, ver /api/records/[datasetId]).
+  const { data: dsPermiso } = await supabase.from("datasets").select("empresa_id, columnas").eq("id", datasetId).single();
+  if (dsPermiso && tipoModulo((dsPermiso.columnas as Columna[]).map((c) => c.rol)) === "compras") {
+    const { data: miMembresia } = await supabase.from("miembros").select("rol").eq("empresa_id", dsPermiso.empresa_id).eq("user_id", user.id).single();
+    if (miMembresia?.rol === "vendedor") {
+      return { error: NextResponse.json({ error: "Tu rol no tiene acceso a este módulo" }, { status: 403 }) };
+    }
+  }
+
   return { supabase, datasetId, recordId, registro, email: user.email ?? null, userId: user.id };
 }
 
