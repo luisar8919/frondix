@@ -4,6 +4,7 @@ import { empresaDelUsuarioServidor } from "@/lib/sesionServidor";
 import { crearClienteAdmin } from "@/lib/supabase/admin";
 import { calcularModulosReporte, resumenConLibresParaIA, huellaModulos } from "@/lib/datosReportes";
 import { generarHighlights } from "@/lib/gemini";
+import { sugerirRecomendacion } from "@/lib/patronesRecomendacion";
 import { tieneSuscripcionActiva } from "@/lib/suscripcion";
 
 // Tope defensivo de respaldo (ver abajo: en la práctica, con el límite de una vez al
@@ -60,6 +61,20 @@ export async function GET() {
 
     const resumen = await resumenConLibresParaIA(supabase, empresaId, modulos);
     const highlights = await generarHighlights(resumen);
+
+    // El bloque "Recomendación" se reemplaza por una sugerencia fija cuando los
+    // números calzan con un patrón ya conocido (ver patronesRecomendacion.ts) --
+    // más consistente que dejar que Gemini la redacte libre cada vez, y sin gastar
+    // una llamada aparte. Si ningún patrón aplica, queda la de Gemini tal cual.
+    const recomendacionSugerida = sugerirRecomendacion(modulos);
+    if (recomendacionSugerida) {
+      const bloque = highlights.find((b) =>
+        b.titulo.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().startsWith("recomendacion")
+      );
+      if (bloque) bloque.texto = recomendacionSugerida;
+      else highlights.push({ titulo: "Recomendacion", texto: recomendacionSugerida });
+    }
+
     const generadoEl = new Date().toISOString();
 
     await admin.from("highlights").upsert({ empresa_id: empresaId, contenido: highlights, huella: huellaActual, generado_en: generadoEl });
