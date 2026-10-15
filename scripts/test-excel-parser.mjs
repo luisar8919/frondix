@@ -55,4 +55,26 @@ assert.strictEqual(r5.filas.length, 2, "la fila en blanco no se carga como dato"
 assert.strictEqual(r5.filasVaciasDescartadas, 1);
 assert.strictEqual(parsearExcel(libro([["Cliente"], ["Ana"]])).filasVaciasDescartadas, 0, "sin filas vacías, queda en 0");
 
+// --- 6. fechas en formatos mezclados: se detecta igual el rol y se
+// estandariza cada valor interpretable a yyyy-mm-dd, sin tocar el que no
+// se pudo entender (la columna queda marcada sospechosa) ---
+const r6 = parsearExcel(libro([
+  ["Cliente", "Fecha", "Monto"],
+  ["Ana", "2026-09-01", 100], // ISO
+  ["Luis", "05/09/2026", 80], // dd/mm/aaaa
+  ["Carla", "13-09-2026", 50], // dd-mm-aaaa
+  ["Pedro", "9 sept 2026", 95], // texto con mes en palabras
+  ["Rosa", new Date(Date.UTC(2026, 8, 20)), 60], // Date real de Excel
+  ["Jose", "no es una fecha", 30], // no se puede interpretar
+]));
+const colFecha = r6.columnas.find((c) => c.key === "fecha");
+assert.strictEqual(colFecha.tipo, "fecha", "mayoria de valores son fecha interpretable");
+assert.strictEqual(colFecha.sospechosa, true, "el valor no interpretable marca la columna sospechosa");
+assert.strictEqual(r6.filas[0].fecha, "2026-09-01");
+assert.strictEqual(r6.filas[1].fecha, "2026-09-05", "dd/mm/aaaa se interpreta dia primero (convencion LatAm)");
+assert.strictEqual(r6.filas[2].fecha, "2026-09-13");
+assert.strictEqual(r6.filas[3].fecha, "2026-09-09", "mes en palabras, abreviado");
+assert.strictEqual(r6.filas[4].fecha, "2026-09-20", "Date real de Excel tambien se estandariza al mismo formato");
+assert.strictEqual(r6.filas[5].fecha, "no es una fecha", "lo no interpretable se deja tal cual, no se inventa");
+
 console.log("OK: test-excel-parser (todas las aserciones pasaron)");

@@ -77,15 +77,74 @@ function pareceSinEncabezado(primeraFila: unknown[], columnasConDatos: number): 
   return celdas.length > 0 && celdas.filter(pareceValorDeDato).length / celdas.length > 0.5;
 }
 
+// Meses en español (con y sin tilde, abreviado o completo) para fechas
+// escritas a mano como texto -- "set" además de "sep" porque es como mucha
+// gente en Perú abrevia setiembre.
+const MESES_ES: Record<string, number> = {
+  ene: 1, feb: 2, mar: 3, abr: 4, may: 5, jun: 6, jul: 7, ago: 8,
+  set: 9, sep: 9, oct: 10, nov: 11, dic: 12,
+};
+
+function fechaValida(anio: number, mes1a12: number, dia: number): Date | null {
+  if (mes1a12 < 1 || mes1a12 > 12 || dia < 1 || dia > 31) return null;
+  const d = new Date(Date.UTC(anio, mes1a12 - 1, dia));
+  // new Date se "desborda" (32 de enero -> 1 de febrero) en vez de fallar --
+  // se revisa que el resultado tenga el mes que se pidió.
+  if (d.getUTCMonth() !== mes1a12 - 1 || d.getUTCDate() !== dia) return null;
+  return d;
+}
+
+// Entiende los formatos de fecha-como-texto más comunes en un Excel real de
+// LatAm (ISO, dd/mm/aaaa con "/" o "-", y fecha en palabras tipo "9 sept
+// 2026" o "9 de setiembre del 2026"). Devuelve null si no reconoce nada --
+// ese valor se deja tal cual y la columna queda marcada sospechosa.
+function parsearFechaTexto(v: string): Date | null {
+  const s = v.trim().toLowerCase();
+
+  let m = s.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})$/);
+  if (m) return fechaValida(+m[1], +m[2], +m[3]);
+
+  // dd/mm/aaaa o dd-mm-aaaa -- convención LatAm (día primero), no mm/dd.
+  m = s.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{4})$/);
+  if (m) return fechaValida(+m[3], +m[2], +m[1]);
+
+  m = s
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .match(/^(\d{1,2})\s*(?:de\s*)?([a-z]+)\.?\s*(?:de\s*|del\s*)?(\d{4})$/);
+  if (m) {
+    const mes = MESES_ES[m[2].slice(0, 3)];
+    if (mes) return fechaValida(+m[3], mes, +m[1]);
+  }
+
+  return null;
+}
+
+function parsearFecha(v: unknown): Date | null {
+  if (v instanceof Date) return v;
+  if (typeof v === "string" && v.trim() !== "") return parsearFechaTexto(v);
+  return null;
+}
+
+function formatearFechaISO(d: Date): string {
+  const y = d.getUTCFullYear();
+  const m = String(d.getUTCMonth() + 1).padStart(2, "0");
+  const dia = String(d.getUTCDate()).padStart(2, "0");
+  return `${y}-${m}-${dia}`;
+}
+
 // Por mayoría, no por unanimidad: un Excel real tiene errores de tipeo (un
 // "no especifica" suelto en una columna de montos, una fecha escrita a mano
-// como texto entre puras fechas reales). Exigir el 100% hacía que una sola
-// celda mal escrita le quitara el tipo -- y con él el rol (sugerirRoles exige
-// que el tipo calce) -- a la columna ENTERA, aunque el resto fuera consistente.
+// con otro formato entre puras fechas reales). Exigir el 100% hacía que una
+// sola celda mal escrita le quitara el tipo -- y con él el rol (sugerirRoles
+// exige que el tipo calce) -- a la columna ENTERA, aunque el resto fuera
+// consistente. Para fecha, cuenta tanto el Date real de Excel como el texto
+// que logramos interpretar como fecha (distintos formatos mezclados en la
+// misma columna, el caso más común en un Excel armado a mano).
 function inferirTipo(valores: unknown[]): TipoColumna {
   const conValor = valores.filter((v) => v !== null && v !== undefined && v !== "");
   if (conValor.length === 0) return "texto";
-  const fechas = conValor.filter((v) => v instanceof Date).length;
+  const fechas = conValor.filter((v) => parsearFecha(v) !== null).length;
   if (fechas / conValor.length > 0.5) return "fecha";
   const numeros = conValor.filter((v) => typeof v === "number").length;
   if (numeros / conValor.length > 0.5) return "numero";
@@ -99,7 +158,7 @@ function inferirTipo(valores: unknown[]): TipoColumna {
 function tieneValoresFueraDeTipo(valores: unknown[], tipo: TipoColumna): boolean {
   if (tipo === "texto") return false;
   const conValor = valores.filter((v) => v !== null && v !== undefined && v !== "");
-  return conValor.some((v) => (tipo === "fecha" ? !(v instanceof Date) : typeof v !== "number"));
+  return conValor.some((v) => (tipo === "fecha" ? parsearFecha(v) === null : typeof v !== "number"));
 }
 
 // Un Excel real de negocio suele tener varias hojas (meses, caja, stock, etc.) —
@@ -214,7 +273,18 @@ function parsearHojaDeWorkbook(
     .map((fila) => {
       const registro: Record<string, unknown> = {};
       columnas.forEach((col) => {
-        registro[col.key] = fila[col.idxOriginal] ?? null;
+        const v = fila[col.idxOriginal] ?? null;
+        // Columna "fecha": se estandariza cada valor interpretable (Date real
+        // o texto en cualquiera de los formatos reconocidos) a yyyy-mm-dd --
+        // el formato que ya espera toda la app (ver DynamicForm/DynamicTable,
+        // <input type="date">). El valor que no se pudo interpretar se deja
+        // tal cual (la columna ya quedó marcada sospechosa para revisarlo).
+        if (col.tipo === "fecha" && v !== null) {
+          const fecha = parsearFecha(v);
+          registro[col.key] = fecha ? formatearFechaISO(fecha) : v;
+        } else {
+          registro[col.key] = v;
+        }
       });
       return registro;
     });
