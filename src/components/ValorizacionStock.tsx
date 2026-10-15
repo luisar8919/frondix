@@ -25,9 +25,9 @@ export default function ValorizacionStock() {
 
   return (
     <div className="tarjeta" style={{ marginBottom: 20 }}>
-      <h3 style={{ margin: 0 }}>Valorización de inventario</h3>
+      <h3 style={{ margin: 0 }}>¿Cuánto vale tu mercadería? (Valorización de inventario)</h3>
       <p className="suave pequeno" style={{ margin: "4px 0 14px" }}>
-        Cuánto dinero hay parado en tu mercadería almacenada (cantidad × el costo de compra más reciente de cada producto).
+        Cuánto dinero tienes guardado en productos sin vender: la cantidad de cada uno × lo que en promedio te costó comprarlo.
       </p>
       {datos.modulos.map((m) => (
         <div key={m.datasetId} style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "center", marginBottom: 8 }}>

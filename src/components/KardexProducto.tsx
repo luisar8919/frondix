@@ -34,7 +34,7 @@ export default function KardexProducto({ datasetId, productos }: { datasetId: st
 
   return (
     <details className="tarjeta plegable" style={{ marginBottom: 20 }}>
-      <summary>Kardex (historial de movimientos por producto)</summary>
+      <summary>Historial de un producto (Kardex)</summary>
       <div className="plegable-cuerpo">
         <div className="campo" style={{ maxWidth: 320 }}>
           <label htmlFor="kardex-producto">Producto</label>

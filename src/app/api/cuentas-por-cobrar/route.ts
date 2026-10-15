@@ -13,8 +13,8 @@ export async function GET() {
   }
 
   try {
-    const cuentas = await cuentasPorCobrar(supabase, sesion.empresaId);
-    return NextResponse.json({ cuentas });
+    const resultado = await cuentasPorCobrar(supabase, sesion.empresaId);
+    return NextResponse.json(resultado);
   } catch (e) {
     return NextResponse.json({ error: e instanceof Error ? e.message : "No se pudieron calcular las cuentas por cobrar" }, { status: 500 });
   }

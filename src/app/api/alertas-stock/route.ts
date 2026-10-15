@@ -15,8 +15,8 @@ export async function GET() {
   }
 
   try {
-    const alertas = await alertasStock(supabase, sesion.empresaId);
-    return NextResponse.json({ alertas });
+    const resultado = await alertasStock(supabase, sesion.empresaId);
+    return NextResponse.json(resultado);
   } catch (e) {
     return NextResponse.json({ error: e instanceof Error ? e.message : "No se pudieron calcular las alertas de stock" }, { status: 500 });
   }

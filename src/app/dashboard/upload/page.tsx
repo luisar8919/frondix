@@ -366,6 +366,12 @@ export default function UploadPage() {
                 >
                   {ed.crearStock ? "✓ Se va a crear el módulo Stock" : "+ Crear también un módulo Stock"}
                 </button>
+                {ed.crearStock && (
+                  <p className="suave pequeno" style={{ marginTop: 8 }}>
+                    💡 Después de crearlo, entra a ese módulo y marca desde cuántas unidades quieres que Frondix te
+                    avise antes de que se te agote un producto.
+                  </p>
+                )}
               </div>
             )}
 

@@ -19,7 +19,7 @@ export const ROLES: { valor: RolColumna; etiqueta: string }[] = [
   { valor: "stock", etiqueta: "Stock (cuánto tienes ahora de ese producto)" },
   { valor: "stock_minimo", etiqueta: "Stock mínimo (para avisarte cuando se esté agotando)" },
   { valor: "saldo_pendiente", etiqueta: "Saldo pendiente (venta a crédito, lo que todavía te deben)" },
-  { valor: "codigo", etiqueta: "Código / SKU" },
+  { valor: "codigo", etiqueta: "Código del producto (SKU)" },
   { valor: "categoria", etiqueta: "Categoría" },
   { valor: "unidad_medida", etiqueta: "Unidad de medida (kg, unidad, caja...)" },
   { valor: "precio_mayorista", etiqueta: "Precio mayorista" },
