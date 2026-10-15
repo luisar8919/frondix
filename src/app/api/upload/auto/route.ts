@@ -466,15 +466,20 @@ export async function POST(request: NextRequest) {
       // La columna de tipo no viaja a ninguno de los dos módulos: ya quedó
       // implícita en a cuál fue a parar cada fila.
       const sinTipo = columnas.filter((c) => c.key !== cTipo.key);
-      let columnasVentas = sinTipo;
+      // La misma columna de "contraparte" significa Cliente en la mitad de Ventas
+      // y Proveedor en la de Compras -- se reasigna el rol, nunca se duplica la
+      // columna. Se reasigna EN AMBOS SENTIDOS: si la hoja mezclaba Ventas y
+      // Compras, sugerirRoles ya le puso un rol a esa columna ANTES de dividir
+      // (por ejemplo "proveedor", si el encabezado decía "Cliente/Proveedor") --
+      // sin este mapeo en los dos sentidos, la mitad de Ventas se quedaba con rol
+      // "proveedor" sin corregir, y tipoModulo() la clasificaba como compras.
+      let columnasVentas = sinTipo.map((c) => (c.rol === "proveedor" ? { ...c, rol: "cliente" as const } : c));
       if (!info.cCosto) columnasVentas = [...columnasVentas, { key: "costo", label: "Costo", tipo: "numero", rol: "costo", sospechosa: false }];
       // Siempre va una columna de Cliente en Ventas, aunque el origen no la
       // tuviera (queda vacía, se llena después a mano o al registrar una venta).
       if (!columnasVentas.some((c) => c.rol === "cliente")) {
         columnasVentas = [...columnasVentas, { key: "cliente", label: "Cliente", tipo: "texto", rol: "cliente", sospechosa: false }];
       }
-      // La misma columna de "contraparte" significa Cliente en la mitad de Ventas
-      // y Proveedor en la de Compras -- se reasigna el rol, nunca se duplica la columna.
       let columnasCompras = sinTipo.map((c) => (c.rol === "cliente" ? { ...c, rol: "proveedor" as const } : c));
       // Si el origen no tenía columna de contraparte, Compras y Ventas quedarían
       // con los mismos roles (Producto+Monto) y tipoModulo no podría distinguirlas

@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { crearClienteServidor } from "@/lib/supabase/server";
 import { empresaDelUsuarioServidor } from "@/lib/sesionServidor";
 import AlertasStock from "@/components/AlertasStock";
+import ValorizacionStock from "@/components/ValorizacionStock";
 import ReporteBalance from "@/components/ReporteBalance";
 
 export default async function DashboardPage() {
@@ -64,6 +65,7 @@ export default async function DashboardPage() {
       )}
 
       {hayModulos && <AlertasStock />}
+      {hayModulos && <ValorizacionStock />}
       {hayModulos && <ReporteBalance />}
     </>
   );
