@@ -3,7 +3,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { crearClienteServidor } from "@/lib/supabase/server";
 import { validarEnlaces } from "@/lib/dependientes";
 import { claveValida } from "@/lib/enlaces";
-import { ajustarStockDesdeRegistro } from "@/lib/stock";
+import { ajustarStockDesdeRegistro, registrarAjusteManual } from "@/lib/stock";
 import { validarCamposRegistro } from "@/lib/roles";
 import type { Columna } from "@/lib/excel-parser";
 
@@ -126,7 +126,10 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ dat
   // quedó bien guardado (lo importante), no vale la pena fallar toda la
   // petición por un ajuste de stock que el usuario puede corregir a mano.
   try {
-    await ajustarStockDesdeRegistro(supabase, dataset.empresa_id, columnas, body);
+    await ajustarStockDesdeRegistro(supabase, dataset.empresa_id, columnas, body, 1, user?.id ?? null);
+    // Si ESTE módulo es el propio Stock (alta manual de un producto, no vía
+    // venta/compra), queda como "ajuste" en el Kardex -- ver registrarAjusteManual.
+    await registrarAjusteManual(supabase, dataset.empresa_id, datasetId, columnas, null, body, user?.id ?? null);
   } catch {
     // silencioso a propósito, ver comentario de arriba
   }

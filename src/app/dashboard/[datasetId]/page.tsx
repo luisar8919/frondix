@@ -6,10 +6,12 @@ import DynamicTable from "@/components/DynamicTable";
 import DynamicForm from "@/components/DynamicForm";
 import EnlacesTabla from "@/components/EnlacesTabla";
 import EditarTabla from "@/components/EditarTabla";
+import KardexProducto from "@/components/KardexProducto";
 import { enviarConfirmando } from "@/lib/confirmar";
 import type { Columna } from "@/lib/excel-parser";
 import { filtrarRegistros } from "@/lib/buscar";
 import { filtrarPorColumna, relacionesEntrantes, type DatasetResumen } from "@/lib/enlaces";
+import { esStock } from "@/lib/stock";
 
 interface Registro {
   id: string;
@@ -265,6 +267,12 @@ export default function DatasetPage({
         onGuardado={cargar}
       />
       <EnlacesTabla datasetId={datasetId} columnas={dataset.columnas} otras={otras} onGuardado={cargar} />
+
+      {esStock(dataset.columnas) && (() => {
+        const cProducto = dataset.columnas.find((c) => c.rol === "producto")!;
+        const productos = [...new Set(registros.map((r) => r.data[cProducto.key]?.toString().trim()).filter((p): p is string => !!p))].sort((a, b) => a.localeCompare(b, "es"));
+        return <KardexProducto datasetId={datasetId} productos={productos} />;
+      })()}
 
       {filtrarCol && filtrarVal !== undefined && (
         <p className="alerta alerta-ok">

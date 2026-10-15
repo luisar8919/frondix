@@ -3,6 +3,8 @@ import { claveValida } from "./enlaces.ts";
 import { tipoModulo } from "./roles.ts";
 import type { Columna } from "./excel-parser.ts";
 
+export type TipoMovimientoStock = "venta" | "compra" | "ajuste";
+
 // Solo servidor. El módulo Stock que alimenta este dataset de Ventas/Compras:
 // su PROPIA columna de Producto está enlazada (enlace) al dataset de Stock
 // (aparte del enlace al revés que ya tenía Stock -> Ventas, para el
@@ -29,6 +31,45 @@ export async function datasetStockDe(
   return { id: stockDataset.id, claveProducto: cProducto.enlace.columnaKey };
 }
 
+// Un dataset "parece" un Stock con el mismo criterio que datasetStockDe usa para
+// reconocer el de OTRO módulo: trae columna "cantidad" (clave fija) y una
+// columna de rol Producto.
+export function esStock(columnas: Columna[]): boolean {
+  return columnas.some((c) => c.key === "cantidad") && columnas.some((c) => c.rol === "producto");
+}
+
+// Deja registro del movimiento en el Kardex (movimientos_stock) -- "mejor
+// esfuerzo" como el resto de este archivo: si la tabla no existe todavía
+// (falta correr la migración 16) o falla por lo que sea, no debe tumbar el
+// ajuste de stock que ya se aplicó.
+async function registrarMovimiento(
+  supabase: SupabaseClient,
+  empresaId: string,
+  datasetId: string,
+  producto: string,
+  tipo: TipoMovimientoStock,
+  delta: number,
+  saldo: number,
+  userId: string | null,
+  motivo?: string | null
+): Promise<void> {
+  if (delta === 0) return;
+  try {
+    await supabase.from("movimientos_stock").insert({
+      empresa_id: empresaId,
+      dataset_id: datasetId,
+      producto,
+      tipo,
+      cantidad: delta,
+      saldo,
+      motivo: motivo ?? null,
+      created_by: userId,
+    });
+  } catch {
+    // silencioso a propósito, ver comentario de arriba
+  }
+}
+
 // Suma (o resta) `delta` a la cantidad de un producto en el dataset de Stock.
 // Si el producto todavía no tiene fila ahí, la crea empezando en 0 antes de
 // ajustar -- así un producto nuevo que se compra o vende por primera vez
@@ -38,7 +79,8 @@ export async function ajustarStock(
   stockDatasetId: string,
   claveProducto: string,
   producto: string,
-  delta: number
+  delta: number,
+  registro: { empresaId: string; tipo: TipoMovimientoStock; userId: string | null }
 ): Promise<void> {
   if (!claveValida(claveProducto) || !producto || delta === 0) return;
 
@@ -49,12 +91,17 @@ export async function ajustarStock(
     .eq(`data->>${claveProducto}`, producto)
     .maybeSingle();
 
+  let saldo: number;
   if (fila) {
     const actual = Number((fila.data as Record<string, unknown>).cantidad) || 0;
-    await supabase.from("records").update({ data: { ...(fila.data as object), cantidad: actual + delta } }).eq("id", fila.id);
+    saldo = actual + delta;
+    await supabase.from("records").update({ data: { ...(fila.data as object), cantidad: saldo } }).eq("id", fila.id);
   } else {
+    saldo = delta;
     await supabase.from("records").insert({ dataset_id: stockDatasetId, data: { [claveProducto]: producto, cantidad: delta } });
   }
+
+  await registrarMovimiento(supabase, registro.empresaId, stockDatasetId, producto, registro.tipo, delta, saldo, registro.userId);
 }
 
 // Si `columnas` (de un dataset recién escrito) clasifica como ventas o
@@ -70,10 +117,11 @@ export async function ajustarStockDesdeRegistro(
   empresaId: string,
   columnas: Columna[],
   datos: Record<string, unknown>,
-  signo: 1 | -1 = 1
+  signo: 1 | -1 = 1,
+  userId: string | null = null
 ): Promise<void> {
-  const tipo = tipoModulo(columnas.map((c) => c.rol));
-  if (tipo !== "compras" && tipo !== "ventas") return;
+  const tipoDelModulo = tipoModulo(columnas.map((c) => c.rol));
+  if (tipoDelModulo !== "compras" && tipoDelModulo !== "ventas") return;
 
   const cProducto = columnas.find((c) => c.rol === "producto");
   if (!cProducto) return;
@@ -87,7 +135,12 @@ export async function ajustarStockDesdeRegistro(
   const cantidadCruda = cCantidad ? Number(datos[cCantidad.key]) : NaN;
   const cantidad = Number.isFinite(cantidadCruda) && cantidadCruda > 0 ? cantidadCruda : 1;
 
-  await ajustarStock(supabase, stock.id, stock.claveProducto, producto, signo * (tipo === "compras" ? cantidad : -cantidad));
+  const tipo: TipoMovimientoStock = tipoDelModulo === "compras" ? "compra" : "venta";
+  await ajustarStock(supabase, stock.id, stock.claveProducto, producto, signo * (tipoDelModulo === "compras" ? cantidad : -cantidad), {
+    empresaId,
+    tipo,
+    userId,
+  });
 }
 
 // Al editar un registro: deshace el efecto que tenía en Stock con los datos
@@ -102,8 +155,38 @@ export async function revertirStockDesdeRegistro(
   empresaId: string,
   columnas: Columna[],
   datosViejos: Record<string, unknown>,
-  datosNuevos?: Record<string, unknown>
+  datosNuevos?: Record<string, unknown>,
+  userId: string | null = null
 ): Promise<void> {
-  await ajustarStockDesdeRegistro(supabase, empresaId, columnas, datosViejos, -1);
-  if (datosNuevos) await ajustarStockDesdeRegistro(supabase, empresaId, columnas, datosNuevos, 1);
+  await ajustarStockDesdeRegistro(supabase, empresaId, columnas, datosViejos, -1, userId);
+  if (datosNuevos) await ajustarStockDesdeRegistro(supabase, empresaId, columnas, datosNuevos, 1, userId);
+}
+
+// Editar o crear una fila A MANO en el propio módulo de Stock (no vía una venta
+// o compra, que ya queda cubierto arriba) -- un conteo físico, una merma, una
+// corrección. Se registra como "ajuste" para que el Kardex no tenga huecos:
+// todo cambio de cantidad queda con su origen, lo haya disparado una venta,
+// una compra, o el dueño corrigiendo el número a mano.
+export async function registrarAjusteManual(
+  supabase: SupabaseClient,
+  empresaId: string,
+  datasetId: string,
+  columnas: Columna[],
+  datosViejos: Record<string, unknown> | null,
+  datosNuevos: Record<string, unknown>,
+  userId: string | null,
+  motivo?: string | null
+): Promise<void> {
+  if (!esStock(columnas)) return;
+  const cProducto = columnas.find((c) => c.rol === "producto");
+  if (!cProducto) return;
+  const producto = datosNuevos[cProducto.key]?.toString().trim();
+  if (!producto) return;
+
+  const cantidadVieja = datosViejos ? Number(datosViejos.cantidad) || 0 : 0;
+  const cantidadNueva = Number(datosNuevos.cantidad) || 0;
+  const delta = cantidadNueva - cantidadVieja;
+  if (delta === 0) return;
+
+  await registrarMovimiento(supabase, empresaId, datasetId, producto, "ajuste", delta, cantidadNueva, userId, motivo);
 }

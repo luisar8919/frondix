@@ -217,3 +217,25 @@ create table recomendacion_usos (
 );
 create index recomendacion_usos_fuente_idx on recomendacion_usos (fuente, patron_id);
 alter table recomendacion_usos enable row level security;
+
+-- Kardex real (migracion 16): cada movimiento de stock -- venta, compra o
+-- ajuste manual -- con el saldo resultante. Stock solo guarda el numero
+-- actual; esto guarda el historial. Ver src/lib/stock.ts.
+create table movimientos_stock (
+  id uuid primary key default gen_random_uuid(),
+  empresa_id uuid not null references empresas(id) on delete cascade,
+  dataset_id uuid not null references datasets(id) on delete cascade,
+  producto text not null,
+  tipo text not null check (tipo in ('venta', 'compra', 'ajuste')),
+  cantidad numeric not null,
+  saldo numeric not null,
+  motivo text,
+  created_by uuid references auth.users(id) on delete set null,
+  created_at timestamptz not null default now()
+);
+create index movimientos_stock_producto_idx on movimientos_stock (dataset_id, producto, created_at desc);
+alter table movimientos_stock enable row level security;
+create policy "ver movimientos de stock de mi empresa" on movimientos_stock for select
+  using (empresa_id in (select public.mis_empresas()));
+create policy "crear movimientos de stock en mi empresa" on movimientos_stock for insert
+  with check (empresa_id in (select public.mis_empresas()) and created_by = auth.uid());

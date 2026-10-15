@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { crearClienteServidor } from "@/lib/supabase/server";
 import { advertenciasDeRegistro, validarEnlaces } from "@/lib/dependientes";
-import { revertirStockDesdeRegistro } from "@/lib/stock";
+import { revertirStockDesdeRegistro, registrarAjusteManual } from "@/lib/stock";
 import { validarCamposRegistro } from "@/lib/roles";
 import type { Columna } from "@/lib/excel-parser";
 
@@ -22,7 +22,7 @@ async function cargar(ctx: Ctx) {
     .eq("dataset_id", datasetId)
     .single();
   if (!registro) return { error: NextResponse.json({ error: "Registro no encontrado" }, { status: 404 }) };
-  return { supabase, datasetId, recordId, registro, email: user.email ?? null };
+  return { supabase, datasetId, recordId, registro, email: user.email ?? null, userId: user.id };
 }
 
 // `data` reemplaza las columnas del Excel (igual que antes); `sustento` es
@@ -32,9 +32,9 @@ async function cargar(ctx: Ctx) {
 export async function PATCH(req: NextRequest, ctx: Ctx) {
   const c = await cargar(ctx);
   if ("error" in c) return c.error;
-  const { supabase, datasetId, recordId, registro, email } = c;
+  const { supabase, datasetId, recordId, registro, email, userId } = c;
 
-  const { data, confirmar, sustento } = await req.json().catch(() => ({}));
+  const { data, confirmar, sustento, motivo } = await req.json().catch(() => ({}));
   let columnas: Columna[] | null = null;
   let empresaId: string | null = null;
   if (data !== undefined) {
@@ -77,7 +77,10 @@ export async function PATCH(req: NextRequest, ctx: Ctx) {
   // efecto de los datos viejos y aplica el de los nuevos -- ver revertirStockDesdeRegistro.
   if (data !== undefined && columnas && empresaId) {
     try {
-      await revertirStockDesdeRegistro(supabase, empresaId, columnas, registro.data as Record<string, unknown>, data);
+      await revertirStockDesdeRegistro(supabase, empresaId, columnas, registro.data as Record<string, unknown>, data, userId);
+      // Si ESTE módulo es el propio Stock (corrección a mano de una cantidad,
+      // no vía venta/compra), queda como "ajuste" en el Kardex, con motivo si se mandó.
+      await registrarAjusteManual(supabase, empresaId, datasetId, columnas, registro.data as Record<string, unknown>, data, userId, typeof motivo === "string" ? motivo.trim().slice(0, 300) || null : null);
     } catch {
       // silencioso a propósito, el registro ya quedó bien guardado
     }
@@ -89,7 +92,7 @@ export async function PATCH(req: NextRequest, ctx: Ctx) {
 export async function DELETE(req: NextRequest, ctx: Ctx) {
   const c = await cargar(ctx);
   if ("error" in c) return c.error;
-  const { supabase, datasetId, recordId, registro } = c;
+  const { supabase, datasetId, recordId, registro, userId } = c;
 
   const { confirmar } = await req.json().catch(() => ({}));
   if (!confirmar) {
@@ -107,7 +110,7 @@ export async function DELETE(req: NextRequest, ctx: Ctx) {
 
   if (dataset) {
     try {
-      await revertirStockDesdeRegistro(supabase, dataset.empresa_id, dataset.columnas as Columna[], registro.data as Record<string, unknown>);
+      await revertirStockDesdeRegistro(supabase, dataset.empresa_id, dataset.columnas as Columna[], registro.data as Record<string, unknown>, undefined, userId);
     } catch {
       // silencioso a propósito, ver comentario de PATCH
     }
