@@ -6,6 +6,9 @@ import AlertasStock from "@/components/AlertasStock";
 import ValorizacionStock from "@/components/ValorizacionStock";
 import CuentasPorCobrar from "@/components/CuentasPorCobrar";
 import ReporteBalance from "@/components/ReporteBalance";
+import { rolEnEmpresa } from "@/lib/permisos";
+import { tipoModulo, type RolColumna } from "@/lib/roles";
+import type { Columna } from "@/lib/excel-parser";
 
 export default async function DashboardPage() {
   const supabase = await crearClienteServidor();
@@ -13,14 +16,20 @@ export default async function DashboardPage() {
   const sesion = await empresaDelUsuarioServidor(supabase);
   if (!sesion.ok) redirect("/login");
 
-  const { data: datasets } = await supabase
+  const { data: datasetsCrudos } = await supabase
     .from("datasets")
-    .select("id, nombre, created_at")
+    .select("id, nombre, created_at, columnas")
     .eq("empresa_id", sesion.empresaId)
     .order("created_at", { ascending: false });
 
   const empresa = sesion.empresas.find((e) => e.empresaId === sesion.empresaId)?.nombre ?? "tu negocio";
-  const hayModulos = !!datasets && datasets.length > 0;
+  const esVendedor = rolEnEmpresa(sesion.empresas, sesion.empresaId) === "vendedor";
+  // Un vendedor no ve módulos de Compras (costos, proveedores) -- solo registra
+  // ventas y consulta stock, ver src/lib/permisos.ts.
+  const datasets = (datasetsCrudos ?? []).filter(
+    (d) => !esVendedor || tipoModulo((d.columnas as Columna[]).map((c) => c.rol as RolColumna | null)) !== "compras"
+  );
+  const hayModulos = datasets.length > 0;
 
   return (
     <>
@@ -28,15 +37,17 @@ export default async function DashboardPage() {
         <div>
           <h1>{empresa}</h1>
           <p className="suave">
-            {hayModulos ? `${datasets!.length} ${datasets!.length === 1 ? "módulo" : "módulos"} en tu panel` : "Empecemos por tu primer Excel"}
+            {hayModulos ? `${datasets.length} ${datasets.length === 1 ? "módulo" : "módulos"} en tu panel` : "Empecemos por tu primer Excel"}
           </p>
         </div>
-        <div className="acciones">
-          <Link href="/dashboard/upload" className="btn btn-primario">Subir Excel</Link>
-        </div>
+        {!esVendedor && (
+          <div className="acciones">
+            <Link href="/dashboard/upload" className="btn btn-primario">Subir Excel</Link>
+          </div>
+        )}
       </div>
 
-      {!hayModulos && (
+      {!hayModulos && !esVendedor && (
         <div className="tarjeta tarjeta-elevada vacio">
           <h2 style={{ fontSize: 24 }}>Todavía no hay módulos</h2>
           <p style={{ maxWidth: 46 + "ch", margin: "0 auto 20px" }}>
@@ -48,7 +59,7 @@ export default async function DashboardPage() {
 
       {hayModulos && (
         <div className="grilla-tablas" style={{ marginBottom: 20 }}>
-          {datasets!.map((d) => (
+          {datasets.map((d) => (
             <Link key={d.id} href={`/dashboard/${d.id}`} className="tarjeta tarjeta-tabla">
               <div className="icono" aria-hidden="true">
                 <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="#237a50" strokeWidth="1.8" strokeLinecap="round">
@@ -65,10 +76,10 @@ export default async function DashboardPage() {
         </div>
       )}
 
-      {hayModulos && <AlertasStock />}
-      {hayModulos && <CuentasPorCobrar />}
-      {hayModulos && <ValorizacionStock />}
-      {hayModulos && <ReporteBalance />}
+      {hayModulos && !esVendedor && <AlertasStock />}
+      {hayModulos && !esVendedor && <CuentasPorCobrar />}
+      {hayModulos && !esVendedor && <ValorizacionStock />}
+      {hayModulos && !esVendedor && <ReporteBalance />}
     </>
   );
 }

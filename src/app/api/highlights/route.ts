@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { crearClienteServidor } from "@/lib/supabase/server";
 import { empresaDelUsuarioServidor } from "@/lib/sesionServidor";
+import { esVendedor, rolEnEmpresa } from "@/lib/permisos";
 import { crearClienteAdmin } from "@/lib/supabase/admin";
 import { calcularModulosReporte, resumenConLibresParaIA, huellaModulos } from "@/lib/datosReportes";
 import { generarHighlights } from "@/lib/gemini";
@@ -20,6 +21,9 @@ export async function GET() {
   const supabase = await crearClienteServidor();
   const sesion = await empresaDelUsuarioServidor(supabase);
   if (!sesion.ok) return NextResponse.json({ error: sesion.error }, { status: 401 });
+  if (esVendedor(rolEnEmpresa(sesion.empresas, sesion.empresaId))) {
+    return NextResponse.json({ error: "Tu rol no tiene acceso a esto" }, { status: 403 });
+  }
   const empresaId = sesion.empresaId;
 
   if (!(await tieneSuscripcionActiva(supabase, empresaId))) {

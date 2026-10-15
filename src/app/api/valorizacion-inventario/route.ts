@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { crearClienteServidor } from "@/lib/supabase/server";
 import { empresaDelUsuarioServidor } from "@/lib/sesionServidor";
+import { esVendedor, rolEnEmpresa } from "@/lib/permisos";
 import { valorizacionInventario } from "@/lib/valorizacionInventario";
 
 // Cuánto dinero hay "parado" en mercadería almacenada, por módulo de Stock y en
@@ -9,6 +10,9 @@ export async function GET() {
   const supabase = await crearClienteServidor();
   const sesion = await empresaDelUsuarioServidor(supabase);
   if (!sesion.ok) return NextResponse.json({ error: sesion.error }, { status: 401 });
+  if (esVendedor(rolEnEmpresa(sesion.empresas, sesion.empresaId))) {
+    return NextResponse.json({ error: "Tu rol no tiene acceso a esto" }, { status: 403 });
+  }
 
   try {
     const valorizacion = await valorizacionInventario(supabase, sesion.empresaId);

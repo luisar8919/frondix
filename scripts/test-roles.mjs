@@ -60,6 +60,28 @@ assert.strictEqual(contacto.correo, "correo");
 assert.strictEqual(contacto.saldo, "saldo_pendiente");
 assert.strictEqual(admiteNegativos("saldo_pendiente"), false, "un saldo por cobrar no puede ser negativo");
 
+// Catalogo: SKU, categoria, unidad de medida, precios por nivel y descuento --
+// "Precio mayorista"/"Precio minorista" no deben caer en el rol "monto" genérico
+// (su patrón incluye "precio").
+const catalogo = sugerirRoles([
+  { key: "codigo", label: "SKU", tipo: "texto" },
+  { key: "categoria", label: "Categoría", tipo: "texto" },
+  { key: "unidad", label: "Unidad de medida", tipo: "texto" },
+  { key: "p_mayor", label: "Precio mayorista", tipo: "numero" },
+  { key: "p_menor", label: "Precio minorista", tipo: "numero" },
+  { key: "desc", label: "Descuento", tipo: "numero" },
+  { key: "monto", label: "Monto", tipo: "numero" },
+]);
+assert.strictEqual(catalogo.codigo, "codigo");
+assert.strictEqual(catalogo.categoria, "categoria");
+assert.strictEqual(catalogo.unidad, "unidad_medida");
+assert.strictEqual(catalogo.p_mayor, "precio_mayorista", "'Precio mayorista' no cae en monto genérico");
+assert.strictEqual(catalogo.p_menor, "precio_minorista", "'Precio minorista' no cae en monto genérico");
+assert.strictEqual(catalogo.desc, "descuento");
+assert.strictEqual(catalogo.monto, "monto");
+assert.strictEqual(admiteNegativos("precio_mayorista"), false);
+assert.strictEqual(admiteNegativos("descuento"), false);
+
 // Compras: "proveedor" se reconoce, y no se cruza con cliente aunque ambos
 // patrones incluyan "nombre" (proveedor va primero en las reglas)
 const compras = sugerirRoles([

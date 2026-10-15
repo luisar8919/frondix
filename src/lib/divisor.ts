@@ -34,44 +34,62 @@ export function dividirVentasYCompras(filas: Record<string, unknown>[], claveTip
 }
 
 export interface PrecioCompra {
-  precio: number;
-  fecha: string; // "" si la hoja no tenía fecha -- igual sirve para comparar, solo nunca gana
+  precio: number; // costo promedio PONDERADO por unidad (totalGastado / totalUnidades)
+  totalGastado: number;
+  totalUnidades: number;
 }
 
-// Precio de compra MÁS RECIENTE por producto, a partir de filas ya sabidas
-// como "compra" (una pestaña entera de Compras, o la mitad de compras de una
-// pestaña dividida -- a esta función no le importa de dónde vinieron).
+// Costo promedio PONDERADO por producto, a partir de filas ya sabidas como
+// "compra" (una pestaña entera de Compras, o la mitad de compras de una
+// pestaña dividida -- a esta función no le importa de dónde vinieron). Junta
+// TODAS las compras del producto (no solo la más reciente) y divide el total
+// gastado entre el total de unidades: un lote grande y barato no pesa igual
+// que uno chico y caro. Si una fila no trae cantidad, cuenta como 1 unidad
+// (mismo criterio que el resto del código, ver ajustarStockDesdeRegistro).
 export function preciosDeCompra(
   filasCompra: Record<string, unknown>[],
   claveProducto: string,
   claveMonto: string,
-  claveFecha?: string
+  claveCantidad?: string
 ): Map<string, PrecioCompra> {
-  const porProducto = new Map<string, PrecioCompra>();
+  const acumulado = new Map<string, { totalGastado: number; totalUnidades: number }>();
   for (const c of filasCompra) {
     const producto = c[claveProducto]?.toString().trim();
     const monto = Number(c[claveMonto]);
     if (!producto || !Number.isFinite(monto)) continue;
-    const fecha = claveFecha ? String(c[claveFecha] ?? "") : "";
-    const actual = porProducto.get(producto);
-    if (!actual || fecha >= actual.fecha) porProducto.set(producto, { precio: monto, fecha });
+    const cantidadCruda = claveCantidad ? Number(c[claveCantidad]) : NaN;
+    const cantidad = Number.isFinite(cantidadCruda) && cantidadCruda > 0 ? cantidadCruda : 1;
+    const actual = acumulado.get(producto) ?? { totalGastado: 0, totalUnidades: 0 };
+    actual.totalGastado += monto;
+    actual.totalUnidades += cantidad;
+    acumulado.set(producto, actual);
   }
-  return porProducto;
+  return aMapaDePrecios(acumulado);
 }
 
-// Junta los precios de compra de varias pestañas/módulos en un solo mapa --
-// así da igual si "Zapatillas" se compró según la pestaña Compras o según la
-// mitad de compras de un módulo dividido: se queda con el más reciente de
-// TODAS las fuentes, no solo de una.
+function aMapaDePrecios(acumulado: Map<string, { totalGastado: number; totalUnidades: number }>): Map<string, PrecioCompra> {
+  const resultado = new Map<string, PrecioCompra>();
+  for (const [producto, { totalGastado, totalUnidades }] of acumulado) {
+    resultado.set(producto, { precio: totalUnidades > 0 ? totalGastado / totalUnidades : 0, totalGastado, totalUnidades });
+  }
+  return resultado;
+}
+
+// Junta los promedios de compra de varias pestañas/módulos en un solo mapa --
+// SUMA los totales de cada fuente (no se queda con "el más reciente") para
+// que el promedio ponderado considere TODAS las compras de TODAS las fuentes
+// juntas, no solo de una pestaña.
 export function combinarPrecios(mapas: Map<string, PrecioCompra>[]): Map<string, PrecioCompra> {
-  const combinado = new Map<string, PrecioCompra>();
+  const acumulado = new Map<string, { totalGastado: number; totalUnidades: number }>();
   for (const mapa of mapas) {
     for (const [producto, info] of mapa) {
-      const actual = combinado.get(producto);
-      if (!actual || info.fecha >= actual.fecha) combinado.set(producto, info);
+      const actual = acumulado.get(producto) ?? { totalGastado: 0, totalUnidades: 0 };
+      actual.totalGastado += info.totalGastado;
+      actual.totalUnidades += info.totalUnidades;
+      acumulado.set(producto, actual);
     }
   }
-  return combinado;
+  return aMapaDePrecios(acumulado);
 }
 
 // Completa el costo de cada venta (in-place) con el precio de compra más

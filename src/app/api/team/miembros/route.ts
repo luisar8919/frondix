@@ -46,8 +46,8 @@ export async function PATCH(req: NextRequest) {
   if (!user) return NextResponse.json({ error: "No autenticado" }, { status: 401 });
 
   const { empresaId, userId, rol } = await req.json();
-  if (!empresaId || !userId || !["admin", "miembro"].includes(rol)) {
-    return NextResponse.json({ error: "Faltan datos: empresaId, userId, rol (admin|miembro)" }, { status: 400 });
+  if (!empresaId || !userId || !["admin", "miembro", "vendedor"].includes(rol)) {
+    return NextResponse.json({ error: "Faltan datos: empresaId, userId, rol (admin|miembro|vendedor)" }, { status: 400 });
   }
   if (!(await puedeGestionar(supabase, user.id, empresaId))) {
     return NextResponse.json({ error: "No tienes permiso para editar el equipo de esta empresa" }, { status: 403 });

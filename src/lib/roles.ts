@@ -1,6 +1,6 @@
 // "Rol" = qué significa una columna para el negocio (no solo su tipo de dato).
 // El asistente lo necesita para saber, por ejemplo, cuál es el monto de una venta.
-export type RolColumna = "monto" | "fecha" | "cliente" | "producto" | "telefono" | "costo" | "proveedor" | "gastos" | "tipo_movimiento" | "stock" | "cantidad" | "stock_minimo" | "documento" | "direccion" | "correo" | "saldo_pendiente";
+export type RolColumna = "monto" | "fecha" | "cliente" | "producto" | "telefono" | "costo" | "proveedor" | "gastos" | "tipo_movimiento" | "stock" | "cantidad" | "stock_minimo" | "documento" | "direccion" | "correo" | "saldo_pendiente" | "codigo" | "categoria" | "unidad_medida" | "precio_mayorista" | "precio_minorista" | "descuento";
 
 export const ROLES: { valor: RolColumna; etiqueta: string }[] = [
   { valor: "monto", etiqueta: "Monto (importe de la venta o movimiento)" },
@@ -19,6 +19,12 @@ export const ROLES: { valor: RolColumna; etiqueta: string }[] = [
   { valor: "stock", etiqueta: "Stock (cuánto tienes ahora de ese producto)" },
   { valor: "stock_minimo", etiqueta: "Stock mínimo (para avisarte cuando se esté agotando)" },
   { valor: "saldo_pendiente", etiqueta: "Saldo pendiente (venta a crédito, lo que todavía te deben)" },
+  { valor: "codigo", etiqueta: "Código / SKU" },
+  { valor: "categoria", etiqueta: "Categoría" },
+  { valor: "unidad_medida", etiqueta: "Unidad de medida (kg, unidad, caja...)" },
+  { valor: "precio_mayorista", etiqueta: "Precio mayorista" },
+  { valor: "precio_minorista", etiqueta: "Precio minorista" },
+  { valor: "descuento", etiqueta: "Descuento aplicado (% o monto fijo)" },
 ];
 
 // El orden importa: "Teléfono del cliente" debe caer en telefono, no en cliente,
@@ -42,10 +48,18 @@ const REGLAS: { rol: RolColumna; patron: RegExp; tipo?: string }[] = [
   { rol: "tipo_movimiento", patron: /^tipo$|tipo.*(movim|transac|registro)/, tipo: "texto" },
   { rol: "stock_minimo", patron: /stock.?min|minimo|reorden|punto.?de.?pedido/, tipo: "numero" },
   { rol: "stock", patron: /^stock$|inventario|existencia/, tipo: "numero" },
+  { rol: "unidad_medida", patron: /unidad.*medida|unid\.?\s*med/, tipo: "texto" },
   { rol: "cantidad", patron: /^cant(idad)?\.?$|unidades|^qty$|^unid\.?$/, tipo: "numero" },
   { rol: "saldo_pendiente", patron: /saldo|pendiente|por.?cobrar|deuda/, tipo: "numero" },
+  // mayorista/minorista/descuento van antes que "monto" porque su patrón
+  // incluye "precio" -- "Precio mayorista" caería en monto genérico si no.
+  { rol: "precio_mayorista", patron: /mayorista/, tipo: "numero" },
+  { rol: "precio_minorista", patron: /minorista/, tipo: "numero" },
+  { rol: "descuento", patron: /descuento/, tipo: "numero" },
   { rol: "monto", patron: /monto|venta|importe|total|precio|ingreso|entrada/, tipo: "numero" },
   { rol: "costo", patron: /costo|gasto|egreso/, tipo: "numero" },
+  { rol: "codigo", patron: /\bsku\b|codigo/, tipo: "texto" },
+  { rol: "categoria", patron: /categoria|rubro/, tipo: "texto" },
   { rol: "producto", patron: /producto|juego|item|articulo|descripcion|concepto|detalle/, tipo: "texto" },
   { rol: "proveedor", patron: /proveedor|vendedor|distribuidor/, tipo: "texto" },
   { rol: "cliente", patron: /cliente|comprador|nombre/, tipo: "texto" },
@@ -112,7 +126,7 @@ export function camposObligatorios(tipo: TipoModulo): RolColumna[] {
 // un costo o una cantidad negativa es casi siempre un error de tipeo, no una
 // operación real) -- "stock" queda afuera a propósito: negativo ahí SÍ es válido
 // (se vendió algo antes de registrar que se compró, ver lib/stock.ts).
-const ROLES_SIN_NEGATIVOS = new Set<RolColumna>(["monto", "costo", "gastos", "cantidad", "saldo_pendiente"]);
+const ROLES_SIN_NEGATIVOS = new Set<RolColumna>(["monto", "costo", "gastos", "cantidad", "saldo_pendiente", "precio_mayorista", "precio_minorista", "descuento"]);
 
 export function admiteNegativos(rol: RolColumna | null | ""): boolean {
   return !rol || !ROLES_SIN_NEGATIVOS.has(rol);

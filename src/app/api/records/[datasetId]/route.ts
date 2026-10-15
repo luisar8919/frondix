@@ -4,7 +4,7 @@ import { crearClienteServidor } from "@/lib/supabase/server";
 import { validarEnlaces } from "@/lib/dependientes";
 import { claveValida } from "@/lib/enlaces";
 import { ajustarStockDesdeRegistro, registrarAjusteManual } from "@/lib/stock";
-import { validarCamposRegistro } from "@/lib/roles";
+import { validarCamposRegistro, tipoModulo } from "@/lib/roles";
 import type { Columna } from "@/lib/excel-parser";
 
 // Si el valor de una columna de Cliente/Proveedor enlazada no existe todavía en
@@ -59,6 +59,20 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ data
   const { datasetId } = await params;
   const supabase = await crearClienteServidor();
 
+  // Un vendedor no ve el contenido de un módulo de Compras (costos, proveedores):
+  // su rol es solo registrar ventas y consultar stock. Se chequea en TODAS las
+  // páginas (no solo la primera), para que paginar no se salte el bloqueo.
+  const { data: { user } } = await supabase.auth.getUser();
+  if (user) {
+    const { data: dsPermiso } = await supabase.from("datasets").select("empresa_id, columnas").eq("id", datasetId).single();
+    if (dsPermiso) {
+      const { data: miMembresia } = await supabase.from("miembros").select("rol").eq("empresa_id", dsPermiso.empresa_id).eq("user_id", user.id).single();
+      if (miMembresia?.rol === "vendedor" && tipoModulo((dsPermiso.columnas as Columna[]).map((c) => c.rol)) === "compras") {
+        return NextResponse.json({ error: "Tu rol no tiene acceso a este módulo" }, { status: 403 });
+      }
+    }
+  }
+
   const q = req.nextUrl.searchParams;
   const desde = Math.max(0, parseInt(q.get("desde") ?? "0", 10) || 0);
   const limite = Math.min(MAX_PAGINA, Math.max(1, parseInt(q.get("limite") ?? String(MAX_PAGINA), 10) || MAX_PAGINA));
@@ -105,6 +119,11 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ dat
   if (errorDataset?.code === "42501") return respuestaError(errorDataset);
   if (!dataset) return NextResponse.json({ error: "Dataset no encontrado" }, { status: 404 });
   const columnas = dataset.columnas as Columna[];
+
+  if (user && tipoModulo(columnas.map((c) => c.rol)) === "compras") {
+    const { data: miMembresia } = await supabase.from("miembros").select("rol").eq("empresa_id", dataset.empresa_id).eq("user_id", user.id).single();
+    if (miMembresia?.rol === "vendedor") return NextResponse.json({ error: "Tu rol no tiene acceso a este módulo" }, { status: 403 });
+  }
 
   const faltaCampo = validarCamposRegistro(columnas, body);
   if (faltaCampo) return NextResponse.json({ error: faltaCampo }, { status: 422 });

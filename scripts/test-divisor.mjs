@@ -15,19 +15,23 @@ assert.strictEqual(r.ventas.length, 2);
 assert.strictEqual(r.sinClasificar.length, 1);
 assert.strictEqual(r.sinClasificar[0].producto, "Polo", "la fila sin clasificar se conserva, no solo se cuenta");
 
-// --- preciosDeCompra: el más reciente por producto ---
+// --- preciosDeCompra: costo promedio PONDERADO (total gastado / total unidades) ---
 const compras1 = [
-  { producto: "Polo", monto: 20, fecha: "2026-10-01" },
-  { producto: "Polo", monto: 25, fecha: "2026-10-05" }, // más reciente, gana
+  { producto: "Polo", monto: 20, cantidad: 2 }, // 2 unidades a 10 c/u
+  { producto: "Polo", monto: 25, cantidad: 1 }, // 1 unidad a 25
 ];
-const precios1 = preciosDeCompra(compras1, "producto", "monto", "fecha");
-assert.strictEqual(precios1.get("Polo").precio, 25);
+const precios1 = preciosDeCompra(compras1, "producto", "monto", "cantidad");
+assert.strictEqual(precios1.get("Polo").precio, 15, "(20+25)/(2+1) = 15, no un promedio simple de precios");
 
-// --- combinarPrecios: junta mapas de varias pestañas, gana el más reciente entre TODAS ---
-const compras2 = [{ producto: "Polo", monto: 30, fecha: "2026-10-10" }]; // de otra pestaña, más reciente aún
-const precios2 = preciosDeCompra(compras2, "producto", "monto", "fecha");
+// --- sin columna de cantidad, cada fila cuenta como 1 unidad (promedio simple) ---
+const precios1b = preciosDeCompra(compras1, "producto", "monto");
+assert.strictEqual(precios1b.get("Polo").precio, 22.5, "(20+25)/2 si no hay cantidad");
+
+// --- combinarPrecios: junta mapas de varias pestañas SUMANDO totales, no se queda con el último ---
+const compras2 = [{ producto: "Polo", monto: 30, cantidad: 3 }]; // de otra pestaña: 3 unidades a 10 c/u
+const precios2 = preciosDeCompra(compras2, "producto", "monto", "cantidad");
 const combinado = combinarPrecios([precios1, precios2]);
-assert.strictEqual(combinado.get("Polo").precio, 30, "se queda con el precio más reciente entre ambas pestañas");
+assert.strictEqual(combinado.get("Polo").precio, 12.5, "(20+25+30)/(2+1+3) = 12.5, junta TODAS las compras de ambas pestañas");
 
 // --- completarCostos: solo si falta, nunca pisa uno que ya traía ---
 const ventas = [
@@ -36,7 +40,7 @@ const ventas = [
   { producto: "Polo", monto: 60, costo: 10 }, // ya traía costo -> no se toca
 ];
 completarCostos(ventas, combinado, "producto", "costo");
-assert.strictEqual(ventas[0].costo, 30);
+assert.strictEqual(ventas[0].costo, 12.5);
 assert.strictEqual(ventas[1].costo, undefined);
 assert.strictEqual(ventas[2].costo, 10);
 

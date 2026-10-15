@@ -19,10 +19,10 @@ export interface ValorizacionInventario {
 const columnaConRol = (columnas: Columna[], rol: string) => columnas.find((c) => c.rol === rol && claveValida(c.key));
 
 // Cuánto dinero hay "parado" en mercadería almacenada: cantidad (de cada módulo
-// de Stock) × el precio de compra más reciente de ese producto (de cualquier
-// módulo de Compras de la empresa) -- mismo criterio que ya usa el import de
-// Excel para completar costos (ver divisor.ts), reutilizado acá en vez de
-// reinventar otra forma de calcular "el precio de un producto".
+// de Stock) × el costo promedio PONDERADO de ese producto (de cualquier módulo
+// de Compras de la empresa) -- mismo criterio que ya usa el import de Excel
+// para completar costos (ver divisor.ts), reutilizado acá en vez de reinventar
+// otra forma de calcular "el precio de un producto".
 export async function valorizacionInventario(supabase: SupabaseClient, empresaId: string): Promise<ValorizacionInventario> {
   const { data: datasets, error } = await supabase.from("datasets").select("id, nombre, columnas").eq("empresa_id", empresaId);
   if (error) throw new Error(error.message);
@@ -35,12 +35,12 @@ export async function valorizacionInventario(supabase: SupabaseClient, empresaId
     const cProducto = columnaConRol(columnas, "producto");
     const cMonto = columnaConRol(columnas, "monto");
     if (!cProducto || !cMonto) continue;
-    const cFecha = columnas.find((c) => c.rol === "fecha" && c.tipo === "fecha" && claveValida(c.key));
+    const cCantidad = columnaConRol(columnas, "cantidad");
 
-    const seleccion = `producto:data->>${cProducto.key}, monto:data->>${cMonto.key}` + (cFecha ? `, fecha:data->>${cFecha.key}` : "");
+    const seleccion = `producto:data->>${cProducto.key}, monto:data->>${cMonto.key}` + (cCantidad ? `, cantidad:data->>${cCantidad.key}` : "");
     const { data: records, error: errorRecords } = await supabase.from("records").select(seleccion).eq("dataset_id", d.id);
     if (errorRecords) throw new Error(errorRecords.message);
-    mapas.push(preciosDeCompra((records ?? []) as unknown as Record<string, unknown>[], "producto", "monto", cFecha ? "fecha" : undefined));
+    mapas.push(preciosDeCompra((records ?? []) as unknown as Record<string, unknown>[], "producto", "monto", cCantidad ? "cantidad" : undefined));
   }
   const precios = combinarPrecios(mapas);
 

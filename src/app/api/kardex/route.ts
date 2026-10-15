@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { crearClienteServidor } from "@/lib/supabase/server";
 import { empresaDelUsuarioServidor } from "@/lib/sesionServidor";
+import { esVendedor, rolEnEmpresa } from "@/lib/permisos";
 
 // Historial de movimientos de UN producto en un módulo de Stock (venta, compra
 // o ajuste manual, cada uno con el saldo resultante) -- ver migracion-16 y
@@ -10,6 +11,9 @@ export async function GET(req: NextRequest) {
   const supabase = await crearClienteServidor();
   const sesion = await empresaDelUsuarioServidor(supabase);
   if (!sesion.ok) return NextResponse.json({ error: sesion.error }, { status: 401 });
+  if (esVendedor(rolEnEmpresa(sesion.empresas, sesion.empresaId))) {
+    return NextResponse.json({ error: "Tu rol no tiene acceso a esto" }, { status: 403 });
+  }
 
   const datasetId = req.nextUrl.searchParams.get("datasetId");
   const producto = req.nextUrl.searchParams.get("producto");

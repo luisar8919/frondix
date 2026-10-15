@@ -178,6 +178,13 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Faltan datos: archivo o empresaId" }, { status: 400 });
   }
 
+  // Subir/crear módulos es tarea de dueño/admin/miembro -- un vendedor no
+  // puede crear ni reestructurar módulos, solo registrar ventas.
+  const { data: miMembresia } = await supabase.from("miembros").select("rol").eq("empresa_id", empresaId).eq("user_id", user.id).single();
+  if (miMembresia?.rol === "vendedor") {
+    return NextResponse.json({ error: "Tu rol no tiene acceso a esto" }, { status: 403 });
+  }
+
   let grupos, hojasOmitidas;
   try {
     const buffer = await archivo.arrayBuffer();
@@ -306,7 +313,7 @@ export async function POST(request: NextRequest) {
     infosBase
       .filter((i) => i.cProducto && i.cMonto && (i.division || i.tipo === "compras"))
       .map((i) =>
-        preciosDeCompra(i.division ? i.division!.compras : i.grupo.filas, i.cProducto!.key, i.cMonto!.key, i.cFecha?.key)
+        preciosDeCompra(i.division ? i.division!.compras : i.grupo.filas, i.cProducto!.key, i.cMonto!.key, i.cCantidad?.key)
       )
   );
 
@@ -320,7 +327,7 @@ export async function POST(request: NextRequest) {
     if (!info.sel?.separar || info.cTipo || !info.cMonto || !info.cCosto) return { ...info, separacion: undefined };
 
     if (info.cProducto) {
-      const preciosDeEstaHoja = preciosDeCompra(info.grupo.filas, info.cProducto.key, info.cCosto.key, info.cFecha?.key);
+      const preciosDeEstaHoja = preciosDeCompra(info.grupo.filas, info.cProducto.key, info.cCosto.key, info.cCantidad?.key);
       const combinados = combinarPrecios([preciosConocidos, preciosDeEstaHoja]);
       completarCostos(info.grupo.filas, combinados, info.cProducto.key, info.cCosto.key);
     }
@@ -342,7 +349,7 @@ export async function POST(request: NextRequest) {
   // el costo de los módulos de Ventas normales más abajo.
   const mapasPrecios: Map<string, PrecioCompra>[] = [preciosConocidos];
   for (const info of infos) {
-    if (info.separacion) mapasPrecios.push(preciosDeCompra(info.separacion.compras, "producto", "monto", "fecha"));
+    if (info.separacion) mapasPrecios.push(preciosDeCompra(info.separacion.compras, "producto", "monto", "cantidad"));
   }
   const preciosGlobal = combinarPrecios(mapasPrecios);
 

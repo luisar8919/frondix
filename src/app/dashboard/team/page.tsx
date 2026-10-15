@@ -5,7 +5,7 @@ import Link from "next/link";
 import { crearClienteBrowser } from "@/lib/supabase/client";
 import { empresaDelUsuario } from "@/lib/sesion";
 
-const ETIQUETA_ROL: Record<string, string> = { dueno: "Dueño", admin: "Administrador", miembro: "Miembro" };
+const ETIQUETA_ROL: Record<string, string> = { dueno: "Dueño", admin: "Administrador", miembro: "Miembro", vendedor: "Vendedor" };
 
 interface Miembro {
   userId: string;
@@ -15,7 +15,7 @@ interface Miembro {
 
 export default function TeamPage() {
   const [email, setEmail] = useState("");
-  const [rol, setRol] = useState<"admin" | "miembro">("miembro");
+  const [rol, setRol] = useState<"admin" | "miembro" | "vendedor">("miembro");
   const [mensaje, setMensaje] = useState<{ tipo: "ok" | "aviso" | "error"; texto: string } | null>(null);
   const [enviando, setEnviando] = useState(false);
 
@@ -117,9 +117,10 @@ export default function TeamPage() {
         </div>
         <div className="campo">
           <label htmlFor="rol">Qué puede hacer</label>
-          <select id="rol" value={rol} onChange={(e) => setRol(e.target.value as "admin" | "miembro")}>
+          <select id="rol" value={rol} onChange={(e) => setRol(e.target.value as "admin" | "miembro" | "vendedor")}>
             <option value="miembro">Miembro: carga y ve datos</option>
             <option value="admin">Admin: además puede invitar gente</option>
+            <option value="vendedor">Vendedor: solo registra ventas y ve stock, sin costos ni reportes</option>
           </select>
         </div>
 
@@ -155,6 +156,7 @@ export default function TeamPage() {
               >
                 <option value="miembro">Miembro</option>
                 <option value="admin">Admin</option>
+                <option value="vendedor">Vendedor</option>
               </select>
             ) : (
               <span className="suave pequeno">{ETIQUETA_ROL[m.rol] ?? m.rol}</span>

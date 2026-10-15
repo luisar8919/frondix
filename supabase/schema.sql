@@ -13,7 +13,7 @@ create table miembros (
   id uuid primary key default gen_random_uuid(),
   empresa_id uuid not null references empresas(id) on delete cascade,
   user_id uuid not null references auth.users(id) on delete cascade,
-  rol text not null default 'miembro' check (rol in ('dueno', 'admin', 'miembro')),
+  rol text not null default 'miembro' check (rol in ('dueno', 'admin', 'miembro', 'vendedor')), -- vendedor: migracion 17
   created_at timestamptz not null default now(),
   unique (empresa_id, user_id)
 );

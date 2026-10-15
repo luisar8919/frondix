@@ -12,6 +12,8 @@ import type { Columna } from "@/lib/excel-parser";
 import { filtrarRegistros } from "@/lib/buscar";
 import { filtrarPorColumna, relacionesEntrantes, type DatasetResumen } from "@/lib/enlaces";
 import { esStock } from "@/lib/stock";
+import { crearClienteBrowser } from "@/lib/supabase/client";
+import { empresaDelUsuario } from "@/lib/sesion";
 
 interface Registro {
   id: string;
@@ -49,6 +51,14 @@ export default function DatasetPage({
   // Para el botón "Deshacer" de la edición rápida por doble clic (ver guardarCelda):
   // guarda el valor de ANTES del último cambio, para poder volver a escribirlo.
   const [ultimoCambio, setUltimoCambio] = useState<{ registroId: string; columnaKey: string; columnaLabel: string; valorAnterior: unknown } | null>(null);
+  const [esVendedor, setEsVendedor] = useState(false);
+
+  useEffect(() => {
+    (async () => {
+      const sesion = await empresaDelUsuario(crearClienteBrowser());
+      if (sesion.ok) setEsVendedor(sesion.empresas.find((e) => e.empresaId === sesion.empresaId)?.rol === "vendedor");
+    })();
+  }, []);
 
   async function cargar() {
     let acumulados: Registro[] = [];
@@ -135,7 +145,14 @@ export default function DatasetPage({
   async function guardarCelda(r: Registro, columna: Columna, nuevoValor: unknown, guardarUndo = true): Promise<string | null> {
     const valorAnterior = r.data[columna.key];
     const datos = { ...r.data, [columna.key]: nuevoValor };
-    const res = await enviarConfirmando(`/api/records/${datasetId}/${r.id}`, "PATCH", { data: datos });
+    // Corregir la cantidad a mano en un módulo de Stock queda como "ajuste" en
+    // el Kardex (ver registrarAjusteManual) -- se pide el motivo acá, antes de
+    // guardar, para que ese ajuste no quede sin explicación.
+    let motivo: string | undefined;
+    if (guardarUndo && dataset && esStock(dataset.columnas) && columna.key === "cantidad" && valorAnterior !== nuevoValor) {
+      motivo = window.prompt(`¿Por qué cambia la cantidad de "${r.data[dataset.columnas.find((c) => c.rol === "producto")?.key ?? ""] ?? "este producto"}"? (opcional)`) ?? undefined;
+    }
+    const res = await enviarConfirmando(`/api/records/${datasetId}/${r.id}`, "PATCH", { data: datos, ...(motivo ? { motivo } : {}) });
     if (res.cancelado) return null;
     if (!res.ok) return res.body.error ?? "No se pudo guardar el cambio";
     setRegistros((rs) => rs.map((x) => (x.id === res.body.record.id ? { ...x, data: res.body.record.data, updated_by: res.body.record.updated_by, updated_at: res.body.record.updated_at } : x)));
@@ -218,9 +235,11 @@ export default function DatasetPage({
             {cargando && registros.length < total ? ` (cargando ${registros.length.toLocaleString("es-PE")}...)` : ""}
           </p>
         </div>
-        <div className="acciones">
-          <a href={`/api/export/${datasetId}`} className="btn btn-secundario">Descargar Excel</a>
-        </div>
+        {!esVendedor && (
+          <div className="acciones">
+            <a href={`/api/export/${datasetId}`} className="btn btn-secundario">Descargar Excel</a>
+          </div>
+        )}
       </div>
 
       {incompleta && !cargando && (
@@ -258,21 +277,25 @@ export default function DatasetPage({
         </div>
       )}
 
-      <EditarTabla
-        key={dataset.columnas.map((c) => c.key + c.label).join("|") + dataset.nombre}
-        datasetId={datasetId}
-        nombre={dataset.nombre}
-        columnas={dataset.columnas}
-        incluyeIgv={!!dataset.incluye_igv}
-        onGuardado={cargar}
-      />
-      <EnlacesTabla datasetId={datasetId} columnas={dataset.columnas} otras={otras} onGuardado={cargar} />
+      {!esVendedor && (
+        <>
+          <EditarTabla
+            key={dataset.columnas.map((c) => c.key + c.label).join("|") + dataset.nombre}
+            datasetId={datasetId}
+            nombre={dataset.nombre}
+            columnas={dataset.columnas}
+            incluyeIgv={!!dataset.incluye_igv}
+            onGuardado={cargar}
+          />
+          <EnlacesTabla datasetId={datasetId} columnas={dataset.columnas} otras={otras} onGuardado={cargar} />
 
-      {esStock(dataset.columnas) && (() => {
-        const cProducto = dataset.columnas.find((c) => c.rol === "producto")!;
-        const productos = [...new Set(registros.map((r) => r.data[cProducto.key]?.toString().trim()).filter((p): p is string => !!p))].sort((a, b) => a.localeCompare(b, "es"));
-        return <KardexProducto datasetId={datasetId} productos={productos} />;
-      })()}
+          {esStock(dataset.columnas) && (() => {
+            const cProducto = dataset.columnas.find((c) => c.rol === "producto")!;
+            const productos = [...new Set(registros.map((r) => r.data[cProducto.key]?.toString().trim()).filter((p): p is string => !!p))].sort((a, b) => a.localeCompare(b, "es"));
+            return <KardexProducto datasetId={datasetId} productos={productos} />;
+          })()}
+        </>
+      )}
 
       {filtrarCol && filtrarVal !== undefined && (
         <p className="alerta alerta-ok">

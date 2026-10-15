@@ -1,5 +1,7 @@
 import { redirect } from "next/navigation";
 import { crearClienteServidor } from "@/lib/supabase/server";
+import { empresaDelUsuarioServidor } from "@/lib/sesionServidor";
+import { rolEnEmpresa } from "@/lib/permisos";
 import BarraPanel from "@/components/BarraPanel";
 
 // Protege todo /dashboard sin depender del middleware (que Azure Static Web Apps
@@ -10,9 +12,12 @@ export default async function DashboardLayout({ children }: { children: React.Re
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
+  const sesion = await empresaDelUsuarioServidor(supabase);
+  const rol = sesion.ok ? rolEnEmpresa(sesion.empresas, sesion.empresaId) : undefined;
+
   return (
     <>
-      <BarraPanel />
+      <BarraPanel rol={rol} />
       <main className="contenedor panel">{children}</main>
     </>
   );

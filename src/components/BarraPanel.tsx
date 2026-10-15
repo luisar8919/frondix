@@ -29,7 +29,8 @@ const itemsMenu = [
   { href: "/dashboard/billing", texto: "Plan y pagos" },
 ];
 
-export default function BarraPanel() {
+export default function BarraPanel({ rol }: { rol?: string }) {
+  const esVendedor = rol === "vendedor";
   const ruta = usePathname();
   const router = useRouter();
   const [menuAbierto, setMenuAbierto] = useState(false);
@@ -83,24 +84,26 @@ export default function BarraPanel() {
       <div className="contenedor barra-fila">
         <Logo href="/dashboard" />
         <nav className="nav-panel" aria-label="Panel" ref={reportesRef}>
-          {enlaces.slice(0, 2).map((e) => (
+          {enlaces.slice(0, 2).filter((e) => !esVendedor || e.href !== "/dashboard/upload").map((e) => (
             <Link key={e.href} href={e.href} className="nav-link" aria-current={activo(e.href) ? "page" : undefined}>
               {e.texto}
             </Link>
           ))}
-          <button
-            ref={reportesBotonRef}
-            type="button"
-            className="nav-link"
-            style={{ background: "transparent", border: "none", cursor: "pointer", fontFamily: "inherit" }}
-            aria-haspopup="menu"
-            aria-expanded={reportesAbierto}
-            aria-current={activoReportes ? "page" : undefined}
-            onClick={alClickReportes}
-          >
-            Reportes
-          </button>
-          {enlaces.slice(2).map((e) => (
+          {!esVendedor && (
+            <button
+              ref={reportesBotonRef}
+              type="button"
+              className="nav-link"
+              style={{ background: "transparent", border: "none", cursor: "pointer", fontFamily: "inherit" }}
+              aria-haspopup="menu"
+              aria-expanded={reportesAbierto}
+              aria-current={activoReportes ? "page" : undefined}
+              onClick={alClickReportes}
+            >
+              Reportes
+            </button>
+          )}
+          {enlaces.slice(2).filter((e) => !esVendedor || (e.href !== "/dashboard/seguimiento" && e.href !== "/dashboard/team")).map((e) => (
             <Link key={e.href} href={e.href} className="nav-link" aria-current={activo(e.href) ? "page" : undefined}>
               {e.texto}
             </Link>

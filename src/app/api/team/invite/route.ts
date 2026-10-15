@@ -13,8 +13,8 @@ export async function POST(req: NextRequest) {
   if (!user) return NextResponse.json({ error: "No autenticado" }, { status: 401 });
 
   const { empresaId, email, rol } = await req.json();
-  if (!empresaId || !email || !["admin", "miembro"].includes(rol)) {
-    return NextResponse.json({ error: "Faltan datos: empresaId, email, rol (admin|miembro)" }, { status: 400 });
+  if (!empresaId || !email || !["admin", "miembro", "vendedor"].includes(rol)) {
+    return NextResponse.json({ error: "Faltan datos: empresaId, email, rol (admin|miembro|vendedor)" }, { status: 400 });
   }
 
   const { data: miMembresia } = await supabase
