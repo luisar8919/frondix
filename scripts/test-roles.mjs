@@ -44,6 +44,22 @@ const stock = sugerirRoles([
 assert.strictEqual(stock.stock, "stock");
 assert.strictEqual(stock.stock_minimo, "stock_minimo", "'Stock mínimo' no cae en el rol 'stock' genérico");
 
+// RUC/DNI, dirección y correo: "del cliente" no debe caer en cliente (mismo
+// criterio que telefono), ni correo en otro lado por el patrón ancho de cliente.
+const contacto = sugerirRoles([
+  { key: "nombre", label: "Nombre", tipo: "texto" },
+  { key: "ruc_cliente", label: "RUC del cliente", tipo: "texto" },
+  { key: "direccion_cliente", label: "Dirección del cliente", tipo: "texto" },
+  { key: "correo", label: "Correo electrónico", tipo: "texto" },
+  { key: "saldo", label: "Saldo pendiente", tipo: "numero" },
+]);
+assert.strictEqual(contacto.nombre, "cliente");
+assert.strictEqual(contacto.ruc_cliente, "documento");
+assert.strictEqual(contacto.direccion_cliente, "direccion");
+assert.strictEqual(contacto.correo, "correo");
+assert.strictEqual(contacto.saldo, "saldo_pendiente");
+assert.strictEqual(admiteNegativos("saldo_pendiente"), false, "un saldo por cobrar no puede ser negativo");
+
 // Compras: "proveedor" se reconoce, y no se cruza con cliente aunque ambos
 // patrones incluyan "nombre" (proveedor va primero en las reglas)
 const compras = sugerirRoles([

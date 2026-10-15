@@ -14,9 +14,12 @@ interface TablaApi {
   resumen: { actual: number; anterior: number; registrosActual: number; variacion: number | null } | null;
 }
 interface Respuesta { negocio: string; plan: "activo" | "gratis"; dias: number; contactosDisponibles: boolean; tablas: TablaApi[] }
+interface MovimientoCliente { datasetNombre: string; fecha: string | null; producto: string | null; monto: number | null }
+interface HistorialApi { nombre: string; movimientos: MovimientoCliente[]; totalGastado: number; cantidadCompras: number }
 
 const CLAVE_PLANTILLA = "frondix_plantilla_seguimiento";
 const soles = (n: number) => `S/ ${n.toLocaleString("es-PE", { maximumFractionDigits: 2 })}`;
+const soles0 = (n: number | null) => (n === null ? "-" : soles(n));
 
 export default function SeguimientoPage() {
   const [dias, setDias] = useState(30);
@@ -26,6 +29,9 @@ export default function SeguimientoPage() {
   const [error, setError] = useState("");
   const [cargando, setCargando] = useState(true);
   const [escritos, setEscritos] = useState<Set<string>>(new Set()); // marcados en esta sesión
+  const [historialAbierto, setHistorialAbierto] = useState<string | null>(null);
+  const [historial, setHistorial] = useState<HistorialApi | null>(null);
+  const [cargandoHistorial, setCargandoHistorial] = useState(false);
 
   useEffect(() => {
     try { setPlantilla(localStorage.getItem(CLAVE_PLANTILLA) || PLANTILLA_POR_DEFECTO); } catch { /* sin almacenamiento */ }
@@ -56,6 +62,17 @@ export default function SeguimientoPage() {
     });
     if (res.ok) setEscritos((s) => new Set(s).add(`${datasetId}|${c.clave}`));
     else if (res.status !== 503) setError((await res.json()).error ?? "No se pudo anotar el contacto");
+  }
+
+  async function alternarHistorial(clave: string, nombre: string) {
+    if (historialAbierto === clave) return setHistorialAbierto(null);
+    setHistorialAbierto(clave);
+    setHistorial(null);
+    setCargandoHistorial(true);
+    const res = await fetch(`/api/clientes/historial?nombre=${encodeURIComponent(nombre)}`);
+    const body = await res.json();
+    setCargandoHistorial(false);
+    if (res.ok) setHistorial(body);
   }
 
   const activo = datos?.plan === "activo";
@@ -142,22 +159,52 @@ export default function SeguimientoPage() {
                   const ya = escritos.has(`${t.datasetId}|${c.clave}`) ||
                     (c.contactadoHaceDias !== null && c.contactadoHaceDias < t.seguimiento!.diasSinInsistir);
                   const mensaje = armarMensaje(plantilla, { nombre: c.nombre, negocio, dias: c.dias });
+                  const claveHistorial = `${t.datasetId}|${c.clave}`;
                   return (
-                    <li key={c.clave} style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap", padding: "10px 0", borderTop: "1px solid var(--linea)" }}>
-                      <span style={{ flex: 1, minWidth: 160 }}>
-                        <strong>{c.nombre}</strong><br />
-                        <span className="suave">Última visita hace {c.dias} días · {c.visitas} {c.visitas === 1 ? "visita" : "visitas"}</span>
-                      </span>
-                      {activo && (ya ? (
-                        <span className="insignia">Ya le escribiste</span>
-                      ) : c.telefono ? (
-                        <>
-                          <a className="btn btn-primario" href={enlaceWhatsApp(c.telefono, mensaje)} target="_blank" rel="noopener noreferrer">WhatsApp</a>
-                          <button type="button" className="btn btn-fantasma" onClick={() => marcarEscrito(t.datasetId, c, mensaje)}>Ya le escribí</button>
-                        </>
-                      ) : (
-                        <span className="suave">Sin teléfono válido</span>
-                      ))}
+                    <li key={c.clave} style={{ padding: "10px 0", borderTop: "1px solid var(--linea)" }}>
+                      <div style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
+                        <span style={{ flex: 1, minWidth: 160 }}>
+                          <strong>{c.nombre}</strong><br />
+                          <span className="suave">Última visita hace {c.dias} días · {c.visitas} {c.visitas === 1 ? "visita" : "visitas"}</span>
+                        </span>
+                        <button type="button" className="btn btn-fantasma" onClick={() => alternarHistorial(claveHistorial, c.nombre)}>
+                          {historialAbierto === claveHistorial ? "Ocultar historial" : "Ver historial"}
+                        </button>
+                        {activo && (ya ? (
+                          <span className="insignia">Ya le escribiste</span>
+                        ) : c.telefono ? (
+                          <>
+                            <a className="btn btn-primario" href={enlaceWhatsApp(c.telefono, mensaje)} target="_blank" rel="noopener noreferrer">WhatsApp</a>
+                            <button type="button" className="btn btn-fantasma" onClick={() => marcarEscrito(t.datasetId, c, mensaje)}>Ya le escribí</button>
+                          </>
+                        ) : (
+                          <span className="suave">Sin teléfono válido</span>
+                        ))}
+                      </div>
+                      {historialAbierto === claveHistorial && (
+                        <div style={{ marginTop: 10, padding: 12, background: "var(--verde-50)", borderRadius: 8 }}>
+                          {cargandoHistorial && <p className="suave pequeno">Cargando...</p>}
+                          {!cargandoHistorial && historial && historial.movimientos.length === 0 && (
+                            <p className="suave pequeno">No se encontraron compras de este cliente.</p>
+                          )}
+                          {!cargandoHistorial && historial && historial.movimientos.length > 0 && (
+                            <>
+                              <p className="pequeno" style={{ margin: "0 0 8px" }}>
+                                <strong>{historial.cantidadCompras}</strong> {historial.cantidadCompras === 1 ? "compra" : "compras"} ·{" "}
+                                total <strong>{soles(historial.totalGastado)}</strong>
+                              </p>
+                              <ul style={{ listStyle: "none", padding: 0, margin: 0 }}>
+                                {historial.movimientos.map((m, i) => (
+                                  <li key={i} className="pequeno" style={{ padding: "4px 0", borderTop: i > 0 ? "1px solid var(--linea)" : "none" }}>
+                                    {m.fecha ?? "Sin fecha"} · {m.producto ?? "Producto sin especificar"} · {soles0(m.monto)}{" "}
+                                    <span className="suave">({m.datasetNombre})</span>
+                                  </li>
+                                ))}
+                              </ul>
+                            </>
+                          )}
+                        </div>
+                      )}
                     </li>
                   );
                 })}

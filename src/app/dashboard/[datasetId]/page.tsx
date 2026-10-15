@@ -216,6 +216,9 @@ export default function DatasetPage({
             {cargando && registros.length < total ? ` (cargando ${registros.length.toLocaleString("es-PE")}...)` : ""}
           </p>
         </div>
+        <div className="acciones">
+          <a href={`/api/export/${datasetId}`} className="btn btn-secundario">Descargar Excel</a>
+        </div>
       </div>
 
       {incompleta && !cargando && (

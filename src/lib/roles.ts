@@ -1,6 +1,6 @@
 // "Rol" = qué significa una columna para el negocio (no solo su tipo de dato).
 // El asistente lo necesita para saber, por ejemplo, cuál es el monto de una venta.
-export type RolColumna = "monto" | "fecha" | "cliente" | "producto" | "telefono" | "costo" | "proveedor" | "gastos" | "tipo_movimiento" | "stock" | "cantidad" | "stock_minimo";
+export type RolColumna = "monto" | "fecha" | "cliente" | "producto" | "telefono" | "costo" | "proveedor" | "gastos" | "tipo_movimiento" | "stock" | "cantidad" | "stock_minimo" | "documento" | "direccion" | "correo" | "saldo_pendiente";
 
 export const ROLES: { valor: RolColumna; etiqueta: string }[] = [
   { valor: "monto", etiqueta: "Monto (importe de la venta o movimiento)" },
@@ -12,9 +12,13 @@ export const ROLES: { valor: RolColumna; etiqueta: string }[] = [
   { valor: "proveedor", etiqueta: "Proveedor (a quién le compras)" },
   { valor: "producto", etiqueta: "Producto o concepto" },
   { valor: "telefono", etiqueta: "Teléfono (para WhatsApp)" },
+  { valor: "documento", etiqueta: "RUC / DNI" },
+  { valor: "direccion", etiqueta: "Dirección" },
+  { valor: "correo", etiqueta: "Correo electrónico" },
   { valor: "tipo_movimiento", etiqueta: "Tipo de movimiento (si cada fila dice si es venta o compra)" },
   { valor: "stock", etiqueta: "Stock (cuánto tienes ahora de ese producto)" },
   { valor: "stock_minimo", etiqueta: "Stock mínimo (para avisarte cuando se esté agotando)" },
+  { valor: "saldo_pendiente", etiqueta: "Saldo pendiente (venta a crédito, lo que todavía te deben)" },
 ];
 
 // El orden importa: "Teléfono del cliente" debe caer en telefono, no en cliente,
@@ -28,11 +32,18 @@ export const ROLES: { valor: RolColumna; etiqueta: string }[] = [
 // nunca por detección automática, para no competir con "costo" en Excels reales.
 const REGLAS: { rol: RolColumna; patron: RegExp; tipo?: string }[] = [
   { rol: "telefono", patron: /tel|cel|whats|movil|fono/ },
+  // documento/direccion/correo van antes que cliente/proveedor por la misma razón
+  // que telefono: "Correo del cliente" o "RUC del proveedor" deben caer en su rol
+  // específico, no en el genérico (que además matchea "nombre" muy ancho).
+  { rol: "documento", patron: /\bruc\b|\bdni\b|documento/, tipo: "texto" },
+  { rol: "direccion", patron: /direccion|domicilio/, tipo: "texto" },
+  { rol: "correo", patron: /correo|email|e-mail/, tipo: "texto" },
   { rol: "fecha", patron: /fecha|date/, tipo: "fecha" },
   { rol: "tipo_movimiento", patron: /^tipo$|tipo.*(movim|transac|registro)/, tipo: "texto" },
   { rol: "stock_minimo", patron: /stock.?min|minimo|reorden|punto.?de.?pedido/, tipo: "numero" },
   { rol: "stock", patron: /^stock$|inventario|existencia/, tipo: "numero" },
   { rol: "cantidad", patron: /^cant(idad)?\.?$|unidades|^qty$|^unid\.?$/, tipo: "numero" },
+  { rol: "saldo_pendiente", patron: /saldo|pendiente|por.?cobrar|deuda/, tipo: "numero" },
   { rol: "monto", patron: /monto|venta|importe|total|precio|ingreso|entrada/, tipo: "numero" },
   { rol: "costo", patron: /costo|gasto|egreso/, tipo: "numero" },
   { rol: "producto", patron: /producto|juego|item|articulo|descripcion|concepto|detalle/, tipo: "texto" },
@@ -101,7 +112,7 @@ export function camposObligatorios(tipo: TipoModulo): RolColumna[] {
 // un costo o una cantidad negativa es casi siempre un error de tipeo, no una
 // operación real) -- "stock" queda afuera a propósito: negativo ahí SÍ es válido
 // (se vendió algo antes de registrar que se compró, ver lib/stock.ts).
-const ROLES_SIN_NEGATIVOS = new Set<RolColumna>(["monto", "costo", "gastos", "cantidad"]);
+const ROLES_SIN_NEGATIVOS = new Set<RolColumna>(["monto", "costo", "gastos", "cantidad", "saldo_pendiente"]);
 
 export function admiteNegativos(rol: RolColumna | null | ""): boolean {
   return !rol || !ROLES_SIN_NEGATIVOS.has(rol);
