@@ -58,6 +58,33 @@ async function crearTablaMaestra(
   return { datasetId: dataset.id, columnaKey: "nombre" };
 }
 
+// Arma la tabla maestra de Clientes o Proveedores a partir de los valores
+// distintos de la columna de contraparte de un módulo YA creado, y enlaza esa
+// columna a la maestra -- mismo resultado que ya hacía el camino "separar"
+// (Monto+Costo en la misma fila), reusado acá para que los otros dos caminos
+// de importación (dividir por Tipo, y una tabla ya puramente Ventas o
+// Compras) se comporten igual. Antes de esto, SOLO el camino "separar" creaba
+// estas tablas -- el más común (dividir por Tipo, o subir Ventas/Compras ya
+// separadas) se quedaba sin ellas.
+async function crearMaestroYEnlazar(
+  supabase: SupabaseClient,
+  empresaId: string,
+  datasetId: string,
+  filas: Record<string, unknown>[],
+  claveColumna: string,
+  nombreTabla: string
+): Promise<{ datasetId: string; nombre: string; filasImportadas: number } | null> {
+  const valores = valoresDistintos(filas, claveColumna);
+  const maestro = await crearTablaMaestra(supabase, empresaId, nombreTabla, valores);
+  if (!maestro) return null;
+  const { data: ds } = await supabase.from("datasets").select("columnas").eq("id", datasetId).single();
+  if (ds) {
+    const cols = (ds.columnas as Columna[]).map((c) => (c.key === claveColumna ? { ...c, enlace: maestro } : c));
+    await supabase.from("datasets").update({ columnas: cols }).eq("id", datasetId);
+  }
+  return { datasetId: maestro.datasetId, nombre: nombreTabla, filasImportadas: valores.length };
+}
+
 // Crea el módulo Stock opcional (Producto + Cantidad, una fila por producto
 // distinto) y lo enlaza SIMÉTRICAMENTE con cada módulo que lo pidió: Stock ->
 // primer módulo (para que el formulario de Stock autocomplete con productos ya
@@ -511,6 +538,17 @@ export async function POST(request: NextRequest) {
         datasetComprasId = r.datasetId;
       }
 
+      const cClienteVentas = datasetVentasId && columnasVentas.find((c) => c.rol === "cliente");
+      if (datasetVentasId && cClienteVentas) {
+        const maestro = await crearMaestroYEnlazar(supabase, empresaId, datasetVentasId, division.ventas, cClienteVentas.key, `Clientes - ${nombreDataset}`);
+        if (maestro) creados.push({ ...maestro, hojas: [] });
+      }
+      const cProveedorCompras = datasetComprasId && columnasCompras.find((c) => c.rol === "proveedor");
+      if (datasetComprasId && cProveedorCompras) {
+        const maestro = await crearMaestroYEnlazar(supabase, empresaId, datasetComprasId, division.compras, cProveedorCompras.key, `Proveedores - ${nombreDataset}`);
+        if (maestro) creados.push({ ...maestro, hojas: [] });
+      }
+
       if (sel?.crearStock && info.cProducto) {
         const claveProducto = info.cProducto.key;
         const productos = valoresDistintos([...division.ventas, ...division.compras], claveProducto);
@@ -534,6 +572,15 @@ export async function POST(request: NextRequest) {
     const r = await crearModulo(supabase, empresaId, nombreDataset, columnasFinal, grupo.filas, avisos);
     if ("error" in r) return NextResponse.json({ error: r.error, creadosHastaAhora: creados }, { status: 500 });
     creados.push({ ...r, hojas: grupo.hojas });
+
+    // Tabla maestra de Clientes/Proveedores -- mismo criterio que en los otros
+    // dos caminos (dividir por Tipo, separar), ver crearMaestroYEnlazar.
+    const cContraparte = columnasFinal.find((c) => c.rol === "cliente" || c.rol === "proveedor");
+    if (cContraparte) {
+      const nombreTabla = `${cContraparte.rol === "cliente" ? "Clientes" : "Proveedores"} - ${nombreDataset}`;
+      const maestro = await crearMaestroYEnlazar(supabase, empresaId, r.datasetId, grupo.filas, cContraparte.key, nombreTabla);
+      if (maestro) creados.push({ ...maestro, hojas: [] });
+    }
 
     // Módulo Stock opcional: Producto (enlazado al producto de este módulo) +
     // Cantidad, una fila por cada producto distinto que aparece en lo que se

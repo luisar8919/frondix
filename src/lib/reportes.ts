@@ -52,6 +52,17 @@ export function totalesPorMes(filas: FilaMonto[], ahora: Date, meses = 6): Total
   return resultado;
 }
 
+// Recién subido un Excel, los meses anteriores al primer dato real se ven como
+// una fila de ceros sin sentido (nadie vendía "S/ 0" antes de existir el
+// negocio en Frondix) -- se recortan. Si hay un mes con datos más atrás en la
+// ventana, ESE queda como punto de partida (con los ceros intermedios o
+// posteriores a él, que sí son información real: "este mes no hubo ventas").
+// Si no hay ningún mes con datos, se deja el arreglo tal cual (nada que recortar).
+export function recortarMesesSinDatos(meses: TotalMes[]): TotalMes[] {
+  const primero = meses.findIndex((m) => m.registros > 0);
+  return primero <= 0 ? meses : meses.slice(primero);
+}
+
 // Suma simple de un monto, sin agrupar por fecha ni producto: cubre el caso "caja"
 // (ingresos/egresos por concepto, sin columna de fecha) donde totalesPorMes no aplica
 // pero igual hay un monto que el usuario quiere ver sumado.

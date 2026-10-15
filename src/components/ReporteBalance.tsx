@@ -7,6 +7,7 @@ import { crearClienteBrowser } from "@/lib/supabase/client";
 import { tieneSuscripcionActiva } from "@/lib/suscripcion";
 import { empresaDelUsuario } from "@/lib/sesion";
 import Barra from "@/components/Barra";
+import { recortarMesesSinDatos } from "@/lib/reportes";
 
 interface TotalMes { mes: string; total: number; registros: number }
 interface RankingItem { clave: string; total: number; veces: number }
@@ -299,7 +300,8 @@ export default function ReporteBalance() {
       )}
 
       {modulos?.map((m) => {
-        const maxMes = Math.max(1, ...(m.totalesPorMes?.map((x) => x.total) ?? [0]));
+        const mesesRecortados = m.totalesPorMes ? recortarMesesSinDatos(m.totalesPorMes) : null;
+        const maxMes = Math.max(1, ...(mesesRecortados?.map((x) => x.total) ?? [0]));
         return (
           <section key={m.datasetId} className="tarjeta" style={{ marginBottom: 20 }}>
             <h3>{m.nombre}</h3>
@@ -360,11 +362,11 @@ export default function ReporteBalance() {
               </div>
             )}
 
-            {m.totalesPorMes && (
+            {mesesRecortados && mesesRecortados.length > 0 && (
               <div className="tarjeta" style={{ marginTop: 14, padding: 14 }}>
-                <strong>Total por mes (últimos 6 meses)</strong>
+                <strong>Total por mes{mesesRecortados.length === 6 ? " (últimos 6 meses)" : ""}</strong>
                 <div style={{ marginTop: 10 }}>
-                  {m.totalesPorMes.map((t) => (
+                  {mesesRecortados.map((t) => (
                     <Barra key={t.mes} valor={t.total} maximo={maxMes} etiqueta={nombreMes(t.mes)} texto={soles(t.total)} />
                   ))}
                 </div>

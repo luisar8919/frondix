@@ -7,6 +7,7 @@ import DynamicForm from "@/components/DynamicForm";
 import { crearClienteBrowser } from "@/lib/supabase/client";
 import { empresaDelUsuario } from "@/lib/sesion";
 import { tipoModulo, type TipoModulo } from "@/lib/roles";
+import { recortarMesesSinDatos } from "@/lib/reportes";
 import type { Columna } from "@/lib/excel-parser";
 
 interface TotalMes { mes: string; total: number; registros: number }
@@ -178,7 +179,8 @@ export default function CategoriaMovimientos({ tipo }: { tipo: TipoModulo }) {
 
       {modulos.map((m) => {
         const r = m.reporte;
-        const maxMes = Math.max(1, ...(r?.totalesPorMes?.map((x) => x.total) ?? [0]));
+        const mesesRecortados = r?.totalesPorMes ? recortarMesesSinDatos(r.totalesPorMes) : null;
+        const maxMes = Math.max(1, ...(mesesRecortados?.map((x) => x.total) ?? [0]));
         const topContraparte = tipo === "compras" ? r?.topProveedor : r?.topCliente;
 
         return (
@@ -240,11 +242,11 @@ export default function CategoriaMovimientos({ tipo }: { tipo: TipoModulo }) {
               </div>
             )}
 
-            {r?.totalesPorMes && (
+            {mesesRecortados && mesesRecortados.length > 0 && (
               <div className="tarjeta" style={{ marginTop: 14, padding: 14 }}>
-                <strong>{tipo === "compras" ? "Gasto por mes" : "Ventas por mes"} (últimos 6 meses)</strong>
+                <strong>{tipo === "compras" ? "Gasto por mes" : "Ventas por mes"}{mesesRecortados.length === 6 ? " (últimos 6 meses)" : ""}</strong>
                 <div style={{ marginTop: 10 }}>
-                  {r.totalesPorMes.map((t) => (
+                  {mesesRecortados.map((t) => (
                     <Barra key={t.mes} valor={t.total} maximo={maxMes} etiqueta={nombreMes(t.mes)} texto={soles(t.total)} />
                   ))}
                 </div>

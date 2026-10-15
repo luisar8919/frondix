@@ -1,6 +1,6 @@
 // node scripts/test-reportes.mjs
 import assert from "node:assert";
-import { totalesPorMes, topPor, sumaMonto, flujoCaja, progresoMetas } from "../src/lib/reportes.ts";
+import { totalesPorMes, topPor, sumaMonto, flujoCaja, progresoMetas, recortarMesesSinDatos } from "../src/lib/reportes.ts";
 
 const ahora = new Date("2026-09-25T15:00:00Z"); // "hoy" para las pruebas
 
@@ -24,6 +24,23 @@ assert.deepStrictEqual(soloUnMes.map((m) => m.mes), ["2026-07", "2026-08", "2026
 assert.deepStrictEqual(soloUnMes[0], { mes: "2026-07", total: 0, registros: 0 });
 
 assert.deepStrictEqual(totalesPorMes([], ahora, 1), [{ mes: "2026-09", total: 0, registros: 0 }]);
+
+// --- recortarMesesSinDatos: recien cargado, sin meses anteriores vacios de relleno ---
+const ceroR = { total: 0, registros: 0 };
+const conR = (n) => ({ total: n, registros: 1 });
+const recortado = recortarMesesSinDatos([
+  { mes: "2026-04", ...ceroR }, { mes: "2026-05", ...ceroR }, { mes: "2026-06", ...ceroR },
+  { mes: "2026-07", ...conR(100) }, { mes: "2026-08", ...ceroR }, { mes: "2026-09", ...conR(50) },
+]);
+assert.deepStrictEqual(recortado.map((m) => m.mes), ["2026-07", "2026-08", "2026-09"], "corta antes del primer mes con datos, pero conserva ceros intermedios reales");
+
+// el primer mes YA tiene datos: no hay nada que recortar
+const sinRecorte = [{ mes: "2026-09", ...conR(50) }];
+assert.deepStrictEqual(recortarMesesSinDatos(sinRecorte), sinRecorte);
+
+// todo en cero: no hay de donde partir, se deja igual (no se inventa un recorte)
+const todoCero = [{ mes: "2026-08", ...ceroR }, { mes: "2026-09", ...ceroR }];
+assert.deepStrictEqual(recortarMesesSinDatos(todoCero), todoCero);
 
 // --- topPor ---
 const ventas = [
