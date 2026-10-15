@@ -3,6 +3,7 @@ import { claveValida } from "./enlaces.ts";
 import type { Columna } from "./excel-parser.ts";
 import { tipoModulo } from "./roles.ts";
 import { preciosDeCompra, combinarPrecios, type PrecioCompra } from "./divisor.ts";
+import { esStock } from "./stock.ts";
 
 export interface ValorizacionModulo {
   datasetId: string;
@@ -47,9 +48,9 @@ export async function valorizacionInventario(supabase: SupabaseClient, empresaId
   const modulos: ValorizacionModulo[] = [];
   for (const d of todos) {
     const columnas = d.columnas as Columna[];
-    const cCantidad = columnas.find((c) => c.key === "cantidad" && claveValida(c.key));
-    const cProducto = columnaConRol(columnas, "producto");
-    if (!cCantidad || !cProducto) continue; // no "parece" un módulo de Stock
+    if (!esStock(columnas)) continue;
+    const cCantidad = columnas.find((c) => c.key === "cantidad" && claveValida(c.key))!;
+    const cProducto = columnaConRol(columnas, "producto")!;
 
     const { data: records, error: errorRecords } = await supabase
       .from("records")

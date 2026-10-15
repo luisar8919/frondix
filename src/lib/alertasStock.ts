@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { claveValida } from "./enlaces.ts";
 import type { Columna } from "./excel-parser.ts";
+import { esStock } from "./stock.ts";
 
 export interface AlertaStock {
   datasetId: string;
@@ -40,9 +41,9 @@ export async function alertasStock(supabase: SupabaseClient, empresaId: string):
   const modulosSinConfigurar: ModuloSinConfigurar[] = [];
   for (const d of datasets ?? []) {
     const columnas = d.columnas as Columna[];
-    const cCantidad = columnas.find((c) => c.key === "cantidad" && claveValida(c.key));
-    const cProducto = columnas.find((c) => c.rol === "producto" && claveValida(c.key));
-    if (!cCantidad || !cProducto) continue; // no "parece" un módulo de Stock
+    if (!esStock(columnas)) continue;
+    const cCantidad = columnas.find((c) => c.key === "cantidad" && claveValida(c.key))!;
+    const cProducto = columnas.find((c) => c.rol === "producto" && claveValida(c.key))!;
 
     const cMinimo = columnas.find((c) => c.rol === "stock_minimo" && claveValida(c.key));
     if (!cMinimo) {

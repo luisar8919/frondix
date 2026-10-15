@@ -31,11 +31,17 @@ export async function datasetStockDe(
   return { id: stockDataset.id, claveProducto: cProducto.enlace.columnaKey };
 }
 
-// Un dataset "parece" un Stock con el mismo criterio que datasetStockDe usa para
-// reconocer el de OTRO módulo: trae columna "cantidad" (clave fija) y una
-// columna de rol Producto.
+// Un dataset "parece" un Stock si trae columna "cantidad" (clave fija) y una
+// columna de rol Producto -- Y además NO clasifica como Ventas o Compras.
+// Ese último chequeo es necesario: un módulo de Ventas o Compras casi siempre
+// tiene SU PROPIA columna de cantidad (cuántas unidades se vendieron/compraron
+// en esa fila, rol "cantidad"), que por el mismo patrón de armar keys termina
+// con key "cantidad" -- sin este chequeo, cualquier Venta/Compra con esa
+// columna se confundía con un módulo de Stock real (bug visto en vivo:
+// "Compras" aparecía en Valorización de inventario con un monto inventado).
 export function esStock(columnas: Columna[]): boolean {
-  return columnas.some((c) => c.key === "cantidad") && columnas.some((c) => c.rol === "producto");
+  const tipo = tipoModulo(columnas.map((c) => c.rol));
+  return tipo === "otro" && columnas.some((c) => c.key === "cantidad") && columnas.some((c) => c.rol === "producto");
 }
 
 // Deja registro del movimiento en el Kardex (movimientos_stock) -- "mejor
