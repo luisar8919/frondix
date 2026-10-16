@@ -1,0 +1,20 @@
+name: Push de seguimiento caducado
+
+# Revisa los clientes con seguimiento activado y manda una notificacion push
+# por cada uno que cruzo el umbral de "no volvio". Ver /api/cron/seguimiento-push.
+on:
+  schedule:
+    - cron: "0 */6 * * *"
+  workflow_dispatch: {}
+
+jobs:
+  avisar:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Llamar al cron de seguimiento
+        run: |
+          curl -s -o /dev/null -w "HTTP %{http_code}\n" --fail \
+            "https://www.frondix.com/api/cron/seguimiento-push" \
+            -H "x-cron-secret: $CRON_SECRET"
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}

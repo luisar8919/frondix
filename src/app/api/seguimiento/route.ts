@@ -70,6 +70,15 @@ export async function GET(req: NextRequest) {
     if (!ultimoContacto.has(k)) ultimoContacto.set(k, c.created_at);
   }
 
+  // Qué clientes tienen el seguimiento (push a la app) activado -- la tabla puede
+  // no existir si falta la migración 18, igual que con contactos arriba.
+  const { data: activados, error: errorActivados } = await supabase
+    .from("seguimiento_clientes")
+    .select("dataset_id, cliente_clave, activo")
+    .eq("empresa_id", empresaId);
+  const activacionDisponible = !errorActivados;
+  const activadoPorClave = new Set((activados ?? []).filter((a) => a.activo).map((a) => `${a.dataset_id}|${a.cliente_clave}`));
+
   const tablas = [];
   for (const d of datasets ?? []) {
     const columnas = d.columnas as Columna[];
@@ -109,6 +118,7 @@ export async function GET(req: NextRequest) {
           telefono: plan === "activo" ? normalizarTelefonoPE(c.telefono) : null,
           // created_at viene en UTC: se pasa a hora de Lima para que el día coincida con diasDesde
           contactadoHaceDias: ultimo ? diasDesde(new Date(Date.parse(ultimo) - 5 * 3600000).toISOString(), ahora) : null,
+          activado: activadoPorClave.has(`${d.id}|${c.clave}`),
         };
       });
       seguimiento = {
@@ -127,5 +137,5 @@ export async function GET(req: NextRequest) {
     });
   }
 
-  return NextResponse.json({ negocio, plan, dias, contactosDisponibles, tablas });
+  return NextResponse.json({ negocio, plan, dias, contactosDisponibles, activacionDisponible, tablas });
 }

@@ -3,6 +3,7 @@ import { crearClienteServidor } from "@/lib/supabase/server";
 import { empresaDelUsuarioServidor } from "@/lib/sesionServidor";
 import { rolEnEmpresa } from "@/lib/permisos";
 import BarraPanel from "@/components/BarraPanel";
+import RegistrarPush from "@/components/RegistrarPush";
 
 // Protege todo /dashboard sin depender del middleware (que Azure Static Web Apps
 // no ejecuta). Las páginas que leen datos del servidor validan la sesión además
@@ -17,6 +18,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
 
   return (
     <>
+      <RegistrarPush />
       <BarraPanel rol={rol} />
       <main className="contenedor panel">{children}</main>
     </>

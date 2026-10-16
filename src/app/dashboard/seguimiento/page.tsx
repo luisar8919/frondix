@@ -6,14 +6,14 @@ import { PLANTILLA_POR_DEFECTO, PLANTILLAS, armarMensaje, enlaceWhatsApp } from 
 
 interface ClienteApi {
   clave: string; nombre: string; ultimaFecha: string; dias: number; visitas: number;
-  telefono: string | null; contactadoHaceDias: number | null;
+  telefono: string | null; contactadoHaceDias: number | null; activado: boolean;
 }
 interface TablaApi {
   datasetId: string; nombre: string;
   seguimiento: { totalSinVolver: number; clientes: ClienteApi[]; tieneTelefono: boolean; diasSinInsistir: number } | null;
   resumen: { actual: number; anterior: number; registrosActual: number; variacion: number | null } | null;
 }
-interface Respuesta { negocio: string; plan: "activo" | "gratis"; dias: number; contactosDisponibles: boolean; tablas: TablaApi[] }
+interface Respuesta { negocio: string; plan: "activo" | "gratis"; dias: number; contactosDisponibles: boolean; activacionDisponible: boolean; tablas: TablaApi[] }
 interface MovimientoCliente { datasetNombre: string; fecha: string | null; producto: string | null; monto: number | null }
 interface HistorialApi { nombre: string; movimientos: MovimientoCliente[]; totalGastado: number; cantidadCompras: number }
 
@@ -62,6 +62,28 @@ export default function SeguimientoPage() {
     });
     if (res.ok) setEscritos((s) => new Set(s).add(`${datasetId}|${c.clave}`));
     else if (res.status !== 503) setError((await res.json()).error ?? "No se pudo anotar el contacto");
+  }
+
+  async function alternarActivacion(t: TablaApi, c: ClienteApi) {
+    const nuevoValor = !c.activado;
+    // Optimista: se ve al toque, se revierte si falla.
+    setDatos((d) => d && {
+      ...d,
+      tablas: d.tablas.map((x) => x.datasetId !== t.datasetId || !x.seguimiento ? x : {
+        ...x,
+        seguimiento: { ...x.seguimiento, clientes: x.seguimiento.clientes.map((y) => y.clave === c.clave ? { ...y, activado: nuevoValor } : y) },
+      }),
+    });
+    const res = await fetch("/api/seguimiento/activar", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ datasetId: t.datasetId, nombre: c.nombre, activo: nuevoValor }),
+    });
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      setError(body.error ?? "No se pudo cambiar el seguimiento");
+      cargar(diasAplicados); // revierte trayendo el estado real
+    }
   }
 
   async function alternarHistorial(clave: string, nombre: string) {
@@ -170,6 +192,12 @@ export default function SeguimientoPage() {
                         <button type="button" className="btn btn-fantasma" onClick={() => alternarHistorial(claveHistorial, c.nombre)}>
                           {historialAbierto === claveHistorial ? "Ocultar historial" : "Ver historial"}
                         </button>
+                        {datos.activacionDisponible && (
+                          <label className="suave pequeno" style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer" }}>
+                            <input type="checkbox" checked={c.activado} onChange={() => alternarActivacion(t, c)} />
+                            Avisarme en la app si no vuelve
+                          </label>
+                        )}
                         {activo && (ya ? (
                           <span className="insignia">Ya le escribiste</span>
                         ) : c.telefono ? (

@@ -239,3 +239,36 @@ create policy "ver movimientos de stock de mi empresa" on movimientos_stock for 
   using (empresa_id in (select public.mis_empresas()));
 create policy "crear movimientos de stock en mi empresa" on movimientos_stock for insert
   with check (empresa_id in (select public.mis_empresas()) and created_by = auth.uid());
+
+-- Notificaciones push de Seguimiento caducado (migracion 18). Ver src/lib/push.ts.
+create table push_tokens (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users(id) on delete cascade,
+  token text not null,
+  created_at timestamptz not null default now(),
+  unique (user_id, token)
+);
+alter table push_tokens enable row level security;
+create policy "ver mis tokens de push" on push_tokens for select using (user_id = auth.uid());
+create policy "crear mis tokens de push" on push_tokens for insert with check (user_id = auth.uid());
+create policy "borrar mis tokens de push" on push_tokens for delete using (user_id = auth.uid());
+
+create table seguimiento_clientes (
+  id uuid primary key default gen_random_uuid(),
+  empresa_id uuid not null references empresas(id) on delete cascade,
+  dataset_id uuid not null references datasets(id) on delete cascade,
+  cliente_clave text not null,
+  cliente_nombre text not null,
+  activo boolean not null default true,
+  ultima_fecha_cliente text,
+  notificado_en timestamptz,
+  created_at timestamptz not null default now(),
+  unique (dataset_id, cliente_clave)
+);
+alter table seguimiento_clientes enable row level security;
+create policy "ver seguimiento activado de mi empresa" on seguimiento_clientes for select
+  using (empresa_id in (select public.mis_empresas()));
+create policy "activar seguimiento en mi empresa" on seguimiento_clientes for insert
+  with check (empresa_id in (select public.mis_empresas()));
+create policy "editar seguimiento de mi empresa" on seguimiento_clientes for update
+  using (empresa_id in (select public.mis_empresas()));

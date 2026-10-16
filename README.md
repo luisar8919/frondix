@@ -49,6 +49,8 @@ recordatorios por WhatsApp Cloud API.
    - `WHATSAPP_VERIFY_TOKEN` — cualquier texto secreto que tú inventes, se usa solo para que Meta confirme el webhook.
    - `ANTHROPIC_API_KEY` — en console.anthropic.com > API Keys. Solo hace falta para "Sugerir con IA" en el asistente de Crear módulos (estructura de Excel muy desordenada); sin ella, esa función avisa que falta configurarla y todo lo demás sigue funcionando.
    - `GEMINI_API_KEY` — en aistudio.google.com > Get API key. Solo hace falta para "Generar highlights" en Reportes; sin ella, esa función devuelve error 503 pero el resto de la app sigue funcionando. Ojo: el nivel gratuito de Gemini permite que Google use lo que le mandes para mejorar sus productos (el nivel de pago no) — como a la IA solo se le manda el resumen ya calculado (totales, no datos crudos de clientes), el riesgo es bajo, pero si crece el uso conviene pasar a nivel de pago.
+   - `FIREBASE_PROJECT_ID` / `FIREBASE_CLIENT_EMAIL` / `FIREBASE_PRIVATE_KEY` — en Firebase Console > Configuración del proyecto > Cuentas de servicio > Generar nueva clave privada. Habilita las notificaciones push a la app móvil (avisa cuando un cliente con seguimiento activado no vuelve a comprar); sin ellas, el checkbox "Avisarme en la app" sigue guardándose pero no sale ninguna notificación.
+   - `CRON_SECRET` — cualquier texto secreto que tú inventes. Lo usa `.github/workflows/seguimiento-push.yml` (configúralo también como secret de ese repo en GitHub) para autorizar la llamada a `/api/cron/seguimiento-push` cada 6 horas.
 
 3. **Instalar y correr**:
    ```

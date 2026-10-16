@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "544142995937",
+    "project_id": "frondix-adad7",
+    "storage_bucket": "frondix-adad7.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:544142995937:android:fa8aaf5bec0a362d2f62a0",
+        "android_client_info": {
+          "package_name": "com.frondix.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBhuP3RaKiBxqfEWtpOy-_hYodtDzdwhK4"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
