@@ -12,7 +12,20 @@
           "package_name": "com.frondix.app"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "544142995937-th6tm8thop35cabuab294lldpv0s4knl.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.frondix.app",
+            "certificate_hash": "4a6fd7feeedb64030094c6f22e1c89b7d6a67d10"
+          }
+        },
+        {
+          "client_id": "544142995937-h57btf87ihsk7brl71njnno3okctbq50.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyBhuP3RaKiBxqfEWtpOy-_hYodtDzdwhK4"
@@ -20,7 +33,12 @@
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "544142995937-h57btf87ihsk7brl71njnno3okctbq50.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
         }
       }
     }

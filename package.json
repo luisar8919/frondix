@@ -9,11 +9,16 @@
     "enviar-resumen": "node scripts/enviar-resumen-semanal.mjs"
   },
   "dependencies": {
+    "@capacitor-firebase/authentication": "^8.5.2",
     "@capacitor/android": "^8.5.3",
+    "@capacitor/app": "^8.1.2",
     "@capacitor/core": "^8.5.3",
     "@capacitor/push-notifications": "^8.1.3",
+    "@capacitor/splash-screen": "^8.0.2",
+    "@capacitor/status-bar": "^8.0.4",
     "@supabase/ssr": "^0.12.7",
     "@supabase/supabase-js": "^2.117.3",
+    "firebase": "^12.19.0",
     "firebase-admin": "^14.5.0",
     "next": "^15.0.0",
     "react": "^18.3.0",

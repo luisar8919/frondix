@@ -3,6 +3,8 @@
 import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
+import { Capacitor } from "@capacitor/core";
+import { FirebaseAuthentication } from "@capacitor-firebase/authentication";
 import { crearClienteBrowser } from "@/lib/supabase/client";
 import Logo from "@/components/Logo";
 
@@ -52,6 +54,27 @@ function LoginForm() {
 
   async function conGoogle() {
     const supabase = crearClienteBrowser();
+
+    // Dentro de la app: Credential Manager de Android muestra las cuentas de
+    // Google que ya están en el teléfono (sin abrir accounts.google.com en la
+    // WebView). El idToken que devuelve se intercambia directo con Supabase.
+    if (Capacitor.isNativePlatform()) {
+      setError(null);
+      setEnviando(true);
+      try {
+        const resultado = await FirebaseAuthentication.signInWithGoogle();
+        const idToken = resultado.credential?.idToken;
+        if (!idToken) throw new Error("Google no devolvió credencial");
+        const { error } = await supabase.auth.signInWithIdToken({ provider: "google", token: idToken });
+        if (error) throw error;
+        window.location.href = "/dashboard";
+      } catch (e) {
+        setEnviando(false);
+        setError(`Google: ${e instanceof Error ? e.message : "no se pudo iniciar sesión"}`);
+      }
+      return;
+    }
+
     await supabase.auth.signInWithOAuth({
       provider: "google",
       options: { redirectTo: `${window.location.origin}/auth/callback` },

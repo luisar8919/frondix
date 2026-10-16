@@ -19,6 +19,22 @@ const config: CapacitorConfig = {
   android: {
     backgroundColor: "#faf8f3",
   },
+  plugins: {
+    FirebaseAuthentication: {
+      // Solo queremos el idToken para pasárselo a Supabase (signInWithIdToken)
+      // -- sin esto el plugin además abre una sesión de Firebase Auth propia,
+      // que no usamos para nada (la sesión real es la de Supabase).
+      skipNativeAuth: true,
+      providers: ["google.com"],
+    },
+    SplashScreen: {
+      // Se oculta a mano desde ShellNativo recien cuando la pagina remota
+      // termino de cargar -- si no, desaparece apenas arranca la Activity,
+      // mucho antes de que la WebView termine de traer frondix.com.
+      launchAutoHide: false,
+      backgroundColor: "#faf8f3",
+    },
+  },
 };
 
 export default config;
