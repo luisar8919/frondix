@@ -13,7 +13,10 @@ const config: CapacitorConfig = {
   appName: "Frondix",
   webDir: "mobile-web",
   server: {
-    url: "https://www.frondix.com",
+    // Arranca en /dashboard, no en la portada de marketing: dashboard/layout.tsx
+    // ya valida la sesión server-side y manda a /login si no hay una -- así la
+    // app abre directo en login o en el panel, nunca en la landing page web.
+    url: "https://www.frondix.com/dashboard",
     androidScheme: "https",
   },
   android: {
