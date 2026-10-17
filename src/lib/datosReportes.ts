@@ -3,6 +3,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { claveValida } from "./enlaces.ts";
 import { totalesPorMes, topPor, sumaMonto, flujoCaja, progresoMetas } from "./reportes.ts";
 import { tipoModulo } from "./roles.ts";
+import { esStock } from "./stock.ts";
 import type { Columna } from "./excel-parser.ts";
 
 const PAGINA = 1000; // Supabase corta cada respuesta en 1000 filas
@@ -184,6 +185,35 @@ export async function ultimosMovimientos(supabase: SupabaseClient, empresaId: st
   }
 
   return candidatos.sort((a, b) => b.fecha.localeCompare(a.fecha)).slice(0, limite);
+}
+
+export interface ModuloStock { datasetId: string; nombre: string; productos: string[] }
+
+// Qué módulos "parecen" Stock (ver esStock) y qué productos distintos tienen
+// cargados -- para que Balance pueda ofrecer el selector de Kardex sin que el
+// usuario tenga que entrar al módulo de Stock puntual.
+export async function modulosStock(supabase: SupabaseClient, empresaId: string): Promise<ModuloStock[]> {
+  const { data: datasets, error } = await supabase.from("datasets").select("id, nombre, columnas").eq("empresa_id", empresaId);
+  if (error) throw new Error(error.message);
+
+  const modulos: ModuloStock[] = [];
+  for (const d of datasets ?? []) {
+    const columnas = d.columnas as Columna[];
+    if (!esStock(columnas)) continue;
+    const cProducto = columnaConRol(columnas, "producto");
+    if (!cProducto) continue;
+
+    const { data: records, error: errorRecords } = await supabase
+      .from("records")
+      .select(`producto:data->>${cProducto.key}`)
+      .eq("dataset_id", d.id);
+    if (errorRecords) throw new Error(errorRecords.message);
+
+    const productos = [...new Set((records ?? []).map((r) => (r as unknown as { producto: string | null }).producto?.trim()).filter((p): p is string => !!p))]
+      .sort((a, b) => a.localeCompare(b, "es"));
+    modulos.push({ datasetId: d.id, nombre: d.nombre, productos });
+  }
+  return modulos;
 }
 
 // Texto plano con solo los números ya calculados (nunca filas/registros crudos) para

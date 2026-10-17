@@ -5,7 +5,6 @@ import { empresaDelUsuarioServidor } from "@/lib/sesionServidor";
 import AlertasStock from "@/components/AlertasStock";
 import ValorizacionStock from "@/components/ValorizacionStock";
 import CuentasPorCobrar from "@/components/CuentasPorCobrar";
-import ReporteBalance from "@/components/ReporteBalance";
 import { rolEnEmpresa } from "@/lib/permisos";
 import { tipoModulo, type RolColumna } from "@/lib/roles";
 import type { Columna } from "@/lib/excel-parser";
@@ -79,7 +78,6 @@ export default async function DashboardPage() {
       {hayModulos && !esVendedor && <AlertasStock />}
       {hayModulos && !esVendedor && <CuentasPorCobrar />}
       {hayModulos && !esVendedor && <ValorizacionStock />}
-      {hayModulos && !esVendedor && <ReporteBalance />}
     </>
   );
 }
