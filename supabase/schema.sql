@@ -49,6 +49,11 @@ create table suscripciones (
   empresa_id uuid not null references empresas(id) on delete cascade unique,
   culqi_customer_id text,
   culqi_subscription_id text,
+  paypal_subscription_id text,
+  paddle_subscription_id text,
+  -- Cual de las 3 se uso para pagar -- principalmente para saber a que API llamar
+  -- al cancelar; con los *_subscription_id ya alcanzaba, pero esto es mas directo.
+  pasarela text check (pasarela in ('culqi', 'paypal', 'paddle')),
   estado text not null default 'pendiente' check (estado in ('pendiente', 'activa', 'vencida', 'cancelada')),
   -- Prueba gratis de 3 meses al crear la empresa: mientras no pase esta fecha,
   -- estado='activa' cuenta como plan pago aunque no haya pagado. Se limpia (null)

@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { crearClienteServidor } from "@/lib/supabase/server";
 import { crearClienteAdmin } from "@/lib/supabase/admin";
 import { cancelarSuscripcion } from "@/lib/culqi";
+import { cancelarSuscripcionPaypal } from "@/lib/paypal";
+import { cancelarSuscripcionPaddle } from "@/lib/paddle";
 
 // Pasarse al plan gratis: cancela el cobro recurrente en Culqi (si lo hay, ej. no
 // para quien paga por Yape) y marca la suscripción como cancelada en la base.
@@ -26,7 +28,7 @@ export async function POST(req: NextRequest) {
   const admin = crearClienteAdmin();
   const { data: suscripcion } = await admin
     .from("suscripciones")
-    .select("culqi_subscription_id, estado")
+    .select("culqi_subscription_id, paypal_subscription_id, paddle_subscription_id, estado")
     .eq("empresa_id", empresaId)
     .single();
 
@@ -34,14 +36,14 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Esta empresa no tiene una suscripción activa" }, { status: 400 });
   }
 
-  // Con tarjeta hay cobro recurrente que cancelar en Culqi; con Yape el cargo fue
-  // único y no queda nada recurrente ahí, solo se actualiza el estado local.
-  if (suscripcion.culqi_subscription_id) {
-    try {
-      await cancelarSuscripcion(suscripcion.culqi_subscription_id);
-    } catch (e) {
-      return NextResponse.json({ error: e instanceof Error ? e.message : "No se pudo cancelar en Culqi" }, { status: 502 });
-    }
+  // Con tarjeta (cualquier pasarela) hay cobro recurrente que cancelar ahí mismo; con
+  // Yape el cargo fue único y no queda nada recurrente, solo se actualiza el estado local.
+  try {
+    if (suscripcion.culqi_subscription_id) await cancelarSuscripcion(suscripcion.culqi_subscription_id);
+    else if (suscripcion.paypal_subscription_id) await cancelarSuscripcionPaypal(suscripcion.paypal_subscription_id);
+    else if (suscripcion.paddle_subscription_id) await cancelarSuscripcionPaddle(suscripcion.paddle_subscription_id);
+  } catch (e) {
+    return NextResponse.json({ error: e instanceof Error ? e.message : "No se pudo cancelar la suscripción" }, { status: 502 });
   }
 
   const { error } = await admin
