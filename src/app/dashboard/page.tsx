@@ -5,6 +5,7 @@ import { empresaDelUsuarioServidor } from "@/lib/sesionServidor";
 import AlertasStock from "@/components/AlertasStock";
 import ValorizacionStock from "@/components/ValorizacionStock";
 import CuentasPorCobrar from "@/components/CuentasPorCobrar";
+import ConsejosInicio from "@/components/ConsejosInicio";
 import { rolEnEmpresa } from "@/lib/permisos";
 import { tipoModulo, type RolColumna } from "@/lib/roles";
 import type { Columna } from "@/lib/excel-parser";
@@ -74,6 +75,8 @@ export default async function DashboardPage() {
           ))}
         </div>
       )}
+
+      {hayModulos && <ConsejosInicio />}
 
       {hayModulos && !esVendedor && <AlertasStock />}
       {hayModulos && !esVendedor && <CuentasPorCobrar />}
