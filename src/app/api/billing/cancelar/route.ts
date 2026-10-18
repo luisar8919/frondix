@@ -26,12 +26,18 @@ export async function POST(req: NextRequest) {
   }
 
   const admin = crearClienteAdmin();
-  const { data: suscripcion } = await admin
+  const { data: suscripcion, error: errorSuscripcion } = await admin
     .from("suscripciones")
     .select("culqi_subscription_id, paypal_subscription_id, paddle_subscription_id, estado")
     .eq("empresa_id", empresaId)
     .single();
 
+  // Columna inexistente (42703) o tabla sin cache de esquema (PGRST205): falta correr
+  // la migración 19 -- sin esto, el error quedaba tapado por el "no tiene suscripción
+  // activa" de abajo, que no decía nada de lo que realmente pasó.
+  if (errorSuscripcion && ["42703", "PGRST205"].includes(errorSuscripcion.code)) {
+    return NextResponse.json({ error: "Falta ejecutar la migración 19 en Supabase." }, { status: 500 });
+  }
   if (!suscripcion || suscripcion.estado !== "activa") {
     return NextResponse.json({ error: "Esta empresa no tiene una suscripción activa" }, { status: 400 });
   }
