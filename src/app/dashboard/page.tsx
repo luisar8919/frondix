@@ -2,8 +2,6 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { crearClienteServidor } from "@/lib/supabase/server";
 import { empresaDelUsuarioServidor } from "@/lib/sesionServidor";
-import AlertasStock from "@/components/AlertasStock";
-import ValorizacionStock from "@/components/ValorizacionStock";
 import CuentasPorCobrar from "@/components/CuentasPorCobrar";
 import ConsejosInicio from "@/components/ConsejosInicio";
 import { rolEnEmpresa } from "@/lib/permisos";
@@ -78,9 +76,7 @@ export default async function DashboardPage() {
 
       {hayModulos && <ConsejosInicio />}
 
-      {hayModulos && !esVendedor && <AlertasStock />}
       {hayModulos && !esVendedor && <CuentasPorCobrar />}
-      {hayModulos && !esVendedor && <ValorizacionStock />}
     </>
   );
 }

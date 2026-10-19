@@ -10,15 +10,18 @@ import { COOKIE_EMPRESA_ACTIVA } from "@/lib/sesion";
 const enlaces = [
   { href: "/dashboard", texto: "Inicio" },
   { href: "/dashboard/upload", texto: "Subir Excel" },
+  { href: "/dashboard/inventario", texto: "Inventario" },
   { href: "/dashboard/seguimiento", texto: "Seguimiento" },
   { href: "/dashboard/calendario", texto: "Calendario" },
   { href: "/dashboard/team", texto: "Equipo" },
 ];
 
 // Compras y Ventas ya no son botones propios: se ven desde el desplegable de
-// Reportes (junto con Balance, que es la foto combinada de ambos).
+// Reportes (junto con Balance, la foto combinada de ambos, y Resumen, los
+// highlights con IA + el detalle por módulo).
 const reportesSubmenu = [
   { href: "/dashboard/reportes", texto: "Balance" },
+  { href: "/dashboard/reportes/resumen", texto: "Resumen" },
   { href: "/dashboard/ventas", texto: "Venta" },
   { href: "/dashboard/compras", texto: "Compras" },
 ];
@@ -103,7 +106,7 @@ export default function BarraPanel({ rol }: { rol?: string }) {
               Reportes
             </button>
           )}
-          {enlaces.slice(2).filter((e) => !esVendedor || (e.href !== "/dashboard/seguimiento" && e.href !== "/dashboard/team")).map((e) => (
+          {enlaces.slice(2).filter((e) => !esVendedor || !["/dashboard/inventario", "/dashboard/seguimiento", "/dashboard/team"].includes(e.href)).map((e) => (
             <Link key={e.href} href={e.href} className="nav-link" aria-current={activo(e.href) ? "page" : undefined}>
               {e.texto}
             </Link>

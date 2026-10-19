@@ -2,7 +2,6 @@
 
 import { Fragment, useEffect, useState } from "react";
 import { crearClienteBrowser } from "@/lib/supabase/client";
-import KardexProducto from "@/components/KardexProducto";
 
 interface Movimiento {
   id: string;
@@ -14,7 +13,6 @@ interface Movimiento {
   fecha: string;
   sustento: string | null;
 }
-interface ModuloStock { datasetId: string; nombre: string; productos: string[] }
 
 const soles0 = (n: number | null) => (n === null ? "-" : `S/ ${n.toLocaleString("es-PE", { maximumFractionDigits: 2 })}`);
 const fechaCorta = (f: string) => {
@@ -28,7 +26,6 @@ const fechaCorta = (f: string) => {
 // componente, mismo fetch, cero lógica duplicada.
 export default function ReporteBalance() {
   const [movimientos, setMovimientos] = useState<Movimiento[] | null>(null);
-  const [stock, setStock] = useState<ModuloStock[] | null>(null);
   const [sustentoAbierto, setSustentoAbierto] = useState<string | null>(null);
   const [valorSustento, setValorSustento] = useState("");
   const [guardandoSustento, setGuardandoSustento] = useState(false);
@@ -42,7 +39,6 @@ export default function ReporteBalance() {
         const body = await res.json();
         if (!res.ok) return setError(body.error ?? "No se pudieron cargar los reportes");
         setMovimientos(body.movimientos);
-        setStock(body.stock ?? []);
       })
       .catch(() => setError("No se pudo conectar con el servidor."));
   }, []);
@@ -71,7 +67,7 @@ export default function ReporteBalance() {
         <div>
           <h2>Balance</h2>
           <p className="suave">
-            Ventas y compras de todos tus módulos juntos, lo más reciente primero, y el historial de stock por producto.
+            Ventas y compras de todos tus módulos juntos, lo más reciente primero. Para el Kardex de Stock, entra a Inventario.
           </p>
         </div>
       </div>
@@ -148,8 +144,6 @@ export default function ReporteBalance() {
           </div>
         </div>
       )}
-
-      {stock?.map((s) => <KardexProducto key={s.datasetId} datasetId={s.datasetId} productos={s.productos} />)}
     </>
   );
 }
