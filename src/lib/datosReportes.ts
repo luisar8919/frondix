@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { claveValida } from "./enlaces.ts";
 import { totalesPorMes, topPor, sumaMonto, flujoCaja, progresoMetas } from "./reportes.ts";
-import { tipoModulo } from "./roles.ts";
+import { tipoModulo, type TipoModulo } from "./roles.ts";
 import { esStock } from "./stock.ts";
 import type { Columna } from "./excel-parser.ts";
 
@@ -34,6 +34,7 @@ const columnaConRol = (columnas: Columna[], rol: string) => columnas.find((c) =>
 export interface ModuloReporte {
   datasetId: string;
   nombre: string;
+  tipo: TipoModulo;
   plantillas: string[];
   totalesPorMes: ReturnType<typeof totalesPorMes> | null;
   topProducto: ReturnType<typeof topPor> | null;
@@ -112,6 +113,7 @@ export async function calcularModulosReporte(supabase: SupabaseClient, empresaId
     modulos.push({
       datasetId: d.id,
       nombre: d.nombre,
+      tipo: tipoModulo(columnas.map((c) => c.rol)),
       plantillas,
       totalesPorMes: conTotales ? totalesPorMes(filas, ahora, 6) : null,
       topProducto: conTopProducto ? topPor(filas.map((f) => ({ clave: f.p, m: f.m })), 5) : null,

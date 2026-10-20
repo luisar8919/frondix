@@ -17,6 +17,7 @@ interface BloqueHighlight { titulo: string; texto: string }
 interface Modulo {
   datasetId: string;
   nombre: string;
+  tipo: "ventas" | "compras" | "otro";
   plantillas: string[];
   totalesPorMes: TotalMes[] | null;
   topProducto: RankingItem[] | null;
@@ -119,8 +120,9 @@ export default function ResumenReportes() {
         <div>
           <h2>Resumen</h2>
           <p className="suave">
-            Lo más importante en palabras (IA), y el detalle de cada módulo: flujo de caja, top 5 y metas de
-            venta. Para los movimientos crudos de todos los módulos juntos, entra a Reportes → Balance.
+            Lo más importante en palabras (IA) y las metas de venta. El flujo de caja y el top 5 de cada
+            módulo de Venta o Compras está en Reportes → Venta / Compras; los movimientos crudos de todos
+            los módulos juntos, en Reportes → Balance.
           </p>
         </div>
       </div>
@@ -197,16 +199,23 @@ export default function ResumenReportes() {
       {modulos?.map((m) => {
         const mesesRecortados = m.totalesPorMes ? recortarMesesSinDatos(m.totalesPorMes) : null;
         const maxMes = Math.max(1, ...(mesesRecortados?.map((x) => x.total) ?? [0]));
+        // Flujo de caja, totales, top 5: ya se ven en Reportes -> Venta/Compras para
+        // estos módulos -- acá solo se muestran las Metas de venta, que no están en
+        // ningún otro lado.
+        const duplicadoEnCategoria = m.tipo === "ventas" || m.tipo === "compras";
         return (
           <section key={m.datasetId} className="tarjeta" style={{ marginBottom: 20 }}>
             <h3>{m.nombre}</h3>
             {m.plantillas.length > 0 && (
               <p className="suave pequeno" style={{ margin: "2px 0 0" }}>
                 Se armó: {m.plantillas.map((id) => nombrePlantilla[id] ?? id).join(", ")}
+                {duplicadoEnCategoria && (
+                  <> — el detalle completo está en Reportes → {m.tipo === "ventas" ? "Venta" : "Compras"}.</>
+                )}
               </p>
             )}
 
-            {m.flujoCaja && (
+            {!duplicadoEnCategoria && m.flujoCaja && (
               <div className="tarjeta" style={{ marginTop: 14, padding: 14 }}>
                 <strong>Flujo de caja</strong>
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 10, marginTop: 10 }}>
@@ -239,7 +248,7 @@ export default function ResumenReportes() {
               </div>
             )}
 
-            {m.sumaTotal !== null && (
+            {!duplicadoEnCategoria && m.sumaTotal !== null && (
               <div className="tarjeta" style={{ marginTop: 14, padding: 14 }}>
                 <strong>Total</strong>
                 <p style={{ margin: "6px 0 0" }}>
@@ -249,7 +258,7 @@ export default function ResumenReportes() {
               </div>
             )}
 
-            {m.sumaGastos !== null && (
+            {!duplicadoEnCategoria && m.sumaGastos !== null && (
               <div className="tarjeta" style={{ marginTop: 14, padding: 14 }}>
                 <strong>Gastos adicionales</strong>
                 <p className="suave pequeno" style={{ margin: "2px 0 0" }}>Envío, comisión u otro gasto aparte del monto.</p>
@@ -257,7 +266,7 @@ export default function ResumenReportes() {
               </div>
             )}
 
-            {mesesRecortados && mesesRecortados.length > 0 && (
+            {!duplicadoEnCategoria && mesesRecortados && mesesRecortados.length > 0 && (
               <div className="tarjeta" style={{ marginTop: 14, padding: 14 }}>
                 <strong>Total por mes{mesesRecortados.length === 6 ? " (últimos 6 meses)" : ""}</strong>
                 <div style={{ marginTop: 10 }}>
@@ -268,7 +277,7 @@ export default function ResumenReportes() {
               </div>
             )}
 
-            {m.topProducto && m.topProducto.length > 0 && (
+            {!duplicadoEnCategoria && m.topProducto && m.topProducto.length > 0 && (
               <div className="tarjeta" style={{ marginTop: 14, padding: 14 }}>
                 <strong>Top 5 productos</strong>
                 <div style={{ marginTop: 10 }}>
@@ -339,7 +348,7 @@ export default function ResumenReportes() {
               </div>
             )}
 
-            {m.topCliente && m.topCliente.length > 0 && (
+            {!duplicadoEnCategoria && m.topCliente && m.topCliente.length > 0 && (
               <div className="tarjeta" style={{ marginTop: 14, padding: 14 }}>
                 <strong>Top 5 clientes</strong>
                 <div style={{ marginTop: 10 }}>
@@ -359,7 +368,7 @@ export default function ResumenReportes() {
               </div>
             )}
 
-            {m.topProveedor && m.topProveedor.length > 0 && (
+            {!duplicadoEnCategoria && m.topProveedor && m.topProveedor.length > 0 && (
               <div className="tarjeta" style={{ marginTop: 14, padding: 14 }}>
                 <strong>Top 5 proveedores</strong>
                 <div style={{ marginTop: 10 }}>
