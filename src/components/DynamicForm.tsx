@@ -107,10 +107,11 @@ export default function DynamicForm({
     const datos: Record<string, unknown> = {};
     for (const c of columnas) {
       const v = valores[c.key];
-      if (v === undefined || v === "") datos[c.key] = null;
-      else if (c.tipo === "numero") datos[c.key] = Number(v);
-      else if (c.tipo === "fecha") datos[c.key] = `${v}T00:00:00.000Z`;
-      else datos[c.key] = v;
+      const vLimpio = c.tipo === "texto" ? v?.trim() : v;
+      if (vLimpio === undefined || vLimpio === "") datos[c.key] = null;
+      else if (c.tipo === "numero") datos[c.key] = Number(vLimpio);
+      else if (c.tipo === "fecha") datos[c.key] = `${vLimpio}T00:00:00.000Z`;
+      else datos[c.key] = vLimpio;
     }
     const fallo = await onSubmit(datos);
     setEnviando(false);
