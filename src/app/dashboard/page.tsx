@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { crearClienteServidor } from "@/lib/supabase/server";
 import { empresaDelUsuarioServidor } from "@/lib/sesionServidor";
 import CuentasPorCobrar from "@/components/CuentasPorCobrar";
+import CuentasPorPagar from "@/components/CuentasPorPagar";
 import ConsejosInicio from "@/components/ConsejosInicio";
 import { rolEnEmpresa } from "@/lib/permisos";
 import { tipoModulo, type RolColumna } from "@/lib/roles";
@@ -77,6 +78,7 @@ export default async function DashboardPage() {
       {hayModulos && <ConsejosInicio />}
 
       {hayModulos && !esVendedor && <CuentasPorCobrar />}
+      {hayModulos && !esVendedor && <CuentasPorPagar />}
     </>
   );
 }

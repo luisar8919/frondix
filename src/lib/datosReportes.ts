@@ -218,6 +218,44 @@ export async function modulosStock(supabase: SupabaseClient, empresaId: string):
   return modulos;
 }
 
+export interface StockPorAlmacen { datasetId: string; datasetNombre: string; cantidad: number }
+export interface ProductoCombinado { producto: string; total: number; porAlmacen: StockPorAlmacen[] }
+
+// Vista "multi-almacén": cada módulo de Stock YA es, en los hechos, un almacén
+// propio (una tienda, una bodega...) -- esto solo suma por nombre de producto
+// entre todos para saber el total real disponible, sin cambiar en nada el
+// modelo de datos. Solo tiene sentido mostrarla cuando hay 2+ módulos de Stock.
+export async function stockCombinado(supabase: SupabaseClient, empresaId: string): Promise<ProductoCombinado[]> {
+  const { data: datasets, error } = await supabase.from("datasets").select("id, nombre, columnas").eq("empresa_id", empresaId);
+  if (error) throw new Error(error.message);
+
+  const combinados = new Map<string, ProductoCombinado>();
+  for (const d of datasets ?? []) {
+    const columnas = d.columnas as Columna[];
+    if (!esStock(columnas)) continue;
+    const cProducto = columnaConRol(columnas, "producto");
+    if (!cProducto) continue;
+
+    const { data: records, error: errorRecords } = await supabase
+      .from("records")
+      .select(`producto:data->>${cProducto.key}, cantidad:data->>cantidad`)
+      .eq("dataset_id", d.id);
+    if (errorRecords) throw new Error(errorRecords.message);
+
+    for (const r of (records ?? []) as unknown as { producto: string | null; cantidad: string | null }[]) {
+      const producto = r.producto?.trim();
+      const cantidad = Number(r.cantidad);
+      if (!producto || !Number.isFinite(cantidad)) continue;
+      const clave = producto.toLowerCase();
+      const actual = combinados.get(clave) ?? { producto, total: 0, porAlmacen: [] };
+      actual.total += cantidad;
+      actual.porAlmacen.push({ datasetId: d.id, datasetNombre: d.nombre, cantidad });
+      combinados.set(clave, actual);
+    }
+  }
+  return [...combinados.values()].sort((a, b) => a.producto.localeCompare(b.producto, "es"));
+}
+
 // Texto plano con solo los números ya calculados (nunca filas/registros crudos) para
 // mandarle a la IA. Determinista y acotado: nada de volcar la base, solo lo que ya
 // se le muestra al usuario en Reportes.
