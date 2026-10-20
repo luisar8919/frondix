@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import AlertasStock from "@/components/AlertasStock";
 import ValorizacionStock from "@/components/ValorizacionStock";
 import KardexProducto from "@/components/KardexProducto";
+import CatalogoCompartir from "@/components/CatalogoCompartir";
 
 interface ModuloStock { datasetId: string; nombre: string; productos: string[] }
 interface StockPorAlmacen { datasetId: string; datasetNombre: string; cantidad: number }
@@ -37,6 +38,7 @@ export default function InventarioResumen() {
 
       <AlertasStock />
       <ValorizacionStock />
+      <CatalogoCompartir />
 
       {hayMultiAlmacen && combinado.length > 0 && (
         <div className="tarjeta" style={{ marginBottom: 20 }}>

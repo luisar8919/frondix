@@ -12,6 +12,7 @@ const enlaces = [
   { href: "/dashboard/upload", texto: "Subir Excel" },
   { href: "/dashboard/inventario", texto: "Inventario" },
   { href: "/dashboard/clientes", texto: "Clientes" },
+  { href: "/dashboard/pipeline", texto: "Pipeline" },
   { href: "/dashboard/seguimiento", texto: "Seguimiento" },
   { href: "/dashboard/calendario", texto: "Calendario" },
   { href: "/dashboard/team", texto: "Equipo" },
@@ -109,7 +110,7 @@ export default function BarraPanel({ rol }: { rol?: string }) {
               Reportes
             </button>
           )}
-          {enlaces.slice(2).filter((e) => !esVendedor || !["/dashboard/inventario", "/dashboard/clientes", "/dashboard/seguimiento", "/dashboard/team"].includes(e.href)).map((e) => (
+          {enlaces.slice(2).filter((e) => !esVendedor || !["/dashboard/inventario", "/dashboard/clientes", "/dashboard/pipeline", "/dashboard/seguimiento", "/dashboard/team"].includes(e.href)).map((e) => (
             <Link key={e.href} href={e.href} className="nav-link" aria-current={activo(e.href) ? "page" : undefined}>
               {e.texto}
             </Link>

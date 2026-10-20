@@ -6,6 +6,9 @@ create table empresas (
   id uuid primary key default gen_random_uuid(),
   nombre text not null,
   telefono text, -- WhatsApp del negocio: contacto de cuenta y, a futuro, promociones
+  -- Catalogo publico de productos (migracion 23): opt-in, apagado por
+  -- defecto -- sin esto, nadie de afuera deberia poder ver precios/stock.
+  catalogo_publico boolean not null default false,
   created_at timestamptz not null default now()
 );
 
@@ -337,3 +340,27 @@ create policy "crear items de ordenes en mi empresa" on orden_compra_items for i
   with check (orden_id in (select id from ordenes_compra where empresa_id in (select public.mis_empresas())));
 create policy "borrar items de ordenes de mi empresa" on orden_compra_items for delete
   using (orden_id in (select id from ordenes_compra where empresa_id in (select public.mis_empresas())));
+
+-- Pipeline de ventas (migracion 22): en que etapa esta cada cliente/prospecto.
+-- Ver src/lib/pipeline.ts.
+create table etapas_cliente (
+  id uuid primary key default gen_random_uuid(),
+  empresa_id uuid not null references empresas(id) on delete cascade,
+  cliente_clave text not null,
+  cliente_nombre text not null,
+  telefono text,
+  etapa text not null default 'prospecto' check (etapa in ('prospecto', 'contactado', 'negociacion', 'cliente', 'perdido')),
+  manual boolean not null default false,
+  updated_at timestamptz not null default now(),
+  created_at timestamptz not null default now(),
+  unique (empresa_id, cliente_clave)
+);
+alter table etapas_cliente enable row level security;
+create policy "ver etapas de mi empresa" on etapas_cliente for select
+  using (empresa_id in (select public.mis_empresas()));
+create policy "crear etapas en mi empresa" on etapas_cliente for insert
+  with check (empresa_id in (select public.mis_empresas()));
+create policy "editar etapas de mi empresa" on etapas_cliente for update
+  using (empresa_id in (select public.mis_empresas()));
+create policy "borrar etapas de mi empresa" on etapas_cliente for delete
+  using (empresa_id in (select public.mis_empresas()));
