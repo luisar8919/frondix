@@ -160,11 +160,20 @@ export default function DynamicForm({
                   min={c.tipo === "numero" && !enlazada && !admiteNegativos(c.rol) ? 0 : undefined}
                   inputMode={c.tipo === "numero" && !enlazada ? "decimal" : undefined}
                   autoComplete={enlazada ? "off" : undefined}
+                  list={enlazada && hayExistentes ? `lista-${c.key}` : undefined}
                   placeholder={enModoNuevo ? `Nombre del ${sustantivo} nuevo` : undefined}
                   autoFocus={enModoNuevo}
                   value={valores[c.key] ?? ""}
                   onChange={(e) => setValores({ ...valores, [c.key]: e.target.value })}
                 />
+              )}
+              {enlazada && hayExistentes && (
+                // Autocompletado nativo: al tipear coincide con un valor ya enlazado y
+                // lo sugiere -- usarlo (clic o Tab) asocia el registro sin tener que
+                // cambiar a la vista de desplegable.
+                <datalist id={`lista-${c.key}`}>
+                  {(opciones?.[c.key] ?? []).map((v) => <option key={v} value={v} />)}
+                </datalist>
               )}
               {enlazada && (
                 <>

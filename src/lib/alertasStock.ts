@@ -61,7 +61,7 @@ export async function alertasStock(supabase: SupabaseClient, empresaId: string):
       const cantidad = Number(r.cantidad);
       const minimo = Number(r.minimo);
       if (!r.producto || !Number.isFinite(cantidad) || !Number.isFinite(minimo) || minimo <= 0) continue;
-      if (cantidad < minimo) {
+      if (cantidad <= minimo) {
         alertas.push({ datasetId: d.id, datasetNombre: d.nombre, producto: r.producto, cantidad, minimo });
       }
     }
