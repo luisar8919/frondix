@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import type { Columna, TipoColumna } from "@/lib/excel-parser";
 import { ROLES, type RolColumna } from "@/lib/roles";
 import { enviarConfirmando } from "@/lib/confirmar";
+import { MONEDAS } from "@/lib/moneda";
 
 interface Fila {
   key?: string; // sin key = campo nuevo
@@ -20,12 +21,14 @@ export default function EditarTabla({
   nombre,
   columnas,
   incluyeIgv,
+  moneda,
   onGuardado,
 }: {
   datasetId: string;
   nombre: string;
   columnas: Columna[];
   incluyeIgv: boolean;
+  moneda: string;
   onGuardado: () => Promise<void>;
 }) {
   const router = useRouter();
@@ -33,6 +36,7 @@ export default function EditarTabla({
   const [nombreTabla, setNombreTabla] = useState(nombre);
   const [filas, setFilas] = useState<Fila[]>(desdeColumnas);
   const [incluyeIgvLocal, setIncluyeIgvLocal] = useState(incluyeIgv);
+  const [monedaLocal, setMonedaLocal] = useState(moneda);
   const [ocupado, setOcupado] = useState(false);
   const [mensaje, setMensaje] = useState<{ tipo: "ok" | "error"; texto: string } | null>(null);
 
@@ -45,6 +49,7 @@ export default function EditarTabla({
       nombre: nombreTabla,
       columnas: filas.map((f) => ({ ...f, rol: f.rol || null })),
       incluyeIgv: incluyeIgvLocal,
+      moneda: monedaLocal,
     });
     setOcupado(false);
     if (r.cancelado) return;
@@ -78,6 +83,14 @@ export default function EditarTabla({
             Los montos de venta de este módulo ya incluyen IGV (18%)
           </label>
           <p className="ayuda">Lo usa el reporte de flujo de caja para calcular el IGV y la ganancia neta correctamente. Si no sabes, déjalo sin marcar.</p>
+        </div>
+
+        <div className="campo" style={{ maxWidth: 220 }}>
+          <label htmlFor="moneda-tabla">Moneda de este módulo</label>
+          <select id="moneda-tabla" value={monedaLocal} onChange={(e) => setMonedaLocal(e.target.value)}>
+            {MONEDAS.map((m) => <option key={m.valor} value={m.valor}>{m.etiqueta}</option>)}
+          </select>
+          <p className="ayuda">No convierte entre monedas: si combinás módulos en soles y en dólares, los totales que suman varios módulos juntos (Balance, Cuentas por cobrar/pagar, Valorización) asumen que todo es la misma moneda.</p>
         </div>
 
         <p className="suave pequeno">

@@ -31,6 +31,7 @@ const reportesSubmenu = [
 const itemsMenu = [
   { href: "/dashboard/cuenta", texto: "Mis datos" },
   { href: "/dashboard/empresa", texto: "Mi empresa" },
+  { href: "/dashboard/actividad", texto: "Actividad" },
   { href: "/dashboard/billing", texto: "Plan y pagos" },
 ];
 

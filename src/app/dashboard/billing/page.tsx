@@ -8,8 +8,6 @@ import { tieneSuscripcionActiva } from "@/lib/suscripcion";
 
 declare global {
   interface Window {
-    Culqi: any;
-    culqi: () => void;
     paypal: any;
     Paddle: any;
   }
@@ -22,7 +20,6 @@ const PADDLE_PRICE_ID = process.env.NEXT_PUBLIC_PADDLE_PRICE_ID;
 
 export default function BillingPage() {
   const [mensaje, setMensaje] = useState<string | null>(null);
-  const [scriptCulqiListo, setScriptCulqiListo] = useState(false);
   const [scriptPaypalListo, setScriptPaypalListo] = useState(false);
   const [scriptPaddleListo, setScriptPaddleListo] = useState(false);
   const [empresaId, setEmpresaId] = useState<string | null>(null);
@@ -87,40 +84,6 @@ export default function BillingPage() {
     setPlanActivo(false);
   }
 
-  function cobrarConCulqi() {
-    if (!scriptCulqiListo) return;
-
-    window.culqi = async function () {
-      if (!window.Culqi.token) {
-        setMensaje(window.Culqi.error?.user_message ?? "No se pudo validar la tarjeta");
-        return;
-      }
-      const supabase = crearClienteBrowser();
-      const sesion = await empresaDelUsuario(supabase);
-      if (!sesion.ok) return setMensaje(sesion.error);
-
-      const res = await fetch("/api/billing/checkout", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          empresaId: sesion.empresaId,
-          metodo: "tarjeta",
-          token: window.Culqi.token.id,
-        }),
-      });
-      const body = await res.json();
-      setMensaje(res.ok ? "Suscripción activada." : body.error);
-      if (res.ok) {
-        setPlanActivo(true);
-        setPruebaHasta(null);
-      }
-    };
-
-    window.Culqi.publicKey = process.env.NEXT_PUBLIC_CULQI_PUBLIC_KEY;
-    window.Culqi.settings({ title: "Frondix", currency: "PEN", amount: 3500 });
-    window.Culqi.open();
-  }
-
   function cobrarConPaddle() {
     if (!scriptPaddleListo || !empresaId || !PADDLE_PRICE_ID) return;
     window.Paddle.Checkout.open({
@@ -132,7 +95,6 @@ export default function BillingPage() {
 
   return (
     <>
-      <Script src="https://checkout.culqi.com/js/v4" onLoad={() => setScriptCulqiListo(true)} />
       {PAYPAL_CLIENT_ID && PAYPAL_PLAN_ID && (
         <Script
           src={`https://www.paypal.com/sdk/js?client-id=${PAYPAL_CLIENT_ID}&vault=true&intent=subscription`}
@@ -168,7 +130,7 @@ export default function BillingPage() {
 
       <div className="tarjeta tarjeta-elevada precio precio-destacado" style={{ maxWidth: 460 }}>
         <h3>Plan Completo</h3>
-        <div className="precio-monto">S/ 35<small> /mes</small></div>
+        <div className="precio-monto">$ 9.99<small> /mes</small></div>
         <ul>
           <li>Invita a tu equipo con accesos por rol</li>
           <li>Todos los módulos y registros que necesites</li>
@@ -190,7 +152,7 @@ export default function BillingPage() {
             ) : (
               <div className="alerta alerta-aviso" style={{ marginBottom: 0 }}>
                 <p style={{ marginTop: 0 }}>
-                  Al pasarte al plan gratis dejas de pagar S/ 35/mes, pero también pierdes invitar a tu equipo y
+                  Al pasarte al plan gratis dejas de pagar $ 9.99/mes, pero también pierdes invitar a tu equipo y
                   el seguimiento por WhatsApp. Tus datos no se borran, se quedan tal como están.
                 </p>
                 <div style={{ display: "flex", gap: 10 }}>
@@ -206,14 +168,6 @@ export default function BillingPage() {
           </>
         ) : (
           <>
-            <button type="button" className="btn btn-primario btn-grande btn-bloque" onClick={cobrarConCulqi} disabled={!scriptCulqiListo}>
-              {scriptCulqiListo ? "Pagar con tarjeta (soles)" : "Cargando pagos..."}
-            </button>
-
-            {(PAYPAL_CLIENT_ID || PADDLE_CLIENT_TOKEN) && (
-              <div className="separador-o" style={{ margin: "14px 0" }}><span>o paga en dólares</span></div>
-            )}
-
             {PAYPAL_CLIENT_ID && PAYPAL_PLAN_ID && (
               <div id="paypal-buttons" style={{ marginBottom: 10 }} />
             )}
@@ -222,6 +176,10 @@ export default function BillingPage() {
               <button type="button" className="btn btn-secundario btn-grande btn-bloque" onClick={cobrarConPaddle} disabled={!scriptPaddleListo}>
                 {scriptPaddleListo ? "Pagar con Paddle (tarjeta internacional)" : "Cargando Paddle..."}
               </button>
+            )}
+
+            {!PAYPAL_CLIENT_ID && !PADDLE_CLIENT_TOKEN && (
+              <p className="alerta alerta-aviso" style={{ marginBottom: 0 }}>Falta configurar una pasarela de pago.</p>
             )}
           </>
         )}
@@ -232,11 +190,6 @@ export default function BillingPage() {
           </p>
         )}
       </div>
-
-      <p className="suave pequeno" style={{ maxWidth: 460, marginTop: 16 }}>
-        ¿Prefieres pagar con Yape? Escríbenos y te mandamos el enlace de cobro manual. Con Yape el cobro
-        no es automático todos los meses: hay que aprobarlo cada vez.
-      </p>
     </>
   );
 }

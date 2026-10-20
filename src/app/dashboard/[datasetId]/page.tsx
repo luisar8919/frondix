@@ -38,7 +38,7 @@ export default function DatasetPage({
   const { datasetId } = usePromise(params);
   const { filtrarCol, filtrarVal } = usePromise(searchParams);
 
-  const [dataset, setDataset] = useState<{ id: string; nombre: string; columnas: Columna[]; incluye_igv?: boolean } | null>(null);
+  const [dataset, setDataset] = useState<{ id: string; nombre: string; columnas: Columna[]; incluye_igv?: boolean; moneda?: string } | null>(null);
   const [otras, setOtras] = useState<DatasetResumen[]>([]);
   const [registros, setRegistros] = useState<Registro[]>([]);
   const [total, setTotal] = useState(0);
@@ -285,6 +285,7 @@ export default function DatasetPage({
             nombre={dataset.nombre}
             columnas={dataset.columnas}
             incluyeIgv={!!dataset.incluye_igv}
+            moneda={dataset.moneda ?? "PEN"}
             onGuardado={cargar}
           />
           <EnlacesTabla datasetId={datasetId} columnas={dataset.columnas} otras={otras} onGuardado={cargar} />

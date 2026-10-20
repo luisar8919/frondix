@@ -125,6 +125,9 @@ export default function ResumenReportes() {
             los módulos juntos, en Reportes → Balance.
           </p>
         </div>
+        <div className="acciones no-imprimir">
+          <button type="button" className="btn btn-fantasma" onClick={() => window.print()}>Exportar a PDF</button>
+        </div>
       </div>
 
       {planActivo !== false && (

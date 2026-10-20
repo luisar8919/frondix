@@ -25,6 +25,9 @@ create table datasets (
   columnas jsonb not null, -- [{ "key": "nombre", "label": "Nombre", "tipo": "texto" }, ...]
   archivo_original_url text,
   incluye_igv boolean not null default false, -- las ventas de este modulo ya traen el 18% incluido
+  -- En que moneda estan los montos de este modulo (migracion 21) -- cada modulo
+  -- es independiente, no hay conversion automatica entre monedas distintas.
+  moneda text not null default 'PEN' check (moneda in ('PEN', 'USD')),
   created_at timestamptz not null default now()
 );
 

@@ -2,6 +2,7 @@
 
 import { Fragment, useEffect, useState } from "react";
 import { crearClienteBrowser } from "@/lib/supabase/client";
+import { formatearMonto } from "@/lib/moneda";
 
 interface Movimiento {
   id: string;
@@ -10,11 +11,12 @@ interface Movimiento {
   tipo: "venta" | "compra";
   producto: string | null;
   monto: number | null;
+  moneda: string;
   fecha: string;
   sustento: string | null;
 }
 
-const soles0 = (n: number | null) => (n === null ? "-" : `S/ ${n.toLocaleString("es-PE", { maximumFractionDigits: 2 })}`);
+const soles0 = (n: number | null, moneda: string) => (n === null ? "-" : formatearMonto(n, moneda));
 const fechaCorta = (f: string) => {
   const d = new Date(f.length <= 10 ? `${f}T00:00:00` : f);
   return Number.isNaN(d.getTime()) ? f : d.toLocaleDateString("es-PE", { day: "2-digit", month: "short" });
@@ -70,6 +72,10 @@ export default function ReporteBalance() {
             Ventas y compras de todos tus módulos juntos, lo más reciente primero. Para el Kardex de Stock, entra a Inventario.
           </p>
         </div>
+        <div className="acciones no-imprimir">
+          <a href="/api/export/balance" className="btn btn-secundario">Exportar a Excel</a>
+          <button type="button" className="btn btn-fantasma" onClick={() => window.print()}>Exportar a PDF</button>
+        </div>
       </div>
 
       {error && <p className="alerta alerta-error" role="alert">{error}</p>}
@@ -111,7 +117,7 @@ export default function ReporteBalance() {
                       </td>
                       <td>{m.producto ?? "-"}</td>
                       <td className="num" style={{ fontWeight: 700, color: m.tipo === "venta" ? "var(--verde-700)" : "var(--error)" }}>
-                        {soles0(m.monto)}
+                        {soles0(m.monto, m.moneda)}
                       </td>
                       <td>
                         <button type="button" className="btn btn-fantasma" onClick={() => abrirSustento(m)}>

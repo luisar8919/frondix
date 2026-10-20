@@ -8,6 +8,7 @@ import { crearClienteBrowser } from "@/lib/supabase/client";
 import { empresaDelUsuario } from "@/lib/sesion";
 import { tipoModulo, type TipoModulo } from "@/lib/roles";
 import { recortarMesesSinDatos } from "@/lib/reportes";
+import { formatearMonto } from "@/lib/moneda";
 import type { Columna } from "@/lib/excel-parser";
 
 interface TotalMes { mes: string; total: number; registros: number }
@@ -25,7 +26,6 @@ interface ModuloReporte {
   flujoCaja: FlujoCaja | null;
 }
 
-const soles = (n: number) => `S/ ${n.toLocaleString("es-PE", { maximumFractionDigits: 2 })}`;
 const nombreMes = (clave: string) => {
   const [anio, mes] = clave.split("-").map(Number);
   return new Date(Date.UTC(anio, mes - 1, 1)).toLocaleDateString("es-PE", { month: "short", year: "2-digit" });
@@ -38,7 +38,7 @@ const nombreMes = (clave: string) => {
 export default function CategoriaMovimientos({ tipo }: { tipo: TipoModulo }) {
   const [cargando, setCargando] = useState(true);
   const [empresaId, setEmpresaId] = useState<string | null>(null);
-  const [modulos, setModulos] = useState<{ datasetId: string; nombre: string; columnas: Columna[]; reporte?: ModuloReporte }[]>([]);
+  const [modulos, setModulos] = useState<{ datasetId: string; nombre: string; columnas: Columna[]; moneda: string; reporte?: ModuloReporte }[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [registrando, setRegistrando] = useState<string | null>(null);
   const [mensajeRegistro, setMensajeRegistro] = useState<Record<string, string>>({});
@@ -57,7 +57,7 @@ export default function CategoriaMovimientos({ tipo }: { tipo: TipoModulo }) {
     }
     setEmpresaId(sesion.empresaId);
 
-    const { data: datasets } = await supabase.from("datasets").select("id, nombre, columnas").eq("empresa_id", sesion.empresaId);
+    const { data: datasets } = await supabase.from("datasets").select("id, nombre, columnas, moneda").eq("empresa_id", sesion.empresaId);
     const delTipo = (datasets ?? []).filter((d) => tipoModulo((d.columnas as Columna[]).map((c) => c.rol)) === tipo);
 
     const resReportes = await fetch("/api/reportes");
@@ -69,6 +69,7 @@ export default function CategoriaMovimientos({ tipo }: { tipo: TipoModulo }) {
         datasetId: d.id,
         nombre: d.nombre,
         columnas: d.columnas as Columna[],
+        moneda: d.moneda ?? "PEN",
         reporte: reportesPorId.get(d.id),
       }))
     );
@@ -182,6 +183,7 @@ export default function CategoriaMovimientos({ tipo }: { tipo: TipoModulo }) {
         const mesesRecortados = r?.totalesPorMes ? recortarMesesSinDatos(r.totalesPorMes) : null;
         const maxMes = Math.max(1, ...(mesesRecortados?.map((x) => x.total) ?? [0]));
         const topContraparte = tipo === "compras" ? r?.topProveedor : r?.topCliente;
+        const soles = (n: number) => formatearMonto(n, m.moneda);
 
         return (
           <section key={m.datasetId} className="tarjeta" style={{ marginBottom: 20 }}>

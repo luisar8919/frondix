@@ -244,3 +244,11 @@ th.num, td.num { text-align: right; font-variant-numeric: tabular-nums; }
 @media (prefers-reduced-motion: reduce) {
   * { transition: none !important; scroll-behavior: auto !important; }
 }
+
+/* "Exportar a PDF" es, en la práctica, imprimir con Ctrl+P / Cmd+P y elegir
+   "Guardar como PDF" -- no hace falta una librería aparte. Esto oculta la
+   navegación y cualquier botón marcado .no-imprimir del resultado. */
+@media print {
+  .barra-panel, .no-imprimir { display: none !important; }
+  body { background: #fff; }
+}

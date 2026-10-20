@@ -136,6 +136,7 @@ export interface Movimiento {
   tipo: "venta" | "compra";
   producto: string | null;
   monto: number | null;
+  moneda: string;
   fecha: string;
   sustento: string | null;
 }
@@ -147,7 +148,7 @@ const TOPE_POR_MODULO = 50;
 // o por cuándo se registró si no. Trae hasta 50 recientes de cada módulo (cota
 // para no leer un módulo entero) y de ahí se queda con los 50 más nuevos en total.
 export async function ultimosMovimientos(supabase: SupabaseClient, empresaId: string, limite = 50): Promise<Movimiento[]> {
-  const { data: datasets, error } = await supabase.from("datasets").select("id, nombre, columnas").eq("empresa_id", empresaId);
+  const { data: datasets, error } = await supabase.from("datasets").select("id, nombre, columnas, moneda").eq("empresa_id", empresaId);
   if (error) throw new Error(error.message);
 
   const candidatos: Movimiento[] = [];
@@ -180,6 +181,7 @@ export async function ultimosMovimientos(supabase: SupabaseClient, empresaId: st
         tipo: tipo === "ventas" ? "venta" : "compra",
         producto,
         monto: Number.isFinite(monto) ? monto : null,
+        moneda: d.moneda ?? "PEN",
         fecha: fechaFila || r.created_at,
         sustento: r.sustento ?? null,
       });
