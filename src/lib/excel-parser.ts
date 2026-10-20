@@ -282,6 +282,10 @@ function parsearHojaDeWorkbook(
         if (col.tipo === "fecha" && v !== null) {
           const fecha = parsearFecha(v);
           registro[col.key] = fecha ? formatearFechaISO(fecha) : v;
+        } else if (typeof v === "string") {
+          // Un espacio de más (tipeado a mano en el Excel) rompe la comparación
+          // exacta de los enlaces entre tablas (ver validarEnlaces en dependientes.ts).
+          registro[col.key] = v.trim();
         } else {
           registro[col.key] = v;
         }
