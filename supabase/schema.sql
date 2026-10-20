@@ -364,3 +364,28 @@ create policy "editar etapas de mi empresa" on etapas_cliente for update
   using (empresa_id in (select public.mis_empresas()));
 create policy "borrar etapas de mi empresa" on etapas_cliente for delete
   using (empresa_id in (select public.mis_empresas()));
+
+-- Desde el 30/10/2026 Supabase ya no otorga acceso a la Data API por
+-- defecto a tablas nuevas de "public" -- hay que otorgarlo a mano o la API
+-- (supabase-js/PostgREST) responde "permission denied". RLS sigue siendo
+-- quien de verdad limita qué puede ver/tocar cada usuario; esto solo abre
+-- la puerta de la API, igual que ya tenían las tablas creadas antes de esa
+-- fecha. anon casi no se usa directo (el catálogo público pasa por una
+-- ruta con service_role), pero se otorga igual por si acaso, sin riesgo
+-- porque RLS sigue aplicando.
+do $$
+declare
+  t text;
+begin
+  for t in select unnest(array[
+    'empresas', 'miembros', 'datasets', 'records', 'suscripciones', 'contactos',
+    'metas', 'ia_llamadas', 'highlights', 'recomendacion_usos', 'movimientos_stock',
+    'push_tokens', 'seguimiento_clientes', 'notas_cliente', 'ordenes_compra',
+    'orden_compra_items', 'etapas_cliente'
+  ])
+  loop
+    execute format('grant select on public.%I to anon', t);
+    execute format('grant select, insert, update, delete on public.%I to authenticated', t);
+    execute format('grant select, insert, update, delete on public.%I to service_role', t);
+  end loop;
+end $$;
