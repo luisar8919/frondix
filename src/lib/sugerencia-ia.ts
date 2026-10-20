@@ -1,4 +1,5 @@
 import { ROLES } from "./roles.ts";
+import { aKey, type Columna, type TipoColumna } from "./excel-parser.ts";
 
 // Solo se llama cuando la estructura sale "confusa" de las reglas normales (ver
 // estructuraConfusa en roles.ts): no en cada importación, para no gastar de más.
@@ -144,4 +145,84 @@ Responde ÚNICAMENTE con JSON válido, sin texto antes ni después, un elemento 
     const tipo = resultado[i]?.tipo;
     return tipo === "venta" || tipo === "compra" ? tipo : null;
   });
+}
+
+export interface ModuloSugerido {
+  nombre: string;
+  columnas: Columna[];
+}
+
+const TIPOS_VALIDOS = new Set<TipoColumna>(["texto", "numero", "fecha"]);
+
+// Para negocios sin Excel que cargar: en vez de armar las tablas a mano, el
+// dueño describe su negocio con sus palabras y Gemini propone de 1 a 4 módulos
+// (tablas) con sus columnas, usando los mismos roles que ya reconoce el resto
+// de la app (monto, cliente, producto...) para que los módulos nazcan ya
+// enganchados a Reportes, Seguimiento, alertas de stock, etc. -- igual que si
+// se hubieran detectado solo al subir un Excel. Las tablas salen vacías (0
+// filas): el dueño las llena después a mano o subiendo un Excel más adelante.
+export async function sugerirModulosConIA(descripcionNegocio: string): Promise<ModuloSugerido[]> {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) throw new Error("Falta configurar GEMINI_API_KEY para usar la sugerencia por IA.");
+
+  const prompt = `Ayudas a armar la estructura inicial de Frondix (un gestor tipo micro-ERP/CRM para
+negocios pequeños y medianos de LatAm) para un negocio que todavía no tiene ningún Excel que cargar.
+El dueño describió su negocio así:
+
+"${descripcionNegocio.slice(0, 500)}"
+
+Proponé de 1 a 4 módulos (tablas) que ese negocio necesita para empezar a registrar su día a día (por
+ejemplo: Ventas, Compras, y si tiene sentido para ese rubro, uno propio del negocio como Reservas,
+Citas, Proyectos, Pedidos...). Para cada módulo, proponé sus columnas EN ESPAÑOL, claras y cortas.
+
+Para cada columna asigná, cuando aplique, uno de estos roles de negocio (así la columna queda
+automáticamente conectada a Reportes, alertas de stock, cuentas por cobrar/pagar, etc. -- usalos
+siempre que la columna encaje, no inventes columnas sueltas si un rol ya cubre lo que hace falta):
+${ROLES.map((r) => `- ${r.valor}: ${r.etiqueta}`).join("\n")}
+
+Si una columna no corresponde a ninguno de esos roles, dejá "rol" en null (por ejemplo un campo propio
+del rubro, como "Mesa" en un restaurante o "Talla" en una tienda de ropa) -- es totalmente válido tener
+columnas así, no todo tiene que mapear a un rol.
+
+Cada columna tiene un "tipo": "texto", "numero" o "fecha".
+
+Responde ÚNICAMENTE con JSON válido, sin texto antes ni después, con esta forma exacta:
+{"modulos":[{"nombre":"Ventas","columnas":[{"label":"Fecha","tipo":"fecha","rol":"fecha"},{"label":"Cliente","tipo":"texto","rol":"cliente"}]}]}`;
+
+  const res = await fetch(`${GEMINI_API}?key=${apiKey}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      contents: [{ parts: [{ text: prompt }] }],
+      generationConfig: { temperature: 0.3, maxOutputTokens: 2000, responseMimeType: "application/json" },
+    }),
+  });
+
+  if (!res.ok) {
+    const cuerpo = await res.text().catch(() => "");
+    throw new Error(`Gemini respondió ${res.status}: ${cuerpo.slice(0, 300)}`);
+  }
+
+  const data = await res.json();
+  const texto: string = data.candidates?.[0]?.content?.parts?.[0]?.text ?? "{}";
+  let modulos: { nombre?: string; columnas?: { label?: string; tipo?: string; rol?: string | null }[] }[] = [];
+  try {
+    modulos = JSON.parse(texto).modulos ?? [];
+  } catch {
+    throw new Error("La IA no devolvió una estructura válida. Intenta describir tu negocio de otra forma.");
+  }
+
+  return modulos
+    .filter((m) => m.nombre && m.columnas?.length)
+    .slice(0, 4)
+    .map((m) => {
+      const usados = new Set<string>();
+      const columnas: Columna[] = (m.columnas ?? []).slice(0, 15).map((c) => {
+        const label = (c.label || "Campo").slice(0, 60);
+        const tipo = TIPOS_VALIDOS.has(c.tipo as TipoColumna) ? (c.tipo as TipoColumna) : "texto";
+        const rol = c.rol && (ROLES.map((r) => r.valor) as string[]).includes(c.rol) ? (c.rol as Columna["rol"]) : null;
+        return { key: aKey(label, usados), label, tipo, rol, sospechosa: false };
+      });
+      return { nombre: m.nombre!.slice(0, 120), columnas };
+    });
 }

@@ -24,6 +24,7 @@ export default function DynamicTable({
   onEditar,
   onEliminar,
   onEditarCelda,
+  onGuardarFila,
   onEditarSustento,
 }: {
   columnas: Columna[];
@@ -35,6 +36,9 @@ export default function DynamicTable({
   // edición rápida de un solo campo con doble clic en la celda; null = guardado
   // (o el usuario canceló una advertencia), string = mensaje de error a mostrar
   onEditarCelda?: (r: { id: string; data: Record<string, unknown> }, columna: Columna, nuevoValor: unknown) => Promise<string | null>;
+  // guarda varios campos de UN registro de una vez (modo "editar toda la tabla");
+  // null = guardado, string = error. Mismo registro, ya con los valores tipados.
+  onGuardarFila?: (r: { id: string; data: Record<string, unknown> }, datos: Record<string, unknown>) => Promise<string | null>;
   // guarda el sustento contable (boleta/factura) de un registro; null = guardado, string = error
   onEditarSustento?: (r: { id: string }, texto: string) => Promise<string | null>;
 }) {
@@ -44,6 +48,42 @@ export default function DynamicTable({
   const [guardandoCelda, setGuardandoCelda] = useState(false);
   const [errorCelda, setErrorCelda] = useState("");
   const guardandoRef = useRef(false); // evita doble guardado: Enter dispara blur justo después
+
+  // Modo "editar toda la tabla": en vez de doble clic campo por campo, todas las
+  // celdas editables (no enlazadas, igual que el doble clic) quedan como input a
+  // la vez; los cambios se juntan acá y se mandan de a un PATCH por fila recién
+  // al tocar "Guardar cambios".
+  const [modoTabla, setModoTabla] = useState(false);
+  const [edicionesTabla, setEdicionesTabla] = useState<Record<string, Record<string, string>>>({});
+  const [guardandoTabla, setGuardandoTabla] = useState(false);
+  const [errorTabla, setErrorTabla] = useState("");
+
+  function cambiarCeldaTabla(id: string, key: string, valor: string) {
+    setEdicionesTabla((eds) => ({ ...eds, [id]: { ...eds[id], [key]: valor } }));
+  }
+
+  async function guardarModoTabla() {
+    if (!onGuardarFila) return;
+    setGuardandoTabla(true);
+    setErrorTabla("");
+    const errores: string[] = [];
+    for (const [id, cambios] of Object.entries(edicionesTabla)) {
+      const r = registros.find((x) => x.id === id);
+      if (!r || Object.keys(cambios).length === 0) continue;
+      const datos = Object.fromEntries(
+        Object.entries(cambios).map(([key, texto]) => {
+          const col = columnas.find((c) => c.key === key)!;
+          return [key, valorDesdeTexto(col, texto)];
+        })
+      );
+      const error = await onGuardarFila(r, datos);
+      if (error) errores.push(error);
+      else setEdicionesTabla((eds) => { const { [id]: _quitado, ...resto } = eds; return resto; });
+    }
+    setGuardandoTabla(false);
+    if (errores.length > 0) setErrorTabla(errores.join(" / "));
+    else setModoTabla(false);
+  }
 
   const [sustentoAbierto, setSustentoAbierto] = useState<string | null>(null);
   const [valorSustento, setValorSustento] = useState("");
@@ -65,7 +105,7 @@ export default function DynamicTable({
   }
 
   function abrirCelda(r: { id: string; data: Record<string, unknown> }, c: Columna) {
-    if (!onEditarCelda || c.enlace) return; // enlazadas se editan desde el formulario (necesitan el autocompletado)
+    if (!onEditarCelda || c.enlace || modoTabla) return; // enlazadas se editan desde el formulario (necesitan el autocompletado)
     const v = r.data[c.key];
     setCelda({ id: r.id, key: c.key });
     setValorCelda(c.tipo === "fecha" && v ? String(v).slice(0, 10) : v === null || v === undefined ? "" : String(v));
@@ -92,6 +132,25 @@ export default function DynamicTable({
 
   return (
     <>
+      {onGuardarFila && (
+        <div style={{ display: "flex", gap: 10, alignItems: "center", marginBottom: 10, flexWrap: "wrap" }}>
+          {modoTabla ? (
+            <>
+              <button type="button" className="btn btn-primario" onClick={guardarModoTabla} disabled={guardandoTabla || Object.keys(edicionesTabla).length === 0}>
+                {guardandoTabla ? "Guardando..." : "Guardar cambios"}
+              </button>
+              <button type="button" className="btn btn-fantasma" onClick={() => { setModoTabla(false); setEdicionesTabla({}); setErrorTabla(""); }} disabled={guardandoTabla}>
+                Cancelar
+              </button>
+              {errorTabla && <span className="alerta alerta-error pequeno" role="alert">{errorTabla}</span>}
+            </>
+          ) : (
+            <button type="button" className="btn btn-secundario" onClick={() => setModoTabla(true)}>
+              Editar toda la tabla
+            </button>
+          )}
+        </div>
+      )}
       <div className="tabla-envoltura" tabIndex={0} role="region" aria-label="Tabla de datos">
         <table>
           <thead>
@@ -117,7 +176,7 @@ export default function DynamicTable({
                       key={c.key}
                       className={c.tipo === "numero" ? "num" : undefined}
                       onDoubleClick={() => abrirCelda(r, c)}
-                      title={onEditarCelda && !c.enlace ? "Doble clic para editar" : undefined}
+                      title={onEditarCelda && !c.enlace && !modoTabla ? "Doble clic para editar" : undefined}
                     >
                       {editandoEstaCelda ? (
                         <>
@@ -137,6 +196,15 @@ export default function DynamicTable({
                           />
                           {errorCelda && <span className="alerta alerta-error" style={{ display: "block", fontSize: 11, padding: "2px 6px" }}>{errorCelda}</span>}
                         </>
+                      ) : modoTabla && onGuardarFila && !c.enlace ? (
+                        <input
+                          type={c.tipo === "numero" ? "number" : c.tipo === "fecha" ? "date" : "text"}
+                          step={c.tipo === "numero" ? "any" : undefined}
+                          disabled={guardandoTabla}
+                          value={edicionesTabla[r.id]?.[c.key] ?? texto}
+                          onChange={(e) => cambiarCeldaTabla(r.id, c.key, e.target.value)}
+                          style={{ width: "100%", minWidth: 80 }}
+                        />
                       ) : c.enlace && texto ? (
                         <Link href={urlFiltrada(c.enlace.datasetId, c.enlace.columnaKey, valor)}>{texto}</Link>
                       ) : (

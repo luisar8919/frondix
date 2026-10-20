@@ -224,6 +224,9 @@ export default function UploadPage() {
 
       {!grupos && !resultado && (
         <div className="tarjeta" style={{ maxWidth: 760 }}>
+          <p className="suave pequeno" style={{ marginTop: 0 }}>
+            ¿No tienes un Excel? <Link href="/dashboard/upload/nuevo-negocio">Cuéntanos de tu negocio</Link> y te proponemos las tablas.
+          </p>
           <label htmlFor="archivo">Tu archivo de Excel</label>
           <input
             id="archivo"

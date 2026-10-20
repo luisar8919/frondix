@@ -35,7 +35,7 @@ export interface OpcionesParseo {
   sinEncabezado?: boolean;
 }
 
-function aKey(label: string, usados: Set<string>): string {
+export function aKey(label: string, usados: Set<string>): string {
   let key = label
     .toString()
     .trim()

@@ -184,6 +184,20 @@ export default function DatasetPage({
     return null;
   }
 
+  // Igual que guardarCelda, pero junta varios campos de la misma fila en un
+  // solo PATCH (modo "editar toda la tabla" de DynamicTable). Sin deshacer
+  // (el botón Deshacer solo cubre un campo a la vez, ver ultimoCambio) y sin
+  // el prompt de motivo de ajuste de Stock -- pedirlo por cada fila editada en
+  // bloque sería más fricción que ayuda; el Kardex igual registra el cambio.
+  async function guardarFila(r: Registro, cambios: Record<string, unknown>): Promise<string | null> {
+    const datos = { ...r.data, ...cambios };
+    const res = await enviarConfirmando(`/api/records/${datasetId}/${r.id}`, "PATCH", { data: datos });
+    if (res.cancelado) return null;
+    if (!res.ok) return res.body.error ?? "No se pudo guardar el cambio";
+    setRegistros((rs) => rs.map((x) => (x.id === res.body.record.id ? { ...x, data: res.body.record.data, updated_by: res.body.record.updated_by, updated_at: res.body.record.updated_at } : x)));
+    return null;
+  }
+
   async function deshacerUltimoCambio() {
     if (!ultimoCambio) return;
     const r = registros.find((x) => x.id === ultimoCambio.registroId);
@@ -373,6 +387,7 @@ export default function DatasetPage({
         onEditar={(r) => { setEditando(r); window.scrollTo({ top: 0, behavior: "smooth" }); }}
         onEliminar={eliminarRegistro}
         onEditarCelda={guardarCelda}
+        onGuardarFila={guardarFila}
         onEditarSustento={guardarSustento}
         columnas={dataset.columnas}
         registros={registrosFiltrados.map((r) => ({ ...r, updatedBy: r.updated_by, updatedAt: r.updated_at }))}
