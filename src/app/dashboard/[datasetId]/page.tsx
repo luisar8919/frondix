@@ -14,6 +14,8 @@ import { filtrarPorColumna, relacionesEntrantes, type DatasetResumen } from "@/l
 import { esStock } from "@/lib/stock";
 import { crearClienteBrowser } from "@/lib/supabase/client";
 import { empresaDelUsuario } from "@/lib/sesion";
+import { Capacitor } from "@capacitor/core";
+import { BarcodeScanner } from "@capacitor-mlkit/barcode-scanning";
 
 interface Registro {
   id: string;
@@ -52,6 +54,28 @@ export default function DatasetPage({
   // guarda el valor de ANTES del último cambio, para poder volver a escribirlo.
   const [ultimoCambio, setUltimoCambio] = useState<{ registroId: string; columnaKey: string; columnaLabel: string; valorAnterior: unknown } | null>(null);
   const [esVendedor, setEsVendedor] = useState(false);
+  const [escaneando, setEscaneando] = useState(false);
+
+  // Conteo de inventario con la cámara del celular (solo dentro de la app
+  // nativa): escanea un código y lo usa como búsqueda de texto -- encuentra el
+  // producto sea cual sea la columna donde esté el código (SKU, nombre, etc.),
+  // reutilizando el buscador que ya existe en vez de armar un filtro aparte.
+  async function escanear() {
+    setEscaneando(true);
+    try {
+      const permiso = await BarcodeScanner.checkPermissions();
+      if (permiso.camera !== "granted") {
+        const pedido = await BarcodeScanner.requestPermissions();
+        if (pedido.camera !== "granted") return;
+      }
+      const { barcodes } = await BarcodeScanner.scan();
+      if (barcodes[0]?.rawValue) setBusqueda(barcodes[0].rawValue);
+    } catch {
+      // el usuario cerró la cámara o no hay una disponible -- no es un error que avisar
+    } finally {
+      setEscaneando(false);
+    }
+  }
 
   useEffect(() => {
     (async () => {
@@ -314,6 +338,11 @@ export default function DatasetPage({
           value={busqueda}
           onChange={(e) => setBusqueda(e.target.value)}
         />
+        {esStock(dataset.columnas) && Capacitor.isNativePlatform() && (
+          <button type="button" className="btn btn-secundario" onClick={escanear} disabled={escaneando}>
+            {escaneando ? "Abriendo cámara..." : "📷 Escanear código"}
+          </button>
+        )}
         <span className="suave pequeno" aria-live="polite">
           {registrosFiltrados.length.toLocaleString("es-PE")} de {registros.length.toLocaleString("es-PE")}
         </span>
