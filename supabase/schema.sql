@@ -365,6 +365,20 @@ create policy "editar etapas de mi empresa" on etapas_cliente for update
 create policy "borrar etapas de mi empresa" on etapas_cliente for delete
   using (empresa_id in (select public.mis_empresas()));
 
+-- Hitos del negocio (migracion 25): ver src/lib/logros.ts para el catálogo.
+create table logros (
+  id uuid primary key default gen_random_uuid(),
+  empresa_id uuid not null references empresas(id) on delete cascade,
+  clave text not null,
+  logrado_en timestamptz not null default now(),
+  unique (empresa_id, clave)
+);
+alter table logros enable row level security;
+create policy "ver logros de mi empresa" on logros for select
+  using (empresa_id in (select public.mis_empresas()));
+create policy "insertar logros de mi empresa" on logros for insert
+  with check (empresa_id in (select public.mis_empresas()));
+
 -- Desde el 30/10/2026 Supabase ya no otorga acceso a la Data API por
 -- defecto a tablas nuevas de "public" -- hay que otorgarlo a mano o la API
 -- (supabase-js/PostgREST) responde "permission denied". RLS sigue siendo
@@ -381,7 +395,7 @@ begin
     'empresas', 'miembros', 'datasets', 'records', 'suscripciones', 'contactos',
     'metas', 'ia_llamadas', 'highlights', 'recomendacion_usos', 'movimientos_stock',
     'push_tokens', 'seguimiento_clientes', 'notas_cliente', 'ordenes_compra',
-    'orden_compra_items', 'etapas_cliente'
+    'orden_compra_items', 'etapas_cliente', 'logros'
   ])
   loop
     execute format('grant select on public.%I to anon', t);

@@ -3,6 +3,7 @@
 import { Fragment, useEffect, useState } from "react";
 import { crearClienteBrowser } from "@/lib/supabase/client";
 import { formatearMonto } from "@/lib/moneda";
+import { marcarLogroCliente } from "@/lib/marcarLogro";
 
 interface Movimiento {
   id: string;
@@ -73,8 +74,8 @@ export default function ReporteBalance() {
           </p>
         </div>
         <div className="acciones no-imprimir">
-          <a href="/api/export/balance" className="btn btn-secundario">Exportar a Excel</a>
-          <button type="button" className="btn btn-fantasma" onClick={() => window.print()}>Exportar a PDF</button>
+          <a href="/api/export/balance" className="btn btn-secundario" onClick={() => marcarLogroCliente("exportaste_reporte")}>Exportar a Excel</a>
+          <button type="button" className="btn btn-fantasma" onClick={() => { window.print(); marcarLogroCliente("exportaste_reporte"); }}>Exportar a PDF</button>
         </div>
       </div>
 

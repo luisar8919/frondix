@@ -5,6 +5,7 @@ import { empresaDelUsuarioServidor } from "@/lib/sesionServidor";
 import CuentasPorCobrar from "@/components/CuentasPorCobrar";
 import CuentasPorPagar from "@/components/CuentasPorPagar";
 import ConsejosInicio from "@/components/ConsejosInicio";
+import Logros from "@/components/Logros";
 import { rolEnEmpresa } from "@/lib/permisos";
 import { tipoModulo, type RolColumna } from "@/lib/roles";
 import type { Columna } from "@/lib/excel-parser";
@@ -60,6 +61,8 @@ export default async function DashboardPage() {
           <Link href="/dashboard/upload" className="btn btn-primario btn-grande">Subir mi primer Excel</Link>
         </div>
       )}
+
+      <Logros />
 
       {hayModulos && (
         <div className="grilla-tablas" style={{ marginBottom: 20 }}>

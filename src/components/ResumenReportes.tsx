@@ -8,6 +8,7 @@ import { tieneSuscripcionActiva } from "@/lib/suscripcion";
 import { empresaDelUsuario } from "@/lib/sesion";
 import Barra from "@/components/Barra";
 import { recortarMesesSinDatos } from "@/lib/reportes";
+import { marcarLogroCliente } from "@/lib/marcarLogro";
 
 interface TotalMes { mes: string; total: number; registros: number }
 interface RankingItem { clave: string; total: number; veces: number }
@@ -126,7 +127,7 @@ export default function ResumenReportes() {
           </p>
         </div>
         <div className="acciones no-imprimir">
-          <button type="button" className="btn btn-fantasma" onClick={() => window.print()}>Exportar a PDF</button>
+          <button type="button" className="btn btn-fantasma" onClick={() => { window.print(); marcarLogroCliente("exportaste_reporte"); }}>Exportar a PDF</button>
         </div>
       </div>
 

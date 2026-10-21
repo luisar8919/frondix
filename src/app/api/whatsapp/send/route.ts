@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { crearClienteServidor } from "@/lib/supabase/server";
 import { enviarTexto } from "@/lib/whatsapp";
 import { tieneSuscripcionActiva } from "@/lib/suscripcion";
+import { marcarLogro } from "@/lib/logros";
 
 // Endpoint manual para probar el envío desde la UI (ej. botón "recordar" en un record).
 export async function POST(req: NextRequest) {
@@ -24,6 +25,7 @@ export async function POST(req: NextRequest) {
 
   try {
     await enviarTexto(telefono, mensaje);
+    await marcarLogro(supabase, empresaId, "whatsapp_enviado");
     return NextResponse.json({ ok: true });
   } catch (e) {
     return NextResponse.json({ error: e instanceof Error ? e.message : "Error enviando" }, { status: 502 });
