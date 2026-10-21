@@ -13,7 +13,12 @@ export default async function DashboardPage() {
   const supabase = await crearClienteServidor();
   // El middleware no corre en Azure Static Web Apps: la página misma exige la sesión.
   const sesion = await empresaDelUsuarioServidor(supabase);
-  if (!sesion.ok) redirect("/login");
+  // "No se pudo identificar tu empresa" es un usuario YA logueado que nunca
+  // terminó de crear su negocio (signup interrumpido, o quedó sin miembros) --
+  // mandarlo a /login ahí se veía igual que una contraseña incorrecta, sin
+  // ninguna pista real. /auth/completar ya sabe pedirle el nombre del negocio
+  // en ese caso (mismo paso que ve alguien que entra con Google por primera vez).
+  if (!sesion.ok) redirect(sesion.error === "No se pudo identificar tu empresa." ? "/auth/completar" : "/login");
 
   const { data: datasetsCrudos } = await supabase
     .from("datasets")

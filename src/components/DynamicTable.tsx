@@ -66,7 +66,13 @@ export default function DynamicTable({
     if (!onGuardarFila) return;
     setGuardandoTabla(true);
     setErrorTabla("");
+    // Las filas que sí se guardan recién se sacan de edicionesTabla todas
+    // juntas al final (no una por una dentro del for): si se sacaban antes,
+    // esa celda caía un instante en el valor de `registros` (el prop, que
+    // todavía no se repintó con el guardado) mientras las demás filas seguían
+    // guardándose -- se veía como un parpadeo a vacío fila por fila.
     const errores: string[] = [];
+    const idsGuardados: string[] = [];
     for (const [id, cambios] of Object.entries(edicionesTabla)) {
       const r = registros.find((x) => x.id === id);
       if (!r || Object.keys(cambios).length === 0) continue;
@@ -78,8 +84,9 @@ export default function DynamicTable({
       );
       const error = await onGuardarFila(r, datos);
       if (error) errores.push(error);
-      else setEdicionesTabla((eds) => { const { [id]: _quitado, ...resto } = eds; return resto; });
+      else idsGuardados.push(id);
     }
+    setEdicionesTabla((eds) => Object.fromEntries(Object.entries(eds).filter(([id]) => !idsGuardados.includes(id))));
     setGuardandoTabla(false);
     if (errores.length > 0) setErrorTabla(errores.join(" / "));
     else setModoTabla(false);

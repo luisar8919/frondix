@@ -124,7 +124,11 @@ export default function DynamicForm({
   }
 
   return (
-    <form onSubmit={handleSubmit}>
+    // noValidate: sin esto, el navegador bloqueaba un número negativo con su
+    // propio aviso nativo (en el idioma del navegador, no necesariamente
+    // español) ANTES de que corriera la validación de abajo -- el mensaje
+    // propio ("X no puede ser negativo") nunca llegaba a mostrarse.
+    <form onSubmit={handleSubmit} noValidate>
       <div className="grilla-form">
         {columnas.map((c) => {
           const enlazada = !!c.enlace;
