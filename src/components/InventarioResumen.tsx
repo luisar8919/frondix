@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import AlertasStock from "@/components/AlertasStock";
 import ValorizacionStock from "@/components/ValorizacionStock";
 import KardexProducto from "@/components/KardexProducto";
 import CatalogoCompartir from "@/components/CatalogoCompartir";
@@ -10,10 +9,10 @@ interface ModuloStock { datasetId: string; nombre: string; productos: string[] }
 interface StockPorAlmacen { datasetId: string; datasetNombre: string; cantidad: number }
 interface ProductoCombinado { producto: string; total: number; porAlmacen: StockPorAlmacen[] }
 
-// Todo lo de inventario junto en un solo lugar (antes repartido entre Inicio
-// y Reportes -> Balance): alertas de stock por agotarse, valorización de
-// mercadería, el total combinado cuando hay más de un almacén (cada módulo de
-// Stock es, en los hechos, un almacén propio), y el Kardex de cada producto.
+// "Módulos > Stock > Reporte": valorización de mercadería, el total combinado
+// cuando hay más de un almacén (cada módulo de Stock es, en los hechos, un
+// almacén propio), y el Kardex de cada producto. Las alertas de stock por
+// agotarse viven aparte, en "Seguimiento > Alertas" (ver AlertasStock.tsx).
 export default function InventarioResumen() {
   const [stock, setStock] = useState<ModuloStock[] | null>(null);
   const [combinado, setCombinado] = useState<ProductoCombinado[]>([]);
@@ -31,12 +30,11 @@ export default function InventarioResumen() {
     <>
       <div className="panel-cabecera">
         <div>
-          <h1>Inventario</h1>
-          <p className="suave">Alertas de stock, cuánto vale tu mercadería, y el historial de cada producto.</p>
+          <h1>Stock</h1>
+          <p className="suave">Cuánto vale tu mercadería y el historial de cada producto.</p>
         </div>
       </div>
 
-      <AlertasStock />
       <ValorizacionStock />
       <CatalogoCompartir />
 

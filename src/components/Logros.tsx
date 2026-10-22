@@ -81,13 +81,10 @@ export default function Logros() {
 
   return (
     <div className="tarjeta" style={{ marginBottom: 20, padding: 20 }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
-        <h3 style={{ margin: 0 }}>Hitos de tu negocio</h3>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+        <h3 style={{ margin: 0 }}>Plan gratis</h3>
         <span className="suave pequeno">{logradosGratis} de {gratis.length}</span>
       </div>
-      <p className="suave pequeno" style={{ margin: "0 0 10px" }}>
-        Vas probando Frondix a tu ritmo -- cada uno de estos es una función real de la app.
-      </p>
       <ul style={{ listStyle: "none", margin: 0, padding: 0 }}>
         {gratis.map((l) => <Fila key={l.clave} l={l} />)}
       </ul>

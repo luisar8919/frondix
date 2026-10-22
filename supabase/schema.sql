@@ -379,6 +379,25 @@ create policy "ver logros de mi empresa" on logros for select
 create policy "insertar logros de mi empresa" on logros for insert
   with check (empresa_id in (select public.mis_empresas()));
 
+-- Ficha de proveedor (migracion 26): directorio manual para "Proveedor >
+-- Registrar" en la barra, antes de la primera compra -- ver src/lib/proveedores.ts.
+create table proveedores_manual (
+  id uuid primary key default gen_random_uuid(),
+  empresa_id uuid not null references empresas(id) on delete cascade,
+  clave text not null,
+  nombre text not null,
+  telefono text,
+  created_at timestamptz not null default now(),
+  unique (empresa_id, clave)
+);
+alter table proveedores_manual enable row level security;
+create policy "ver proveedores manuales de mi empresa" on proveedores_manual for select
+  using (empresa_id in (select public.mis_empresas()));
+create policy "crear proveedores manuales en mi empresa" on proveedores_manual for insert
+  with check (empresa_id in (select public.mis_empresas()));
+create policy "borrar proveedores manuales de mi empresa" on proveedores_manual for delete
+  using (empresa_id in (select public.mis_empresas()));
+
 -- Desde el 30/10/2026 Supabase ya no otorga acceso a la Data API por
 -- defecto a tablas nuevas de "public" -- hay que otorgarlo a mano o la API
 -- (supabase-js/PostgREST) responde "permission denied". RLS sigue siendo
@@ -395,7 +414,7 @@ begin
     'empresas', 'miembros', 'datasets', 'records', 'suscripciones', 'contactos',
     'metas', 'ia_llamadas', 'highlights', 'recomendacion_usos', 'movimientos_stock',
     'push_tokens', 'seguimiento_clientes', 'notas_cliente', 'ordenes_compra',
-    'orden_compra_items', 'etapas_cliente', 'logros'
+    'orden_compra_items', 'etapas_cliente', 'logros', 'proveedores_manual'
   ])
   loop
     execute format('grant select on public.%I to anon', t);
