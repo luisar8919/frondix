@@ -20,6 +20,7 @@ const enlaces = [
 const modulosSubmenu = [
   { href: "/dashboard/ventas/registrar", texto: "Ventas · Registrar" },
   { href: "/dashboard/ventas", texto: "Ventas · Reporte" },
+  { href: "/dashboard/cotizaciones", texto: "Ventas · Cotizaciones" },
   { href: "/dashboard/compras/registrar", texto: "Compras · Registrar" },
   { href: "/dashboard/compras", texto: "Compras · Reporte" },
   { href: "/dashboard/ordenes-compra", texto: "Compras · Órdenes de compra" },

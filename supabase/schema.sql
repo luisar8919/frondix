@@ -398,6 +398,33 @@ create policy "crear proveedores manuales en mi empresa" on proveedores_manual f
 create policy "borrar proveedores manuales de mi empresa" on proveedores_manual for delete
   using (empresa_id in (select public.mis_empresas()));
 
+-- Cotizaciones (migracion 27): un paso antes de la venta confirmada -- ver
+-- src/app/api/cotizaciones.
+create table cotizaciones (
+  id uuid primary key default gen_random_uuid(),
+  empresa_id uuid not null references empresas(id) on delete cascade,
+  cliente text not null,
+  producto text not null,
+  monto numeric not null,
+  fecha date not null default current_date,
+  estado text not null default 'pendiente' check (estado in ('pendiente', 'aceptada', 'rechazada')),
+  venta_dataset_id uuid references datasets(id) on delete set null,
+  venta_record_id uuid references records(id) on delete set null,
+  notas text,
+  created_by uuid references auth.users(id) on delete set null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+alter table cotizaciones enable row level security;
+create policy "ver cotizaciones de mi empresa" on cotizaciones for select
+  using (empresa_id in (select public.mis_empresas()));
+create policy "crear cotizaciones en mi empresa" on cotizaciones for insert
+  with check (empresa_id in (select public.mis_empresas()));
+create policy "editar cotizaciones de mi empresa" on cotizaciones for update
+  using (empresa_id in (select public.mis_empresas()));
+create policy "borrar cotizaciones de mi empresa" on cotizaciones for delete
+  using (empresa_id in (select public.mis_empresas()));
+
 -- Desde el 30/10/2026 Supabase ya no otorga acceso a la Data API por
 -- defecto a tablas nuevas de "public" -- hay que otorgarlo a mano o la API
 -- (supabase-js/PostgREST) responde "permission denied". RLS sigue siendo
@@ -414,7 +441,7 @@ begin
     'empresas', 'miembros', 'datasets', 'records', 'suscripciones', 'contactos',
     'metas', 'ia_llamadas', 'highlights', 'recomendacion_usos', 'movimientos_stock',
     'push_tokens', 'seguimiento_clientes', 'notas_cliente', 'ordenes_compra',
-    'orden_compra_items', 'etapas_cliente', 'logros', 'proveedores_manual'
+    'orden_compra_items', 'etapas_cliente', 'logros', 'proveedores_manual', 'cotizaciones'
   ])
   loop
     execute format('grant select on public.%I to anon', t);
