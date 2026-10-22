@@ -425,6 +425,28 @@ create policy "editar cotizaciones de mi empresa" on cotizaciones for update
 create policy "borrar cotizaciones de mi empresa" on cotizaciones for delete
   using (empresa_id in (select public.mis_empresas()));
 
+-- Abonos (migracion 28): pagos parciales sobre una cuenta por cobrar -- ver
+-- src/app/api/cuentas-por-cobrar/abonos.
+create table abonos (
+  id uuid primary key default gen_random_uuid(),
+  empresa_id uuid not null references empresas(id) on delete cascade,
+  dataset_id uuid not null references datasets(id) on delete cascade,
+  record_id uuid not null references records(id) on delete cascade,
+  monto numeric not null check (monto > 0),
+  fecha date not null default current_date,
+  notas text,
+  created_by uuid references auth.users(id) on delete set null,
+  created_at timestamptz not null default now()
+);
+create index abonos_record_idx on abonos (record_id, created_at desc);
+alter table abonos enable row level security;
+create policy "ver abonos de mi empresa" on abonos for select
+  using (empresa_id in (select public.mis_empresas()));
+create policy "crear abonos en mi empresa" on abonos for insert
+  with check (empresa_id in (select public.mis_empresas()));
+create policy "borrar abonos de mi empresa" on abonos for delete
+  using (empresa_id in (select public.mis_empresas()));
+
 -- Desde el 30/10/2026 Supabase ya no otorga acceso a la Data API por
 -- defecto a tablas nuevas de "public" -- hay que otorgarlo a mano o la API
 -- (supabase-js/PostgREST) responde "permission denied". RLS sigue siendo
@@ -441,7 +463,7 @@ begin
     'empresas', 'miembros', 'datasets', 'records', 'suscripciones', 'contactos',
     'metas', 'ia_llamadas', 'highlights', 'recomendacion_usos', 'movimientos_stock',
     'push_tokens', 'seguimiento_clientes', 'notas_cliente', 'ordenes_compra',
-    'orden_compra_items', 'etapas_cliente', 'logros', 'proveedores_manual', 'cotizaciones'
+    'orden_compra_items', 'etapas_cliente', 'logros', 'proveedores_manual', 'cotizaciones', 'abonos'
   ])
   loop
     execute format('grant select on public.%I to anon', t);

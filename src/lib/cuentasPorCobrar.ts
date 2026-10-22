@@ -6,6 +6,7 @@ import { tipoModulo } from "./roles.ts";
 export interface CuentaPorCobrar {
   datasetId: string;
   datasetNombre: string;
+  recordId: string;
   cliente: string | null;
   fecha: string | null;
   saldo: number;
@@ -45,15 +46,15 @@ export async function cuentasPorCobrar(supabase: SupabaseClient, empresaId: stri
     const cCliente = columnaConRol(columnas, "cliente");
     const cFecha = columnas.find((c) => c.rol === "fecha" && c.tipo === "fecha" && claveValida(c.key));
 
-    const seleccion = [`saldo:data->>${cSaldo.key}`, cCliente && `cliente:data->>${cCliente.key}`, cFecha && `fecha:data->>${cFecha.key}`]
+    const seleccion = ["id", `saldo:data->>${cSaldo.key}`, cCliente && `cliente:data->>${cCliente.key}`, cFecha && `fecha:data->>${cFecha.key}`]
       .filter(Boolean).join(", ");
     const { data: records, error: errorRecords } = await supabase.from("records").select(seleccion).eq("dataset_id", d.id);
     if (errorRecords) throw new Error(errorRecords.message);
 
-    for (const r of (records ?? []) as unknown as { saldo: string | null; cliente?: string | null; fecha?: string | null }[]) {
+    for (const r of (records ?? []) as unknown as { id: string; saldo: string | null; cliente?: string | null; fecha?: string | null }[]) {
       const saldo = Number(r.saldo);
       if (!Number.isFinite(saldo) || saldo <= 0) continue;
-      cuentas.push({ datasetId: d.id, datasetNombre: d.nombre, cliente: r.cliente ?? null, fecha: r.fecha ?? null, saldo });
+      cuentas.push({ datasetId: d.id, datasetNombre: d.nombre, recordId: r.id, cliente: r.cliente ?? null, fecha: r.fecha ?? null, saldo });
     }
   }
   return { cuentas: cuentas.sort((a, b) => (a.fecha ?? "").localeCompare(b.fecha ?? "")), modulosSinConfigurar };
