@@ -17,19 +17,40 @@ const enlaces = [
 // "Registrar" de Ventas/Compras es un redirect inteligente (ver
 // dashboard/ventas/registrar) a tu único módulo de ese tipo si tienes uno
 // solo; con 0 o varios cae al Reporte, que ya deja elegir/expandir cada uno.
-const modulosSubmenu = [
-  { href: "/dashboard/ventas/registrar", texto: "Ventas · Registrar" },
-  { href: "/dashboard/ventas", texto: "Ventas · Reporte" },
-  { href: "/dashboard/cotizaciones", texto: "Ventas · Cotizaciones" },
-  { href: "/dashboard/compras/registrar", texto: "Compras · Registrar" },
-  { href: "/dashboard/compras", texto: "Compras · Reporte" },
-  { href: "/dashboard/ordenes-compra", texto: "Compras · Órdenes de compra" },
-  { href: "/dashboard/inventario", texto: "Stock · Reporte" },
-  { href: "/dashboard/proveedores/nuevo", texto: "Proveedor · Registrar" },
-  { href: "/dashboard/proveedores", texto: "Proveedor · Reporte" },
-  { href: "/dashboard/pipeline", texto: "Cliente · Registrar" },
-  { href: "/dashboard/clientes", texto: "Cliente · Reporte" },
+const modulosGrupos = [
+  {
+    grupo: "Ventas",
+    items: [
+      { href: "/dashboard/ventas/registrar", texto: "Registrar" },
+      { href: "/dashboard/ventas", texto: "Reporte" },
+      { href: "/dashboard/cotizaciones", texto: "Cotizaciones" },
+    ],
+  },
+  {
+    grupo: "Compras",
+    items: [
+      { href: "/dashboard/compras/registrar", texto: "Registrar" },
+      { href: "/dashboard/compras", texto: "Reporte" },
+      { href: "/dashboard/ordenes-compra", texto: "Órdenes de compra" },
+    ],
+  },
+  { grupo: "Stock", items: [{ href: "/dashboard/inventario", texto: "Reporte" }] },
+  {
+    grupo: "Proveedor",
+    items: [
+      { href: "/dashboard/proveedores/nuevo", texto: "Registrar" },
+      { href: "/dashboard/proveedores", texto: "Reporte" },
+    ],
+  },
+  {
+    grupo: "Cliente",
+    items: [
+      { href: "/dashboard/pipeline", texto: "Registrar" },
+      { href: "/dashboard/clientes", texto: "Reporte" },
+    ],
+  },
 ];
+const modulosSubmenu = modulosGrupos.flatMap((g) => g.items);
 
 const resumenSubmenu = [
   { href: "/dashboard/reportes/resumen", texto: "General" },
@@ -61,10 +82,15 @@ function BotonSubmenu({
   texto,
   items,
   activo,
+  render,
 }: {
   texto: string;
-  items: { href: string; texto: string }[];
+  items?: { href: string; texto: string }[];
   activo: boolean;
+  // Para Módulos: en vez de la lista plana de Links, cada fila abre su propio
+  // flyout (ver FilaConFlyout). Recibe "cerrar" para que navegar adentro del
+  // flyout también cierre este desplegable exterior.
+  render?: (cerrar: () => void) => React.ReactNode;
 }) {
   const [abierto, setAbierto] = useState(false);
   const [pos, setPos] = useState({ top: 0, left: 0 });
@@ -102,14 +128,76 @@ function BotonSubmenu({
       </button>
       {abierto && (
         <div ref={listaRef} className="menu-cuenta-lista" role="menu" style={{ position: "fixed", top: pos.top, left: pos.left, right: "auto" }}>
-          {items.map((s) => (
-            <Link key={s.href} href={s.href} className="menu-cuenta-item" role="menuitem" onClick={() => setAbierto(false)}>
-              {s.texto}
+          {render
+            ? render(() => setAbierto(false))
+            : items?.map((s) => (
+                <Link key={s.href} href={s.href} className="menu-cuenta-item" role="menuitem" onClick={() => setAbierto(false)}>
+                  {s.texto}
+                </Link>
+              ))}
+        </div>
+      )}
+    </>
+  );
+}
+
+// Una fila de grupo (Ventas, Compras...) dentro del desplegable de Módulos:
+// al pasar el mouse por encima (o tocarla, para que funcione sin mouse) abre
+// una segunda cajita pegada a su derecha con Registrar/Reporte/etc -- un
+// pequeño margen de demora al salir evita que se cierre si el cursor pasa por
+// el huequito entre la fila y la cajita.
+function FilaConFlyout({
+  grupo,
+  items,
+  onNavegar,
+}: {
+  grupo: string;
+  items: { href: string; texto: string }[];
+  onNavegar: () => void;
+}) {
+  const [abierto, setAbierto] = useState(false);
+  const [pos, setPos] = useState({ top: 0, left: 0 });
+  const filaRef = useRef<HTMLDivElement>(null);
+  const cierreRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  function abrir() {
+    if (cierreRef.current) clearTimeout(cierreRef.current);
+    const r = filaRef.current?.getBoundingClientRect();
+    if (r) setPos({ top: r.top, left: r.right + 4 });
+    setAbierto(true);
+  }
+  function cerrarConDemora() {
+    cierreRef.current = setTimeout(() => setAbierto(false), 200);
+  }
+
+  return (
+    <div ref={filaRef} onMouseEnter={abrir} onMouseLeave={cerrarConDemora}>
+      <button
+        type="button"
+        className="menu-cuenta-item"
+        style={{ display: "flex", justifyContent: "space-between", alignItems: "center", width: "100%", background: "transparent", border: "none", cursor: "pointer", fontFamily: "inherit" }}
+        aria-haspopup="menu"
+        aria-expanded={abierto}
+        onClick={() => (abierto ? setAbierto(false) : abrir())}
+      >
+        {grupo} <span aria-hidden="true" className="suave">›</span>
+      </button>
+      {abierto && (
+        <div
+          onMouseEnter={abrir}
+          onMouseLeave={cerrarConDemora}
+          className="menu-cuenta-lista"
+          role="menu"
+          style={{ position: "fixed", top: pos.top, left: pos.left, right: "auto" }}
+        >
+          {items.map((it) => (
+            <Link key={it.href} href={it.href} className="menu-cuenta-item" role="menuitem" onClick={() => { setAbierto(false); onNavegar(); }}>
+              {it.texto}
             </Link>
           ))}
         </div>
       )}
-    </>
+    </div>
   );
 }
 
@@ -157,7 +245,13 @@ export default function BarraPanel({ rol }: { rol?: string }) {
               {e.texto}
             </Link>
           ))}
-          {!esVendedor && <BotonSubmenu texto="Módulos" items={modulosSubmenu} activo={activoModulos} />}
+          {!esVendedor && (
+            <BotonSubmenu
+              texto="Módulos"
+              activo={activoModulos}
+              render={(cerrar) => modulosGrupos.map((g) => <FilaConFlyout key={g.grupo} grupo={g.grupo} items={g.items} onNavegar={cerrar} />)}
+            />
+          )}
           {!esVendedor && <BotonSubmenu texto="Resumen" items={resumenSubmenu} activo={activoResumen} />}
           {!esVendedor && <BotonSubmenu texto="Seguimiento" items={seguimientoSubmenu} activo={activoSeguimiento} />}
           {esVendedor && (
