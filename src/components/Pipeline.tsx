@@ -18,8 +18,7 @@ const soles = (n: number) => `S/ ${n.toLocaleString("es-PE", { maximumFractionDi
 
 // Pipeline de ventas: en qué etapa está cada cliente o prospecto. Los que ya
 // compraron algo (vienen de Ventas) empiezan en "Cliente" sola; los prospectos
-// que todavía no compraron nada se agregan a mano. Sin drag&drop -- botones
-// "mover" para adelante/atrás, más simple y accesible.
+// que todavía no compraron nada se agregan a mano.
 export default function Pipeline() {
   const [tarjetas, setTarjetas] = useState<Tarjeta[] | null>(null);
   const [error, setError] = useState("");
@@ -28,6 +27,13 @@ export default function Pipeline() {
   const [telefono, setTelefono] = useState("");
   const [enviando, setEnviando] = useState(false);
   const [errorForm, setErrorForm] = useState("");
+
+  // Arrastre con Pointer Events (mouse Y dedo, una sola API nativa para los
+  // dos -- sin eso HTML5 drag&drop no funciona en touch/WebView). x/y es la
+  // posición actual del dedo/cursor; dx/dy el punto donde lo agarró dentro de
+  // la tarjeta, para que no "salte" al centro al empezar a arrastrar.
+  const [arrastre, setArrastre] = useState<{ tarjeta: Tarjeta; x: number; y: number; dx: number; dy: number } | null>(null);
+  const [columnaSobre, setColumnaSobre] = useState<Etapa | null>(null);
 
   function cargar() {
     fetch("/api/pipeline")
@@ -49,6 +55,33 @@ export default function Pipeline() {
       body: JSON.stringify({ etapa, nombre: t.nombre }),
     });
     if (!res.ok) cargar(); // revierte trayendo el estado real si falló
+  }
+
+  function iniciarArrastre(e: React.PointerEvent<HTMLDivElement>, t: Tarjeta) {
+    if (e.pointerType === "mouse" && e.button !== 0) return;
+    const rect = e.currentTarget.getBoundingClientRect();
+    e.currentTarget.setPointerCapture(e.pointerId);
+    setArrastre({ tarjeta: t, x: e.clientX, y: e.clientY, dx: e.clientX - rect.left, dy: e.clientY - rect.top });
+  }
+
+  function columnaBajoPuntero(x: number, y: number): Etapa | null {
+    const el = document.elementFromPoint(x, y)?.closest<HTMLElement>("[data-columna]");
+    return (el?.dataset.columna as Etapa | undefined) ?? null;
+  }
+
+  function moverArrastre(e: React.PointerEvent<HTMLDivElement>) {
+    if (!arrastre) return;
+    setArrastre((a) => a && { ...a, x: e.clientX, y: e.clientY });
+    setColumnaSobre(columnaBajoPuntero(e.clientX, e.clientY));
+  }
+
+  function soltarArrastre(e: React.PointerEvent<HTMLDivElement>) {
+    if (!arrastre) return;
+    const destino = columnaBajoPuntero(e.clientX, e.clientY);
+    const t = arrastre.tarjeta;
+    setArrastre(null);
+    setColumnaSobre(null);
+    if (destino && destino !== t.etapa) moverA(t, destino);
   }
 
   async function agregarProspecto(e: React.FormEvent) {
@@ -106,12 +139,38 @@ export default function Pipeline() {
           {COLUMNAS.map((col) => {
             const lista = tarjetas.filter((t) => t.etapa === col.etapa);
             return (
-              <div key={col.etapa} className="tarjeta" style={{ padding: 14 }}>
+              <div
+                key={col.etapa}
+                data-columna={col.etapa}
+                className="tarjeta"
+                style={{
+                  padding: 14,
+                  outline: columnaSobre === col.etapa ? "2px solid var(--verde-500)" : undefined,
+                  outlineOffset: -2,
+                  transition: "outline-color 0.1s",
+                }}
+              >
                 <h3 style={{ margin: "0 0 10px", fontSize: 15 }}>{col.titulo} ({lista.length})</h3>
                 {lista.map((t) => {
                   const idx = ORDEN.indexOf(t.etapa);
+                  const seEstaArrastrando = arrastre?.tarjeta.clave === t.clave;
                   return (
-                    <div key={t.clave} className="tarjeta" style={{ padding: 10, marginBottom: 8 }}>
+                    <div
+                      key={t.clave}
+                      className="tarjeta"
+                      onPointerDown={(e) => iniciarArrastre(e, t)}
+                      onPointerMove={moverArrastre}
+                      onPointerUp={soltarArrastre}
+                      onPointerCancel={() => { setArrastre(null); setColumnaSobre(null); }}
+                      style={{
+                        padding: 10,
+                        marginBottom: 8,
+                        cursor: "grab",
+                        touchAction: "none", // si no, el dedo hace scroll de la página en vez de arrastrar
+                        userSelect: "none",
+                        opacity: seEstaArrastrando ? 0.3 : 1,
+                      }}
+                    >
                       <strong style={{ fontSize: 14 }}>
                         {t.manual ? t.nombre : <Link href={`/dashboard/clientes/${encodeURIComponent(t.nombre)}`}>{t.nombre}</Link>}
                       </strong>
@@ -136,6 +195,25 @@ export default function Pipeline() {
               </div>
             );
           })}
+        </div>
+      )}
+
+      {arrastre && (
+        <div
+          className="tarjeta"
+          style={{
+            position: "fixed",
+            top: arrastre.y - arrastre.dy,
+            left: arrastre.x - arrastre.dx,
+            width: 200,
+            padding: 10,
+            pointerEvents: "none",
+            zIndex: 1000,
+            boxShadow: "var(--sombra)",
+            opacity: 0.95,
+          }}
+        >
+          <strong style={{ fontSize: 14 }}>{arrastre.tarjeta.nombre}</strong>
         </div>
       )}
     </>
