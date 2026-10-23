@@ -91,16 +91,31 @@ export async function GET(req: NextRequest) {
     }
   }
 
+  // "Mejor esfuerzo" por empresa: si el push de UNA falla (ej. Firebase mal
+  // configurado en el entorno), no debe tumbar el cron entero ni dejar sin
+  // avisar a las demás empresas que sí tenían todo en orden -- antes, un
+  // solo error acá hacía que el job completo respondiera 500.
+  let empresasConError = 0;
   for (const [empresaId, nombres] of caducadosPorEmpresa) {
-    const { data: miembros } = await supabase.from("miembros").select("user_id").eq("empresa_id", empresaId);
-    const userIds = (miembros ?? []).map((m) => m.user_id);
-    const { data: empresa } = await supabase.from("empresas").select("nombre").eq("id", empresaId).single();
-    const titulo = nombres.length === 1 ? "Un cliente no volvió" : `${nombres.length} clientes no volvieron`;
-    const cuerpo = nombres.length <= 3
-      ? `${nombres.join(", ")} llevan ${UMBRAL_DIAS}+ días sin comprar en ${empresa?.nombre ?? "tu negocio"}.`
-      : `${nombres.slice(0, 2).join(", ")} y ${nombres.length - 2} más llevan ${UMBRAL_DIAS}+ días sin comprar.`;
-    await enviarPush(supabase, userIds, titulo, cuerpo, { tipo: "seguimiento_caducado" });
+    try {
+      const { data: miembros } = await supabase.from("miembros").select("user_id").eq("empresa_id", empresaId);
+      const userIds = (miembros ?? []).map((m) => m.user_id);
+      const { data: empresa } = await supabase.from("empresas").select("nombre").eq("id", empresaId).single();
+      const titulo = nombres.length === 1 ? "Un cliente no volvió" : `${nombres.length} clientes no volvieron`;
+      const cuerpo = nombres.length <= 3
+        ? `${nombres.join(", ")} llevan ${UMBRAL_DIAS}+ días sin comprar en ${empresa?.nombre ?? "tu negocio"}.`
+        : `${nombres.slice(0, 2).join(", ")} y ${nombres.length - 2} más llevan ${UMBRAL_DIAS}+ días sin comprar.`;
+      await enviarPush(supabase, userIds, titulo, cuerpo, { tipo: "seguimiento_caducado" });
+    } catch (e) {
+      empresasConError++;
+      console.error(`seguimiento-push: fallo al notificar a la empresa ${empresaId}:`, e instanceof Error ? e.message : e);
+    }
   }
 
-  return NextResponse.json({ revisados: activados.length, avisos: avisosPendientes, empresasNotificadas: caducadosPorEmpresa.size });
+  return NextResponse.json({
+    revisados: activados.length,
+    avisos: avisosPendientes,
+    empresasNotificadas: caducadosPorEmpresa.size - empresasConError,
+    empresasConError,
+  });
 }
