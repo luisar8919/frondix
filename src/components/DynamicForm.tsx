@@ -1,6 +1,8 @@
 "use client";
 
 import { useState } from "react";
+import { Capacitor } from "@capacitor/core";
+import { BarcodeScanner } from "@capacitor-mlkit/barcode-scanning";
 import type { Columna } from "@/lib/excel-parser";
 import { tipoModulo, camposObligatorios, admiteNegativos } from "@/lib/roles";
 
@@ -73,9 +75,31 @@ export default function DynamicForm({
   const [modoNuevo, setModoNuevo] = useState<Record<string, boolean>>(modoNuevoInicial);
   const [enviando, setEnviando] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [escaneando, setEscaneando] = useState<string | null>(null); // key de la columna que está escaneando
 
   const tipo = tipoModulo(columnas.map((c) => c.rol));
   const obligatorios = new Set(camposObligatorios(tipo));
+
+  // Escanear el código de barras de un artículo comprado y usarlo directo
+  // como Producto -- mismo patrón que el buscador de Stock en
+  // dashboard/[datasetId]/page.tsx (cámara nativa vía ML Kit).
+  async function escanear(c: Columna) {
+    setEscaneando(c.key);
+    try {
+      const permiso = await BarcodeScanner.checkPermissions();
+      if (permiso.camera !== "granted") {
+        const pedido = await BarcodeScanner.requestPermissions();
+        if (pedido.camera !== "granted") return;
+      }
+      const { barcodes } = await BarcodeScanner.scan();
+      const valor = barcodes[0]?.rawValue;
+      if (valor) setValores((v) => ({ ...v, [c.key]: valor }));
+    } catch {
+      // el usuario cerró la cámara o no hay una disponible -- no es un error que avisar
+    } finally {
+      setEscaneando(null);
+    }
+  }
 
   function cambiarEnlace(c: Columna, valor: string) {
     if (valor === NUEVO) {
@@ -170,6 +194,17 @@ export default function DynamicForm({
                   value={valores[c.key] ?? ""}
                   onChange={(e) => setValores({ ...valores, [c.key]: e.target.value })}
                 />
+              )}
+              {c.rol === "producto" && tipo === "compras" && Capacitor.isNativePlatform() && (!enlazada || enModoNuevo) && (
+                <button
+                  type="button"
+                  className="btn btn-fantasma pequeno"
+                  style={{ padding: "2px 8px", marginTop: 4 }}
+                  onClick={() => escanear(c)}
+                  disabled={escaneando === c.key}
+                >
+                  {escaneando === c.key ? "Abriendo cámara..." : "📷 Escanear código"}
+                </button>
               )}
               {enlazada && hayExistentes && (
                 // Autocompletado nativo: al tipear coincide con un valor ya enlazado y
