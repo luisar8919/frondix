@@ -36,6 +36,10 @@ export default function Logros() {
   const pago = logros.filter((l) => l.pago);
   const logradosGratis = gratis.filter((l) => l.logrado).length;
   const logradosPago = pago.filter((l) => l.logrado).length;
+  // Siguiente paso sugerido: el primer hito sin marcar, en el orden del
+  // catálogo (ver LOGROS en src/lib/logros.ts) -- empuja a probar el próximo
+  // rincón de la app en vez de dejar que el usuario adivine por dónde seguir.
+  const siguiente = logros.find((l) => !l.logrado && !(l.pago && !pagado));
 
   const Fila = ({ l }: { l: LogroEstado }) => {
     const bloqueado = l.pago && !pagado;
@@ -81,6 +85,12 @@ export default function Logros() {
 
   return (
     <div className="tarjeta" style={{ marginBottom: 20, padding: 20 }}>
+      {siguiente && (
+        <p className="alerta alerta-aviso" style={{ marginTop: 0, marginBottom: 18 }}>
+          Siguiente paso sugerido: <strong>{siguiente.titulo}</strong> — {siguiente.descripcion}
+        </p>
+      )}
+
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
         <h3 style={{ margin: 0 }}>Plan gratis</h3>
         <span className="suave pequeno">{logradosGratis} de {gratis.length}</span>

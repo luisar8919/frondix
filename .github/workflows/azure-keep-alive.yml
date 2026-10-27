@@ -1,0 +1,18 @@
+name: Mantener tibio Azure
+
+# Azure Static Web Apps Free duerme las Functions tras un rato sin tráfico
+# (cold-start de varios segundos en la próxima visita). Esto pega a la home
+# cada 10 min para que casi nunca le toque a un usuario real despertarla.
+# Costo: minutos de GitHub Actions, gratis dentro del free tier.
+on:
+  schedule:
+    - cron: "*/10 * * * *"
+  workflow_dispatch: {}
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Pegarle a la home
+        run: |
+          curl -s -o /dev/null -w "HTTP %{http_code}\n" "https://www.frondix.com/"

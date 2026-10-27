@@ -411,6 +411,8 @@ create table cotizaciones (
   venta_dataset_id uuid references datasets(id) on delete set null,
   venta_record_id uuid references records(id) on delete set null,
   notas text,
+  telefono text,
+  token uuid not null default gen_random_uuid(),
   created_by uuid references auth.users(id) on delete set null,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()

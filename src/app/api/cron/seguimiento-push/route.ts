@@ -56,38 +56,49 @@ export async function GET(req: NextRequest) {
   const caducadosPorEmpresa = new Map<string, string[]>();
   let avisosPendientes = 0;
 
+  // Mismo "mejor esfuerzo" por dataset: si uno falla al leer (se borró, cambió
+  // de columnas, etc.) no debe tumbar el cron entero y dejar sin revisar los
+  // demás datasets que sí están bien -- antes, un solo error acá hacía que el
+  // job completo respondiera 500 (ver 355e7bb, que arregló lo mismo pero solo
+  // en el loop de ENVÍO de pushes; este loop de LECTURA quedó sin el mismo resguardo).
+  let datasetsConError = 0;
   for (const [datasetId, filasActivadas] of porDataset) {
-    const { data: dataset } = await supabase.from("datasets").select("columnas").eq("id", datasetId).single();
-    if (!dataset) continue;
-    const columnas = dataset.columnas as Columna[];
-    const cCliente = columnas.find((c) => c.rol === "cliente");
-    const cFecha = columnas.find((c) => c.rol === "fecha" && c.tipo === "fecha");
-    if (!cCliente || !cFecha) continue;
+    try {
+      const { data: dataset } = await supabase.from("datasets").select("columnas").eq("id", datasetId).single();
+      if (!dataset) continue;
+      const columnas = dataset.columnas as Columna[];
+      const cCliente = columnas.find((c) => c.rol === "cliente");
+      const cFecha = columnas.find((c) => c.rol === "fecha" && c.tipo === "fecha");
+      if (!cCliente || !cFecha) continue;
 
-    const filas = await leerFilas(supabase, datasetId, cCliente.key, cFecha.key);
-    const porClave = new Map(agruparClientes(filas).map((c) => [c.clave, c]));
+      const filas = await leerFilas(supabase, datasetId, cCliente.key, cFecha.key);
+      const porClave = new Map(agruparClientes(filas).map((c) => [c.clave, c]));
 
-    for (const a of filasActivadas) {
-      const actual = porClave.get(a.cliente_clave);
-      const ultimaFecha = actual?.ultimaFecha ?? null;
+      for (const a of filasActivadas) {
+        const actual = porClave.get(a.cliente_clave);
+        const ultimaFecha = actual?.ultimaFecha ?? null;
 
-      // Compró algo nuevo desde la última vez que se revisó: vuelve a estar
-      // "activo", se resetea el aviso para poder notificar de nuevo si se
-      // vuelve a quedar callado más adelante.
-      if (ultimaFecha !== a.ultima_fecha_cliente) {
-        await supabase.from("seguimiento_clientes").update({ ultima_fecha_cliente: ultimaFecha, notificado_en: null }).eq("id", a.id);
-        continue;
+        // Compró algo nuevo desde la última vez que se revisó: vuelve a estar
+        // "activo", se resetea el aviso para poder notificar de nuevo si se
+        // vuelve a quedar callado más adelante.
+        if (ultimaFecha !== a.ultima_fecha_cliente) {
+          await supabase.from("seguimiento_clientes").update({ ultima_fecha_cliente: ultimaFecha, notificado_en: null }).eq("id", a.id);
+          continue;
+        }
+
+        const dias = diasDesde(ultimaFecha, ahora);
+        if (dias === null || dias < UMBRAL_DIAS) continue;
+        if (a.notificado_en) continue; // ya se avisó de este mismo período sin volver
+
+        avisosPendientes++;
+        const lista = caducadosPorEmpresa.get(a.empresa_id) ?? [];
+        lista.push(a.cliente_nombre);
+        caducadosPorEmpresa.set(a.empresa_id, lista);
+        await supabase.from("seguimiento_clientes").update({ notificado_en: ahora.toISOString() }).eq("id", a.id);
       }
-
-      const dias = diasDesde(ultimaFecha, ahora);
-      if (dias === null || dias < UMBRAL_DIAS) continue;
-      if (a.notificado_en) continue; // ya se avisó de este mismo período sin volver
-
-      avisosPendientes++;
-      const lista = caducadosPorEmpresa.get(a.empresa_id) ?? [];
-      lista.push(a.cliente_nombre);
-      caducadosPorEmpresa.set(a.empresa_id, lista);
-      await supabase.from("seguimiento_clientes").update({ notificado_en: ahora.toISOString() }).eq("id", a.id);
+    } catch (e) {
+      datasetsConError++;
+      console.error(`seguimiento-push: fallo al leer el dataset ${datasetId}:`, e instanceof Error ? e.message : e);
     }
   }
 
@@ -117,5 +128,6 @@ export async function GET(req: NextRequest) {
     avisos: avisosPendientes,
     empresasNotificadas: caducadosPorEmpresa.size - empresasConError,
     empresasConError,
+    datasetsConError,
   });
 }

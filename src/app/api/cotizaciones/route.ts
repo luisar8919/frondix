@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { crearClienteServidor } from "@/lib/supabase/server";
 import { empresaDelUsuarioServidor } from "@/lib/sesionServidor";
+import { normalizarTelefonoPE } from "@/lib/seguimiento";
 
 // Cotizaciones: un paso antes de la venta confirmada. Cualquier rol que
 // registra ventas (dueño, admin, vendedor) también puede cotizar -- a
@@ -13,7 +14,7 @@ export async function GET() {
 
   const { data, error } = await supabase
     .from("cotizaciones")
-    .select("id, cliente, producto, monto, fecha, estado, notas, venta_dataset_id, created_at")
+    .select("id, cliente, producto, monto, fecha, estado, notas, telefono, token, venta_dataset_id, created_at")
     .eq("empresa_id", sesion.empresaId)
     .order("created_at", { ascending: false });
   if (error) {
@@ -31,7 +32,7 @@ export async function POST(req: NextRequest) {
   const sesion = await empresaDelUsuarioServidor(supabase);
   if (!sesion.ok) return NextResponse.json({ error: sesion.error }, { status: 401 });
 
-  const { cliente, producto, monto, fecha, notas } = await req.json().catch(() => ({}));
+  const { cliente, producto, monto, fecha, notas, telefono } = await req.json().catch(() => ({}));
   if (typeof cliente !== "string" || !cliente.trim()) return NextResponse.json({ error: "Falta el cliente" }, { status: 400 });
   if (typeof producto !== "string" || !producto.trim()) return NextResponse.json({ error: "Falta el producto" }, { status: 400 });
   const montoNum = Number(monto);
@@ -46,9 +47,10 @@ export async function POST(req: NextRequest) {
       monto: montoNum,
       fecha: typeof fecha === "string" && fecha ? fecha : new Date().toISOString().slice(0, 10),
       notas: typeof notas === "string" && notas.trim() ? notas.trim() : null,
+      telefono: normalizarTelefonoPE(telefono),
       created_by: user.id,
     })
-    .select("id")
+    .select("id, token")
     .single();
   if (error) {
     const faltaMigracion = error.code === "42P01" || error.code === "PGRST205";

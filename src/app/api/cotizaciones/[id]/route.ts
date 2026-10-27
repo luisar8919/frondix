@@ -1,13 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { crearClienteServidor } from "@/lib/supabase/server";
 import { empresaDelUsuarioServidor } from "@/lib/sesionServidor";
-import { tipoModulo } from "@/lib/roles";
-import { ajustarStockDesdeRegistro } from "@/lib/stock";
-import { claveValida } from "@/lib/enlaces";
-import type { Columna } from "@/lib/excel-parser";
+import { aceptarCotizacion } from "@/lib/cotizaciones";
 
 const ESTADOS_VALIDOS = ["pendiente", "aceptada", "rechazada"];
-const columnaConRol = (columnas: Columna[], rol: string) => columnas.find((c) => c.rol === rol && claveValida(c.key));
 
 // Cambiar el estado. "Aceptada" dispara la conversión real: crea el registro
 // en un módulo de Ventas con los mismos datos de la cotización. Si hay más de
@@ -30,7 +26,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
   const { data: cot, error: errorCot } = await supabase
     .from("cotizaciones")
-    .select("id, cliente, producto, monto, fecha, estado")
+    .select("id")
     .eq("id", id)
     .eq("empresa_id", sesion.empresaId)
     .single();
@@ -42,51 +38,9 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     return NextResponse.json({ ok: true });
   }
 
-  if (cot.estado === "aceptada") return NextResponse.json({ error: "Esta cotización ya fue aceptada" }, { status: 422 });
-
-  const { data: datasets } = await supabase.from("datasets").select("id, nombre, columnas").eq("empresa_id", sesion.empresaId);
-  const deVentas = (datasets ?? []).filter((d) => tipoModulo((d.columnas as Columna[]).map((c) => c.rol)) === "ventas");
-  if (deVentas.length === 0) {
-    return NextResponse.json({ error: "Primero crea un módulo de Ventas para poder aceptar cotizaciones." }, { status: 422 });
-  }
-  if (deVentas.length > 1 && !datasetId) {
-    return NextResponse.json({ error: "Elige a qué módulo de Ventas va", datasets: deVentas.map((d) => ({ id: d.id, nombre: d.nombre })) }, { status: 409 });
-  }
-  const elegido = deVentas.length === 1 ? deVentas[0] : deVentas.find((d) => d.id === datasetId);
-  if (!elegido) return NextResponse.json({ error: "Ese módulo de Ventas ya no existe" }, { status: 422 });
-
-  const columnas = elegido.columnas as Columna[];
-  const cCliente = columnaConRol(columnas, "cliente");
-  const cProducto = columnaConRol(columnas, "producto");
-  const cMonto = columnaConRol(columnas, "monto");
-  const cFecha = columnas.find((c) => c.rol === "fecha" && c.tipo === "fecha" && claveValida(c.key));
-
-  const datosVenta: Record<string, unknown> = {};
-  if (cCliente) datosVenta[cCliente.key] = cot.cliente;
-  if (cProducto) datosVenta[cProducto.key] = cot.producto;
-  if (cMonto) datosVenta[cMonto.key] = cot.monto;
-  if (cFecha) datosVenta[cFecha.key] = `${cot.fecha}T00:00:00.000Z`;
-
-  const { data: record, error: errorRecord } = await supabase
-    .from("records")
-    .insert({ dataset_id: elegido.id, data: datosVenta, updated_by: user.email ?? null })
-    .select("id")
-    .single();
-  if (errorRecord) return NextResponse.json({ error: errorRecord.message }, { status: 500 });
-
-  try {
-    await ajustarStockDesdeRegistro(supabase, sesion.empresaId, columnas, datosVenta, 1, user.id);
-  } catch {
-    // mejor esfuerzo, igual que en /api/records -- la venta ya quedó guardada
-  }
-
-  const { error: errorUpdate } = await supabase
-    .from("cotizaciones")
-    .update({ estado: "aceptada", venta_dataset_id: elegido.id, venta_record_id: record.id, updated_at: new Date().toISOString() })
-    .eq("id", id);
-  if (errorUpdate) return NextResponse.json({ error: errorUpdate.message }, { status: 500 });
-
-  return NextResponse.json({ ok: true, ventaDatasetId: elegido.id });
+  const resultado = await aceptarCotizacion(supabase, sesion.empresaId, id, datasetId, user.email ?? null);
+  if (!resultado.ok) return NextResponse.json({ error: resultado.error, datasets: resultado.datasets }, { status: resultado.status });
+  return NextResponse.json({ ok: true, ventaDatasetId: resultado.ventaDatasetId });
 }
 
 export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {

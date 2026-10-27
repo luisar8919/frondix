@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { enlaceWhatsApp } from "@/lib/seguimiento";
 
 interface Cotizacion {
   id: string;
@@ -11,6 +12,8 @@ interface Cotizacion {
   fecha: string;
   estado: "pendiente" | "aceptada" | "rechazada";
   notas: string | null;
+  telefono: string | null;
+  token: string;
   venta_dataset_id: string | null;
   created_at: string;
 }
@@ -29,9 +32,15 @@ export default function Cotizaciones() {
   const [cliente, setCliente] = useState("");
   const [producto, setProducto] = useState("");
   const [monto, setMonto] = useState("");
+  const [telefono, setTelefono] = useState("");
   const [notas, setNotas] = useState("");
   const [enviando, setEnviando] = useState(false);
   const [errorForm, setErrorForm] = useState("");
+
+  const [pegarWhatsapp, setPegarWhatsapp] = useState(false);
+  const [textoWhatsapp, setTextoWhatsapp] = useState("");
+  const [leyendoIA, setLeyendoIA] = useState(false);
+  const [errorIA, setErrorIA] = useState("");
 
   const [procesando, setProcesando] = useState<string | null>(null);
   const [eligiendoModulo, setEligiendoModulo] = useState<{ cotizacionId: string; datasets: { id: string; nombre: string }[] } | null>(null);
@@ -55,15 +64,37 @@ export default function Cotizaciones() {
     const res = await fetch("/api/cotizaciones", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ cliente, producto, monto, notas }),
+      body: JSON.stringify({ cliente, producto, monto, notas, telefono }),
     });
     setEnviando(false);
     if (!res.ok) {
       const body = await res.json().catch(() => ({}));
       return setErrorForm(body.error ?? "No se pudo guardar la cotización");
     }
-    setCliente(""); setProducto(""); setMonto(""); setNotas("");
+    setCliente(""); setProducto(""); setMonto(""); setTelefono(""); setNotas(""); setTextoWhatsapp(""); setPegarWhatsapp(false);
     cargar();
+  }
+
+  // Pega un pedido tal cual llegó por WhatsApp y la IA lo convierte en los
+  // campos del formulario -- mismo motor que /api/datasets/sugerir-ia (Gemini,
+  // gated a plan pago), un paso antes de Crear cotización en vez de reemplazarlo.
+  async function leerConIA() {
+    if (!textoWhatsapp.trim()) return;
+    setLeyendoIA(true);
+    setErrorIA("");
+    const res = await fetch("/api/cotizaciones/sugerir-ia", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ texto: textoWhatsapp }),
+    });
+    setLeyendoIA(false);
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok) return setErrorIA(body.error ?? "No se pudo leer el texto");
+    if (body.cliente) setCliente(body.cliente);
+    if (body.producto) setProducto(body.producto);
+    if (body.monto) setMonto(String(body.monto));
+    if (body.telefono) setTelefono(body.telefono);
+    setPegarWhatsapp(false);
   }
 
   async function cambiarEstado(id: string, estado: "aceptada" | "rechazada", datasetId?: string) {
@@ -100,7 +131,30 @@ export default function Cotizaciones() {
       </div>
 
       <form onSubmit={crear} className="tarjeta" style={{ marginBottom: 20 }}>
-        <h3 style={{ marginTop: 0 }}>Nueva cotización</h3>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <h3 style={{ marginTop: 0 }}>Nueva cotización</h3>
+          <button type="button" className="btn btn-fantasma pequeno" onClick={() => setPegarWhatsapp((v) => !v)}>
+            {pegarWhatsapp ? "Cancelar" : "Pegar de WhatsApp"}
+          </button>
+        </div>
+
+        {pegarWhatsapp && (
+          <div className="campo" style={{ marginBottom: 14 }}>
+            <label htmlFor="cot-whatsapp">Pega el pedido tal cual te llegó</label>
+            <textarea
+              id="cot-whatsapp"
+              rows={3}
+              value={textoWhatsapp}
+              onChange={(e) => setTextoWhatsapp(e.target.value)}
+              placeholder="Hola, quería cotizar 2 llantas aro 15, mi número es 987654321"
+            />
+            {errorIA && <p className="alerta alerta-error pequeno" role="alert">{errorIA}</p>}
+            <button type="button" className="btn btn-secundario" disabled={leyendoIA || !textoWhatsapp.trim()} style={{ marginTop: 8 }} onClick={leerConIA}>
+              {leyendoIA ? "Leyendo..." : "Completar con IA"}
+            </button>
+          </div>
+        )}
+
         <div className="grilla-form">
           <div className="campo">
             <label htmlFor="cot-cliente">Cliente</label>
@@ -113,6 +167,10 @@ export default function Cotizaciones() {
           <div className="campo">
             <label htmlFor="cot-monto">Monto</label>
             <input id="cot-monto" type="number" step="any" min={0} value={monto} onChange={(e) => setMonto(e.target.value)} required />
+          </div>
+          <div className="campo">
+            <label htmlFor="cot-telefono">Teléfono (opcional, para WhatsApp)</label>
+            <input id="cot-telefono" value={telefono} onChange={(e) => setTelefono(e.target.value)} maxLength={20} placeholder="987654321" />
           </div>
           <div className="campo">
             <label htmlFor="cot-notas">Notas (opcional)</label>
@@ -151,6 +209,19 @@ export default function Cotizaciones() {
                   <td className="num">{soles(c.monto)}</td>
                   <td><span className={`alerta ${CLASE_ESTADO[c.estado]} pequeno`} style={{ padding: "2px 10px" }}>{ETIQUETA_ESTADO[c.estado]}</span></td>
                   <td style={{ whiteSpace: "nowrap" }}>
+                    {c.estado === "pendiente" && c.telefono && (
+                      <a
+                        href={enlaceWhatsApp(
+                          c.telefono,
+                          `Hola ${c.cliente}, tu cotización por ${soles(c.monto)} (${c.producto}) está lista. Confírmala aquí: ${typeof window !== "undefined" ? window.location.origin : "https://www.frondix.com"}/cotizar/${c.id}?token=${c.token}`
+                        )}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="btn btn-fantasma"
+                      >
+                        Enviar WhatsApp
+                      </a>
+                    )}
                     {c.estado === "pendiente" && (
                       <>
                         <button type="button" className="btn btn-fantasma" disabled={procesando === c.id} onClick={() => cambiarEstado(c.id, "aceptada")}>
