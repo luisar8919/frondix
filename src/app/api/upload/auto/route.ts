@@ -269,6 +269,12 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  // Declarado afuera del try para poder devolverlo en el catch si algo revienta
+  // a mitad de camino (ej. un blip de red entre tantas llamadas async seguidas):
+  // mejor decir qué sí se alcanzó a crear que un 500 genérico sin pistas.
+  const creados: { datasetId: string; nombre: string; hojas: string[]; filasImportadas: number }[] = [];
+
+  try {
   // --- Pasada 1: mirar TODO lo que se va a importar junto, antes de crear nada ---
   // Cada grupo se resuelve una sola vez (columnas editadas, si se divide, a qué
   // tipo clasifica) para no repetir ese trabajo entre la pasada de "juntar
@@ -409,8 +415,6 @@ export async function POST(request: NextRequest) {
   }
 
   // --- Pasada 2: crear los módulos con todo ya resuelto ---
-  const creados: { datasetId: string; nombre: string; hojas: string[]; filasImportadas: number }[] = [];
-
   for (const info of infos) {
     const { grupo, sel, columnas, cTipo, division, separacion } = info;
     const nombreDataset = sel?.nombre?.trim() || (grupo.hojas.length > 1 ? `${grupo.hojas[0]} y otras` : grupo.hojas[0]);
@@ -598,4 +602,10 @@ export async function POST(request: NextRequest) {
   }
 
   return NextResponse.json({ tablas: creados, hojasOmitidas, avisos });
+  } catch (e) {
+    return NextResponse.json(
+      { error: e instanceof Error ? e.message : "No se pudo completar la importación", creadosHastaAhora: creados },
+      { status: 500 }
+    );
+  }
 }

@@ -29,12 +29,19 @@ async function cargar(ctx: Ctx) {
 const SOLO_ADMIN = "Solo el dueño o un administrador puede modificar la estructura de las tablas";
 
 // Quita el enlace de columnas de OTRAS tablas que apuntaban a lo que se borró.
+// Mejor esfuerzo: se llama DESPUÉS de que el cambio principal (renombrar/borrar)
+// ya se guardó -- si esto falla a mitad de camino, no vale la pena devolver un
+// 500 genérico por una limpieza secundaria cuando lo importante ya quedó bien.
 async function romperEnlaces(supabase: SupabaseClient, otras: DatasetResumen[], rotos: { datasetId: string; columnaKey: string }[]) {
-  for (const id of new Set(rotos.map((r) => r.datasetId))) {
-    const claves = new Set(rotos.filter((r) => r.datasetId === id).map((r) => r.columnaKey));
-    const d = otras.find((x) => x.id === id)!;
-    const columnas = d.columnas.map((c) => (claves.has(c.key) ? { ...c, enlace: null } : c));
-    await supabase.from("datasets").update({ columnas }).eq("id", id);
+  try {
+    for (const id of new Set(rotos.map((r) => r.datasetId))) {
+      const claves = new Set(rotos.filter((r) => r.datasetId === id).map((r) => r.columnaKey));
+      const d = otras.find((x) => x.id === id)!;
+      const columnas = d.columnas.map((c) => (claves.has(c.key) ? { ...c, enlace: null } : c));
+      await supabase.from("datasets").update({ columnas }).eq("id", id);
+    }
+  } catch {
+    // ver comentario de arriba
   }
 }
 

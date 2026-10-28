@@ -128,7 +128,14 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ dat
   const faltaCampo = validarCamposRegistro(columnas, body);
   if (faltaCampo) return NextResponse.json({ error: faltaCampo }, { status: 422 });
 
-  await autoCrearEnlazadosFaltantes(supabase, columnas, body);
+  // Mejor esfuerzo: si esto falla (ej. un blip de red), no debe tumbar todo el
+  // registro -- validarEnlaces de abajo igual va a rechazar con un error claro
+  // si de verdad faltó crear algo, en vez de un 500 genérico acá.
+  try {
+    await autoCrearEnlazadosFaltantes(supabase, columnas, body);
+  } catch {
+    // sigue abajo
+  }
 
   const fallo = await validarEnlaces(supabase, columnas, body);
   if (fallo) return NextResponse.json({ error: fallo }, { status: 422 });

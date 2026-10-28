@@ -53,12 +53,17 @@ export async function GET(req: NextRequest) {
   const cCliente = columnas.find((c) => c.rol === "cliente" && claveValida(c.key));
   const cMonto = columnas.find((c) => c.rol === "monto" && claveValida(c.key));
 
-  const filas = (await leerFilas(supabase, datasetId, {
-    f: cFecha.key,
-    ...(cProducto && { p: cProducto.key }),
-    ...(cCliente && { c: cCliente.key }),
-    ...(cMonto && { m: cMonto.key }),
-  })) as FilaCalendario[];
+  let filas: FilaCalendario[];
+  try {
+    filas = (await leerFilas(supabase, datasetId, {
+      f: cFecha.key,
+      ...(cProducto && { p: cProducto.key }),
+      ...(cCliente && { c: cCliente.key }),
+      ...(cMonto && { m: cMonto.key }),
+    })) as FilaCalendario[];
+  } catch (e) {
+    return NextResponse.json({ error: e instanceof Error ? e.message : "No se pudo leer el módulo" }, { status: 500 });
+  }
 
   const porDia = agruparPorDia(filas, anio, mes);
 
