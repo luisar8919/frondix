@@ -12,8 +12,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Llamar al cron de seguimiento
+        # --retry-all-errors: reintenta tambien sobre un 500 (no solo timeouts),
+        # que es el patron real que vimos (cold-start de Azure Functions en el
+        # plan Free, ~50s en vez de ~8s cuando falla).
         run: |
           curl -s -o /dev/null -w "HTTP %{http_code}\n" --fail \
+            --retry 2 --retry-delay 20 --retry-all-errors \
             "https://www.frondix.com/api/cron/seguimiento-push" \
             -H "x-cron-secret: $CRON_SECRET"
         env:
