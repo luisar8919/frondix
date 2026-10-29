@@ -3,7 +3,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 // Gratis: tablas y filas ilimitadas, un solo usuario, sin WhatsApp.
 // Pago: lo que agregamos aquí — invitar gente y mandar WhatsApp.
 //
-// Toda empresa nueva arranca con 3 meses de prueba gratis del plan pago (ver
+// Toda empresa nueva arranca con 1 mes de prueba gratis del plan pago (ver
 // /api/empresas/create): mientras prueba_hasta no haya pasado, estado="activa"
 // cuenta como plan pago aunque nunca haya pagado. Al pagar de verdad (checkout o
 // webhook de Culqi), prueba_hasta se limpia (null) y queda activa sin fecha límite.

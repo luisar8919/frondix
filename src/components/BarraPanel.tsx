@@ -49,6 +49,7 @@ const modulosGrupos = [
       { href: "/dashboard/clientes", texto: "Reporte" },
     ],
   },
+  { grupo: "Más módulos", items: [{ href: "/dashboard/modulos/nuevo", texto: "Agregar módulo" }] },
 ];
 const modulosSubmenu = modulosGrupos.flatMap((g) => g.items);
 

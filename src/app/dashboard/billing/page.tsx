@@ -142,7 +142,7 @@ export default function BillingPage() {
           <>
             <p className="suave pequeno" style={{ margin: "0 0 10px" }}>
               {pruebaHasta
-                ? `Estás en tu prueba gratis de 3 meses, hasta el ${new Date(pruebaHasta).toLocaleDateString("es-PE", { day: "2-digit", month: "long", year: "numeric" })}. Después, si no activas el pago, pasas al plan gratis automáticamente.`
+                ? `Estás en tu prueba gratis de 1 mes, hasta el ${new Date(pruebaHasta).toLocaleDateString("es-PE", { day: "2-digit", month: "long", year: "numeric" })}. Después, si no activas el pago, pasas al plan gratis automáticamente.`
                 : "Ya tienes este plan activo."}
             </p>
             {!confirmando ? (
