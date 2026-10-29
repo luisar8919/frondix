@@ -24,8 +24,8 @@ export async function POST(req: NextRequest) {
 
   const aCrear: { nombre: string; columnas: Columna[] }[] = Array.isArray(modulos)
     ? modulos
-        .filter((m) => m && typeof m.nombre === "string" && Array.isArray(m.columnas) && m.columnas.length > 0)
-        .map((m) => ({ nombre: String(m.nombre).slice(0, 120), columnas: m.columnas as Columna[] }))
+        .filter((m) => m && typeof m.nombre === "string" && m.nombre.trim() && Array.isArray(m.columnas) && m.columnas.length > 0)
+        .map((m) => ({ nombre: String(m.nombre).trim().slice(0, 120), columnas: m.columnas as Columna[] }))
     : ["compras", "ventas"].includes(tipo)
       ? [{
           nombre: (typeof nombre === "string" && nombre.trim()) || (tipo === "compras" ? "Compras" : "Ventas"),
