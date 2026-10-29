@@ -120,7 +120,7 @@ export default function OrdenesCompra() {
       {ordenes && ordenes.length === 0 && (
         <div className="tarjeta">
           <h3>Todavía no hay órdenes de compra</h3>
-          <p className="suave">Creá una cuando le pidas algo a un proveedor, para no perderle el rastro hasta que llegue.</p>
+          <p className="suave">Crea una cuando le pidas algo a un proveedor, para no perderle el rastro hasta que llegue.</p>
         </div>
       )}
 

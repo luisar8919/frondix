@@ -7,35 +7,35 @@ interface Consejo { titulo: string; texto: string }
 const CONSEJOS: Consejo[] = [
   {
     titulo: "Marca el rol de cada columna",
-    texto: "En \"Editar tabla y campos\" decile a Frondix qué significa cada columna (Cliente, Producto, Monto, Fecha...). De eso dependen Reportes, Seguimiento, Stock y Cuentas por cobrar -- sin marcarlo, esas funciones no tienen de dónde sacar los datos.",
+    texto: "En \"Editar tabla y campos\" dile a Frondix qué significa cada columna (Cliente, Producto, Monto, Fecha...). De eso dependen Reportes, Seguimiento, Stock y Cuentas por cobrar -- sin marcarlo, esas funciones no tienen de dónde sacar los datos.",
   },
   {
     titulo: "Agrega una columna de Teléfono a tus Ventas",
-    texto: "Si marcás una columna como Teléfono en tu módulo de Ventas, Seguimiento te arma el enlace de WhatsApp listo para escribirle a cada cliente que no volvió, con un mensaje ya redactado.",
+    texto: "Si marcas una columna como Teléfono en tu módulo de Ventas, Seguimiento te arma el enlace de WhatsApp listo para escribirle a cada cliente que no volvió, con un mensaje ya redactado.",
   },
   {
     titulo: "Un módulo de Stock aparte, enlazado a Ventas y Compras",
-    texto: "Creá un módulo con columnas Producto y Cantidad (le llamás como quieras) y enlazá la columna Producto de Ventas y de Compras a ese Stock. Así ves alertas cuando un producto está por agotarse y cuánto vale tu inventario en Reportes.",
+    texto: "Crea un módulo con columnas Producto y Cantidad (llámalo como quieras) y enlaza la columna Producto de Ventas y de Compras a ese Stock. Así ves alertas cuando un producto está por agotarse y cuánto vale tu inventario en Reportes.",
   },
   {
     titulo: "Marca \"Stock mínimo\" para que te avise a tiempo",
-    texto: "En tu módulo de Stock, agregá una columna con rol \"Stock mínimo\" por producto. Cuando la cantidad baje de ese número, te va a aparecer en \"Stock por agotarse\" en Inicio.",
+    texto: "En tu módulo de Stock, agrega una columna con rol \"Stock mínimo\" por producto. Cuando la cantidad baje de ese número, te va a aparecer en \"Stock por agotarse\" en Inicio.",
   },
   {
-    titulo: "Ventas a crédito: usá \"Saldo pendiente\"",
-    texto: "Si le fías a algún cliente, agregá una columna Monto numérica con rol \"Saldo pendiente\" en Ventas. Cualquier fila con un valor mayor a 0 ahí aparece en Cuentas por cobrar.",
+    titulo: "Ventas a crédito: usa \"Saldo pendiente\"",
+    texto: "Si le fías a algún cliente, agrega una columna Monto numérica con rol \"Saldo pendiente\" en Ventas. Cualquier fila con un valor mayor a 0 ahí aparece en Cuentas por cobrar.",
   },
   {
-    titulo: "Enlazá tus tablas entre sí",
+    titulo: "Enlaza tus tablas entre sí",
     texto: "Cualquier columna de texto se puede enlazar a otra tabla (por ejemplo, Cliente en Ventas -> tu lista de Clientes). Eso te da autocompletado al cargar datos y evita que el mismo cliente quede escrito de formas distintas.",
   },
   {
-    titulo: "Activá el seguimiento cliente por cliente",
+    titulo: "Activa el seguimiento cliente por cliente",
     texto: "En Seguimiento, el check \"Avisarme en la app\" por cada cliente te manda una notificación push a tu celular en cuanto se cumplen los días sin que vuelva a comprar -- no hace falta entrar a revisar todos los días.",
   },
   {
     titulo: "Invita a tu equipo con el rol correcto",
-    texto: "Desde Equipo podés sumar vendedores: ven el stock y registran ventas, pero no ven tus módulos de Compras ni tus costos. Vos y los demás dueños/admins sí ven todo.",
+    texto: "Desde Equipo puedes sumar vendedores: ven el stock y registran ventas, pero no ven tus módulos de Compras ni tus costos. Tú y los demás dueños/admins sí ven todo.",
   },
   {
     titulo: "Revisa Reportes -> Balance para el panorama completo",
@@ -43,7 +43,7 @@ const CONSEJOS: Consejo[] = [
   },
   {
     titulo: "Un Excel desordenado no es problema",
-    texto: "Si tu Excel tiene columnas raras, varias hojas o datos sueltos, subilo igual: el asistente de carga te va a preguntar qué es cada cosa, y si está muy desordenado podés pedirle a la IA que te sugiera cómo separarlo.",
+    texto: "Si tu Excel tiene columnas raras, varias hojas o datos sueltos, súbelo igual: el asistente de carga te va a preguntar qué es cada cosa, y si está muy desordenado puedes pedirle a la IA que te sugiera cómo separarlo.",
   },
 ];
 
