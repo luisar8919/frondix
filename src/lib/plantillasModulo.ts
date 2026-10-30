@@ -243,13 +243,13 @@ export function plantillaImportaciones(): Columna[] {
 // Stock/Proveedor/Cliente en el menú de Módulos. El orden importa: es el
 // orden en que se muestran las categorías.
 export const CATEGORIAS_MODULOS = [
-  { clave: "stock_local", titulo: "Tengo un local con stock", descripcion: "Productos físicos que se vencen, se dañan o se mueven entre locales." },
-  { clave: "servicios", titulo: "Cobro por trabajos o servicios", descripcion: "Talleres, reparaciones, citas con hora y cliente, delivery." },
-  { clave: "produccion", titulo: "Fabrico o produzco algo", descripcion: "Transformas insumos en un producto terminado." },
-  { clave: "finanzas", titulo: "Control financiero", descripcion: "Gastos del negocio, deudas con proveedores, equipos propios, importaciones." },
-  { clave: "consignacion", titulo: "Vendo para otros", descripcion: "Dejas mercadería en otro local para que te la vendan." },
-  { clave: "cobro_recurrente", titulo: "Cobro recurrente o membresías", descripcion: "Un cliente te paga cada mes: gimnasio, academia, alquiler." },
-  { clave: "proyectos", titulo: "Trabajo por proyectos o eventos", descripcion: "Cada cliente es un proyecto u evento con fecha y presupuesto propio." },
+  { clave: "stock_local", titulo: "Tengo un local con stock", descripcion: "Ej. bodegas, minimarkets, farmacias, ferreterías: productos físicos que se vencen, se dañan o se mueven entre locales." },
+  { clave: "servicios", titulo: "Cobro por trabajos o servicios", descripcion: "Ej. talleres mecánicos, peluquerías, consultorios, restaurantes con delivery: cobras por un trabajo o una cita, no por un producto." },
+  { clave: "produccion", titulo: "Fabrico o produzco algo", descripcion: "Ej. panaderías, talleres de costura, carpinterías: transformas insumos en un producto terminado." },
+  { clave: "finanzas", titulo: "Control financiero", descripcion: "Ej. negocios que alquilan su local, importan mercadería o tienen equipos propios: gastos, deudas con proveedores, activos." },
+  { clave: "consignacion", titulo: "Vendo para otros", descripcion: "Ej. artesanos, autores independientes: dejas mercadería en otro local para que te la vendan." },
+  { clave: "cobro_recurrente", titulo: "Cobro recurrente o membresías", descripcion: "Ej. gimnasios, academias, colegios, alquiler de propiedades: un cliente te paga cada mes." },
+  { clave: "proyectos", titulo: "Trabajo por proyectos o eventos", descripcion: "Ej. constructoras, contratistas, organizadores de eventos: cada cliente es un proyecto con fecha y presupuesto propio." },
 ] as const;
 
 export const PLANTILLAS_EXTRA = [
