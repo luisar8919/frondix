@@ -54,3 +54,16 @@ export async function limiteModulos(supabase: SupabaseClient, empresaId: string)
   const limite = (await tieneSuscripcionActiva(supabase, empresaId)) ? LIMITE_MODULOS_PAGO : LIMITE_MODULOS_GRATIS;
   return { actuales: count ?? 0, limite };
 }
+
+// Un módulo "adicional" (creado desde el catálogo curado de
+// /dashboard/modulos/nuevo, ver datasets.plantilla) queda bloqueado si la
+// empresa no tiene la prueba gratis activa ni el plan pago. Ventas/Compras y
+// cualquier módulo subido por Excel o sugerido por IA (plantilla null) nunca
+// se bloquean.
+export async function datasetBloqueado(
+  supabase: SupabaseClient,
+  dataset: { empresa_id: string; plantilla: string | null }
+): Promise<boolean> {
+  if (dataset.plantilla === null) return false;
+  return !(await tieneSuscripcionActiva(supabase, dataset.empresa_id));
+}

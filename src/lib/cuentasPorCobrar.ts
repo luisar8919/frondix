@@ -2,6 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { claveValida } from "./enlaces.ts";
 import type { Columna } from "./excel-parser.ts";
 import { tipoModulo } from "./roles.ts";
+import { tieneSuscripcionActiva } from "./suscripcion.ts";
 
 export interface CuentaPorCobrar {
   datasetId: string;
@@ -29,12 +30,14 @@ const columnaConRol = (columnas: Columna[], rol: string) => columnas.find((c) =>
 // la usa) con un valor mayor a 0 en una fila es una cuenta por cobrar. Sin esa
 // columna marcada, el módulo simplemente no participa.
 export async function cuentasPorCobrar(supabase: SupabaseClient, empresaId: string): Promise<ResultadoCuentasPorCobrar> {
-  const { data: datasets, error } = await supabase.from("datasets").select("id, nombre, columnas").eq("empresa_id", empresaId);
+  const { data: datasets, error } = await supabase.from("datasets").select("id, nombre, columnas, plantilla").eq("empresa_id", empresaId);
   if (error) throw new Error(error.message);
+  const planActivo = await tieneSuscripcionActiva(supabase, empresaId);
 
   const cuentas: CuentaPorCobrar[] = [];
   const modulosSinConfigurar: ModuloSinSaldoPendiente[] = [];
   for (const d of datasets ?? []) {
+    if (d.plantilla !== null && !planActivo) continue; // módulo adicional bloqueado
     const columnas = d.columnas as Columna[];
     if (tipoModulo(columnas.map((c) => c.rol), d.nombre) !== "ventas") continue; // cuentas por cobrar es cosa de Ventas
 

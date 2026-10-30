@@ -3,6 +3,7 @@ import { crearClienteServidor } from "@/lib/supabase/server";
 import { advertenciasDeRegistro, validarEnlaces } from "@/lib/dependientes";
 import { revertirStockDesdeRegistro, registrarAjusteManual } from "@/lib/stock";
 import { validarCamposRegistro, tipoModulo } from "@/lib/roles";
+import { datasetBloqueado } from "@/lib/limites";
 import type { Columna } from "@/lib/excel-parser";
 
 // Editar o eliminar un registro. Si otras tablas dependen de su valor, la primera llamada
@@ -25,7 +26,10 @@ async function cargar(ctx: Ctx) {
 
   // Un vendedor no puede editar/borrar un registro de Compras aunque conozca su
   // ID directo (antes solo se bloqueaba listar/crear, ver /api/records/[datasetId]).
-  const { data: dsPermiso } = await supabase.from("datasets").select("empresa_id, columnas, nombre").eq("id", datasetId).single();
+  const { data: dsPermiso } = await supabase.from("datasets").select("empresa_id, columnas, nombre, plantilla").eq("id", datasetId).single();
+  if (dsPermiso && (await datasetBloqueado(supabase, dsPermiso))) {
+    return { error: NextResponse.json({ error: "Este módulo es parte de la prueba gratis o el plan pago. Actívalo para seguir usándolo.", bloqueado: true }, { status: 402 }) };
+  }
   if (dsPermiso && tipoModulo((dsPermiso.columnas as Columna[]).map((c) => c.rol), dsPermiso.nombre) === "compras") {
     const { data: miMembresia } = await supabase.from("miembros").select("rol").eq("empresa_id", dsPermiso.empresa_id).eq("user_id", user.id).single();
     if (miMembresia?.rol === "vendedor") {

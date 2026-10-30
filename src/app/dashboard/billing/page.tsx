@@ -27,6 +27,7 @@ export default function BillingPage() {
   const [pruebaHasta, setPruebaHasta] = useState<string | null>(null);
   const [cancelando, setCancelando] = useState(false);
   const [confirmando, setConfirmando] = useState(false);
+  const [activandoPrueba, setActivandoPrueba] = useState(false);
   const paypalRenderizado = useRef(false);
 
   async function cargarEstado() {
@@ -82,6 +83,23 @@ export default function BillingPage() {
     if (!res.ok) return setMensaje(body.error ?? "No se pudo cambiar el plan");
     setMensaje("Listo, ya estás en el plan gratis. No se te vuelve a cobrar.");
     setPlanActivo(false);
+  }
+
+  async function activarPrueba() {
+    if (!empresaId) return;
+    setActivandoPrueba(true);
+    setMensaje(null);
+    const res = await fetch("/api/billing/activar-prueba", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ empresaId }),
+    });
+    const body = await res.json();
+    setActivandoPrueba(false);
+    if (!res.ok) return setMensaje(body.error ?? "No se pudo activar la prueba gratis");
+    setMensaje("¡Prueba gratis activada! Ya puedes usar todos los módulos por 1 mes.");
+    setPlanActivo(true);
+    setPruebaHasta(body.prueba_hasta);
   }
 
   function cobrarConPaddle() {
@@ -168,6 +186,16 @@ export default function BillingPage() {
           </>
         ) : (
           <>
+            {pruebaHasta === null ? (
+              <button type="button" className="btn btn-primario btn-grande btn-bloque" style={{ marginBottom: 10 }} onClick={activarPrueba} disabled={activandoPrueba}>
+                {activandoPrueba ? "Activando..." : "Probar 1 mes gratis"}
+              </button>
+            ) : (
+              <p className="suave pequeno" style={{ margin: "0 0 10px" }}>
+                Tu mes de prueba gratis ya venció. Para seguir usando los módulos adicionales, activa el pago:
+              </p>
+            )}
+
             {PAYPAL_CLIENT_ID && PAYPAL_PLAN_ID && (
               <div id="paypal-buttons" style={{ marginBottom: 10 }} />
             )}

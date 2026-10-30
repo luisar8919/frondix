@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { claveValida } from "./enlaces.ts";
 import { tipoModulo } from "./roles.ts";
+import { tieneSuscripcionActiva } from "./suscripcion.ts";
 import { esStock } from "./stock.ts";
 import type { Columna } from "./excel-parser.ts";
 
@@ -17,13 +18,15 @@ const columnaConRol = (columnas: Columna[], rol: string) => columnas.find((c) =>
 // conoce. No es el motor de Ventas/Stock real -- es una foto de solo lectura
 // para compartir, nunca escribe nada.
 export async function productosCatalogo(supabase: SupabaseClient, empresaId: string): Promise<ProductoCatalogo[]> {
-  const { data: datasets, error } = await supabase.from("datasets").select("id, nombre, columnas").eq("empresa_id", empresaId);
+  const { data: datasets, error } = await supabase.from("datasets").select("id, nombre, columnas, plantilla").eq("empresa_id", empresaId);
   if (error) throw new Error(error.message);
+  const planActivo = await tieneSuscripcionActiva(supabase, empresaId);
 
   const stockPorProducto = new Map<string, number>();
   const ventasPorProducto = new Map<string, { total: number; veces: number }>();
 
   for (const d of datasets ?? []) {
+    if (d.plantilla !== null && !planActivo) continue; // módulo adicional bloqueado
     const columnas = d.columnas as Columna[];
     const cProducto = columnaConRol(columnas, "producto");
     if (!cProducto) continue;

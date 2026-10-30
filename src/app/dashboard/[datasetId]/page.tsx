@@ -47,6 +47,9 @@ export default function DatasetPage({
   const [cargando, setCargando] = useState(true);
   const [opciones, setOpciones] = useState<Record<string, string[]>>({});
   const [error, setError] = useState(false);
+  const [bloqueado, setBloqueado] = useState(false);
+  const [empresaId, setEmpresaId] = useState<string | null>(null);
+  const [activandoPrueba, setActivandoPrueba] = useState(false);
   const [busqueda, setBusqueda] = useState("");
   const [editando, setEditando] = useState<Registro | null>(null);
   const [errorAccion, setErrorAccion] = useState("");
@@ -80,7 +83,10 @@ export default function DatasetPage({
   useEffect(() => {
     (async () => {
       const sesion = await empresaDelUsuario(crearClienteBrowser());
-      if (sesion.ok) setEsVendedor(sesion.empresas.find((e) => e.empresaId === sesion.empresaId)?.rol === "vendedor");
+      if (sesion.ok) {
+        setEsVendedor(sesion.empresas.find((e) => e.empresaId === sesion.empresaId)?.rol === "vendedor");
+        setEmpresaId(sesion.empresaId);
+      }
     })();
   }, []);
 
@@ -89,7 +95,10 @@ export default function DatasetPage({
     let totalTabla = 0;
     for (let desde = 0; desde < TOPE_CARGA; desde += PAGINA) {
       const res = await fetch(`/api/records/${datasetId}?desde=${desde}&limite=${PAGINA}`);
-      if (!res.ok) return setError(true);
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        return body.bloqueado ? setBloqueado(true) : setError(true);
+      }
       const body = await res.json();
       if (desde === 0) {
         setDataset(body.dataset);
@@ -129,6 +138,40 @@ export default function DatasetPage({
         <h2 style={{ fontSize: 24 }}>No pudimos abrir este módulo</h2>
         <p>Puede que no exista o que no tengas acceso.</p>
         <Link href="/dashboard" className="btn btn-primario">Volver a mis módulos</Link>
+      </div>
+    );
+  }
+  if (bloqueado) {
+    return (
+      <div className="tarjeta vacio">
+        <h2 style={{ fontSize: 24 }}>🔒 Módulo bloqueado</h2>
+        <p>Este módulo es parte de la prueba gratis o el plan pago. Tus datos están a salvo, solo falta activarlo para seguir usándolo.</p>
+        <div style={{ display: "flex", gap: 10, justifyContent: "center", marginTop: 10 }}>
+          <button
+            type="button"
+            className="btn btn-primario"
+            disabled={activandoPrueba || !empresaId}
+            onClick={async () => {
+              if (!empresaId) return;
+              setActivandoPrueba(true);
+              const res = await fetch("/api/billing/activar-prueba", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ empresaId }),
+              });
+              setActivandoPrueba(false);
+              if (res.ok) {
+                setBloqueado(false);
+                setCargando(true);
+                cargar();
+              }
+            }}
+          >
+            {activandoPrueba ? "Activando..." : "Activar prueba gratis"}
+          </button>
+          <Link href="/dashboard/billing" className="btn btn-secundario">Ver planes</Link>
+        </div>
+        <Link href="/dashboard" className="btn btn-fantasma" style={{ marginTop: 10 }}>Volver a mis módulos</Link>
       </div>
     );
   }

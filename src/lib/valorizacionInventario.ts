@@ -2,6 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { claveValida } from "./enlaces.ts";
 import type { Columna } from "./excel-parser.ts";
 import { tipoModulo } from "./roles.ts";
+import { tieneSuscripcionActiva } from "./suscripcion.ts";
 import { preciosDeCompra, combinarPrecios, type PrecioCompra } from "./divisor.ts";
 import { esStock } from "./stock.ts";
 
@@ -25,9 +26,10 @@ const columnaConRol = (columnas: Columna[], rol: string) => columnas.find((c) =>
 // para completar costos (ver divisor.ts), reutilizado acá en vez de reinventar
 // otra forma de calcular "el precio de un producto".
 export async function valorizacionInventario(supabase: SupabaseClient, empresaId: string): Promise<ValorizacionInventario> {
-  const { data: datasets, error } = await supabase.from("datasets").select("id, nombre, columnas").eq("empresa_id", empresaId);
+  const { data: datasets, error } = await supabase.from("datasets").select("id, nombre, columnas, plantilla").eq("empresa_id", empresaId);
   if (error) throw new Error(error.message);
-  const todos = datasets ?? [];
+  const planActivo = await tieneSuscripcionActiva(supabase, empresaId);
+  const todos = (datasets ?? []).filter((d) => d.plantilla === null || planActivo);
 
   const mapas: Map<string, PrecioCompra>[] = [];
   for (const d of todos) {

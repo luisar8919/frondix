@@ -5,6 +5,7 @@ import { validarEnlaces } from "@/lib/dependientes";
 import { claveValida } from "@/lib/enlaces";
 import { ajustarStockDesdeRegistro, registrarAjusteManual } from "@/lib/stock";
 import { validarCamposRegistro, tipoModulo } from "@/lib/roles";
+import { datasetBloqueado } from "@/lib/limites";
 import type { Columna } from "@/lib/excel-parser";
 
 // Si el valor de una columna de Cliente/Proveedor enlazada no existe todavía en
@@ -64,8 +65,11 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ data
   // páginas (no solo la primera), para que paginar no se salte el bloqueo.
   const { data: { user } } = await supabase.auth.getUser();
   if (user) {
-    const { data: dsPermiso } = await supabase.from("datasets").select("empresa_id, columnas, nombre").eq("id", datasetId).single();
+    const { data: dsPermiso } = await supabase.from("datasets").select("empresa_id, columnas, nombre, plantilla").eq("id", datasetId).single();
     if (dsPermiso) {
+      if (await datasetBloqueado(supabase, dsPermiso)) {
+        return NextResponse.json({ error: "Este módulo es parte de la prueba gratis o el plan pago. Actívalo para seguir usándolo.", bloqueado: true }, { status: 402 });
+      }
       const { data: miMembresia } = await supabase.from("miembros").select("rol").eq("empresa_id", dsPermiso.empresa_id).eq("user_id", user.id).single();
       if (miMembresia?.rol === "vendedor" && tipoModulo((dsPermiso.columnas as Columna[]).map((c) => c.rol), dsPermiso.nombre) === "compras") {
         return NextResponse.json({ error: "Tu rol no tiene acceso a este módulo" }, { status: 403 });
@@ -94,7 +98,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ data
 
   const { data: datasets, error: errorDatasets } = await supabase
     .from("datasets")
-    .select("id, nombre, columnas, incluye_igv, moneda")
+    .select("id, nombre, columnas, incluye_igv, moneda, plantilla")
     .order("created_at", { ascending: false });
   if (errorDatasets) return respuestaError(errorDatasets);
 
@@ -115,9 +119,12 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ dat
   }
 
   // Si una columna está enlazada a otra tabla, el valor debe existir allí.
-  const { data: dataset, error: errorDataset } = await supabase.from("datasets").select("empresa_id, columnas, nombre").eq("id", datasetId).single();
+  const { data: dataset, error: errorDataset } = await supabase.from("datasets").select("empresa_id, columnas, nombre, plantilla").eq("id", datasetId).single();
   if (errorDataset?.code === "42501") return respuestaError(errorDataset);
   if (!dataset) return NextResponse.json({ error: "Dataset no encontrado" }, { status: 404 });
+  if (await datasetBloqueado(supabase, dataset)) {
+    return NextResponse.json({ error: "Este módulo es parte de la prueba gratis o el plan pago. Actívalo para seguir usándolo.", bloqueado: true }, { status: 402 });
+  }
   const columnas = dataset.columnas as Columna[];
 
   if (user && tipoModulo(columnas.map((c) => c.rol), dataset.nombre) === "compras") {

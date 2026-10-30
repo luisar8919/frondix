@@ -7,6 +7,7 @@ import CuentasPorPagar from "@/components/CuentasPorPagar";
 import ConsejosInicio from "@/components/ConsejosInicio";
 import { rolEnEmpresa } from "@/lib/permisos";
 import { tipoModulo, type RolColumna } from "@/lib/roles";
+import { tieneSuscripcionActiva } from "@/lib/suscripcion";
 import type { Columna } from "@/lib/excel-parser";
 
 export default async function DashboardPage() {
@@ -22,10 +23,11 @@ export default async function DashboardPage() {
 
   const { data: datasetsCrudos } = await supabase
     .from("datasets")
-    .select("id, nombre, created_at, columnas")
+    .select("id, nombre, created_at, columnas, plantilla")
     .eq("empresa_id", sesion.empresaId)
     .order("created_at", { ascending: false });
 
+  const planActivo = await tieneSuscripcionActiva(supabase, sesion.empresaId);
   const empresa = sesion.empresas.find((e) => e.empresaId === sesion.empresaId)?.nombre ?? "tu negocio";
   const esVendedor = rolEnEmpresa(sesion.empresas, sesion.empresaId) === "vendedor";
   // Un vendedor no ve módulos de Compras (costos, proveedores) -- solo registra
@@ -63,20 +65,25 @@ export default async function DashboardPage() {
 
       {hayModulos && (
         <div className="grilla-tablas" style={{ marginBottom: 20 }}>
-          {datasets.map((d) => (
-            <Link key={d.id} href={`/dashboard/${d.id}`} className="tarjeta tarjeta-tabla">
-              <div className="icono" aria-hidden="true">
-                <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="#237a50" strokeWidth="1.8" strokeLinecap="round">
-                  <rect x="2.5" y="3.5" width="15" height="13" rx="2.5" />
-                  <path d="M2.5 8.5h15M8 8.5v8" />
-                </svg>
-              </div>
-              <h3>{d.nombre}</h3>
-              <p className="suave pequeno" style={{ margin: 0 }}>
-                Creada el {new Date(d.created_at).toLocaleDateString("es-PE", { day: "numeric", month: "short", year: "numeric" })}
-              </p>
-            </Link>
-          ))}
+          {datasets.map((d) => {
+            const bloqueado = d.plantilla !== null && !planActivo;
+            return (
+              <Link key={d.id} href={`/dashboard/${d.id}`} className="tarjeta tarjeta-tabla">
+                <div className="icono" aria-hidden="true">
+                  <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="#237a50" strokeWidth="1.8" strokeLinecap="round">
+                    <rect x="2.5" y="3.5" width="15" height="13" rx="2.5" />
+                    <path d="M2.5 8.5h15M8 8.5v8" />
+                  </svg>
+                </div>
+                <h3>{bloqueado ? "🔒 " : ""}{d.nombre}</h3>
+                <p className="suave pequeno" style={{ margin: 0 }}>
+                  {bloqueado
+                    ? "Bloqueado: activa tu prueba gratis o el plan pago"
+                    : `Creada el ${new Date(d.created_at).toLocaleDateString("es-PE", { day: "numeric", month: "short", year: "numeric" })}`}
+                </p>
+              </Link>
+            );
+          })}
         </div>
       )}
 

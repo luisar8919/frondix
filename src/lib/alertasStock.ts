@@ -2,6 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { claveValida } from "./enlaces.ts";
 import type { Columna } from "./excel-parser.ts";
 import { esStock } from "./stock.ts";
+import { tieneSuscripcionActiva } from "./suscripcion.ts";
 
 export interface AlertaStock {
   datasetId: string;
@@ -33,13 +34,15 @@ export interface ResultadoAlertasStock {
 export async function alertasStock(supabase: SupabaseClient, empresaId: string): Promise<ResultadoAlertasStock> {
   const { data: datasets, error } = await supabase
     .from("datasets")
-    .select("id, nombre, columnas")
+    .select("id, nombre, columnas, plantilla")
     .eq("empresa_id", empresaId);
   if (error) throw new Error(error.message);
+  const planActivo = await tieneSuscripcionActiva(supabase, empresaId);
 
   const alertas: AlertaStock[] = [];
   const modulosSinConfigurar: ModuloSinConfigurar[] = [];
   for (const d of datasets ?? []) {
+    if (d.plantilla !== null && !planActivo) continue; // módulo adicional bloqueado
     const columnas = d.columnas as Columna[];
     if (!esStock(columnas)) continue;
     const cCantidad = columnas.find((c) => c.key === "cantidad" && claveValida(c.key))!;

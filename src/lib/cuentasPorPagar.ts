@@ -2,6 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { claveValida } from "./enlaces.ts";
 import type { Columna } from "./excel-parser.ts";
 import { tipoModulo } from "./roles.ts";
+import { tieneSuscripcionActiva } from "./suscripcion.ts";
 
 export interface CuentaPorPagar {
   datasetId: string;
@@ -24,12 +25,14 @@ const columnaConRol = (columnas: Columna[], rol: string) => columnas.find((c) =>
 // tus proveedores. Mismo criterio -- columna "Saldo pendiente" (rol
 // saldo_pendiente) con valor mayor a 0 en un módulo de Compras.
 export async function cuentasPorPagar(supabase: SupabaseClient, empresaId: string): Promise<ResultadoCuentasPorPagar> {
-  const { data: datasets, error } = await supabase.from("datasets").select("id, nombre, columnas").eq("empresa_id", empresaId);
+  const { data: datasets, error } = await supabase.from("datasets").select("id, nombre, columnas, plantilla").eq("empresa_id", empresaId);
   if (error) throw new Error(error.message);
+  const planActivo = await tieneSuscripcionActiva(supabase, empresaId);
 
   const cuentas: CuentaPorPagar[] = [];
   const modulosSinConfigurar: ModuloSinSaldoPendiente[] = [];
   for (const d of datasets ?? []) {
+    if (d.plantilla !== null && !planActivo) continue; // módulo adicional bloqueado
     const columnas = d.columnas as Columna[];
     if (tipoModulo(columnas.map((c) => c.rol), d.nombre) !== "compras") continue; // cuentas por pagar es cosa de Compras
 

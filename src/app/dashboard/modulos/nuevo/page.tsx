@@ -2,8 +2,10 @@
 
 import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import Link from "next/link";
 import { crearClienteBrowser } from "@/lib/supabase/client";
 import { empresaDelUsuario } from "@/lib/sesion";
+import { tieneSuscripcionActiva } from "@/lib/suscripcion";
 import { CATEGORIAS_MODULOS, PLANTILLAS_EXTRA } from "@/lib/plantillasModulo";
 
 // Catálogo de módulos listos para usar más allá de Ventas/Compras (ver
@@ -34,14 +36,38 @@ function NuevoModuloForm() {
   const [nombre, setNombre] = useState("");
   const [creando, setCreando] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [planActivo, setPlanActivo] = useState<boolean | null>(null);
+  const [activandoPrueba, setActivandoPrueba] = useState(false);
 
   useEffect(() => {
     const supabase = crearClienteBrowser();
     (async () => {
       const r = await empresaDelUsuario(supabase);
-      if (r.ok) setEmpresaId(r.empresaId);
+      if (!r.ok) return;
+      setEmpresaId(r.empresaId);
+      setPlanActivo(await tieneSuscripcionActiva(supabase, r.empresaId));
     })();
   }, []);
+
+  async function activarPrueba() {
+    if (!empresaId) return;
+    setActivandoPrueba(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/billing/activar-prueba", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ empresaId }),
+      });
+      const body = await res.json();
+      if (!res.ok) return setError(body.error ?? "No se pudo activar la prueba gratis");
+      setPlanActivo(true);
+    } catch {
+      setError("No se pudo conectar con el servidor. Revisa tu conexión e intenta de nuevo.");
+    } finally {
+      setActivandoPrueba(false);
+    }
+  }
 
   function elegir(p: (typeof PLANTILLAS_EXTRA)[number]) {
     setElegida(p);
@@ -58,7 +84,10 @@ function NuevoModuloForm() {
       const res = await fetch("/api/datasets/crear", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ empresaId, modulos: [{ nombre: nombre.trim(), columnas: elegida.columnas() }] }),
+        body: JSON.stringify({
+          empresaId,
+          modulos: [{ nombre: nombre.trim(), columnas: elegida.columnas(), plantilla: elegida.clave }],
+        }),
       });
       const body = await res.json();
       if (!res.ok) return setError(body.error ?? "No se pudo crear el módulo");
@@ -116,7 +145,7 @@ function NuevoModuloForm() {
                 style={{ textAlign: "left", cursor: "pointer" }}
                 onClick={() => elegir(p)}
               >
-                <h3>{p.nombre}</h3>
+                <h3>{planActivo === false ? "🔒 " : ""}{p.nombre}</h3>
                 <p className="suave pequeno">{p.descripcion}</p>
               </button>
             ))}
@@ -125,26 +154,46 @@ function NuevoModuloForm() {
       )}
 
       {elegida && (
-        <form onSubmit={crear} className="tarjeta" style={{ maxWidth: 460 }}>
+        <div className="tarjeta" style={{ maxWidth: 460 }}>
           <h2 style={{ fontSize: 20, marginTop: 0 }}>{elegida.nombre}</h2>
           <p className="suave pequeno">{elegida.descripcion}</p>
 
-          <div className="campo">
-            <label htmlFor="nombre">Nombre del módulo</label>
-            <input id="nombre" value={nombre} maxLength={120} onChange={(e) => setNombre(e.target.value)} required />
-          </div>
+          {planActivo === false ? (
+            <>
+              <p className="alerta" role="status">
+                🔒 Este módulo es parte de la prueba gratis o el plan pago. Activa tu mes de prueba para crearlo, sin costo.
+              </p>
+              {error && <p className="alerta alerta-error" role="alert">{error}</p>}
+              <div style={{ display: "flex", gap: 10, marginTop: 14 }}>
+                <button type="button" className="btn btn-fantasma" onClick={() => setElegida(null)} disabled={activandoPrueba}>
+                  Elegir otra
+                </button>
+                <button type="button" className="btn btn-primario" onClick={activarPrueba} disabled={activandoPrueba}>
+                  {activandoPrueba ? "Activando..." : "Activar prueba gratis"}
+                </button>
+                <Link href="/dashboard/billing" className="btn btn-fantasma">Ver planes</Link>
+              </div>
+            </>
+          ) : (
+            <form onSubmit={crear}>
+              <div className="campo">
+                <label htmlFor="nombre">Nombre del módulo</label>
+                <input id="nombre" value={nombre} maxLength={120} onChange={(e) => setNombre(e.target.value)} required />
+              </div>
 
-          {error && <p className="alerta alerta-error" role="alert">{error}</p>}
+              {error && <p className="alerta alerta-error" role="alert">{error}</p>}
 
-          <div style={{ display: "flex", gap: 10, marginTop: 14 }}>
-            <button type="button" className="btn btn-fantasma" onClick={() => setElegida(null)} disabled={creando}>
-              Elegir otra
-            </button>
-            <button type="submit" className="btn btn-primario" disabled={creando || !nombre.trim() || !empresaId}>
-              {creando ? "Creando..." : "Crear módulo"}
-            </button>
-          </div>
-        </form>
+              <div style={{ display: "flex", gap: 10, marginTop: 14 }}>
+                <button type="button" className="btn btn-fantasma" onClick={() => setElegida(null)} disabled={creando}>
+                  Elegir otra
+                </button>
+                <button type="submit" className="btn btn-primario" disabled={creando || !nombre.trim() || !empresaId}>
+                  {creando ? "Creando..." : "Crear módulo"}
+                </button>
+              </div>
+            </form>
+          )}
+        </div>
       )}
     </>
   );

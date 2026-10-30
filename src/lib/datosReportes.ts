@@ -3,6 +3,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { claveValida } from "./enlaces.ts";
 import { totalesPorMes, topPor, sumaMonto, flujoCaja, progresoMetas } from "./reportes.ts";
 import { tipoModulo, type TipoModulo } from "./roles.ts";
+import { tieneSuscripcionActiva } from "./suscripcion.ts";
 import { esStock } from "./stock.ts";
 import type { Columna } from "./excel-parser.ts";
 
@@ -53,15 +54,17 @@ export interface ModuloReporte {
 export async function calcularModulosReporte(supabase: SupabaseClient, empresaId: string): Promise<ModuloReporte[]> {
   const { data: datasets, error: errorDatasets } = await supabase
     .from("datasets")
-    .select("id, nombre, columnas, incluye_igv")
+    .select("id, nombre, columnas, incluye_igv, plantilla")
     .eq("empresa_id", empresaId)
     .order("created_at", { ascending: false });
   if (errorDatasets) throw new Error(errorDatasets.message);
+  const planActivo = await tieneSuscripcionActiva(supabase, empresaId);
 
   const ahora = new Date();
   const modulos: ModuloReporte[] = [];
 
   for (const d of datasets ?? []) {
+    if (d.plantilla !== null && !planActivo) continue; // módulo adicional bloqueado
     const columnas = d.columnas as Columna[];
     const cFecha = columnas.find((c) => c.rol === "fecha" && c.tipo === "fecha" && claveValida(c.key));
     const cMonto = columnaConRol(columnas, "monto");
@@ -148,11 +151,13 @@ const TOPE_POR_MODULO = 50;
 // o por cuándo se registró si no. Trae hasta 50 recientes de cada módulo (cota
 // para no leer un módulo entero) y de ahí se queda con los 50 más nuevos en total.
 export async function ultimosMovimientos(supabase: SupabaseClient, empresaId: string, limite = 50): Promise<Movimiento[]> {
-  const { data: datasets, error } = await supabase.from("datasets").select("id, nombre, columnas, moneda").eq("empresa_id", empresaId);
+  const { data: datasets, error } = await supabase.from("datasets").select("id, nombre, columnas, moneda, plantilla").eq("empresa_id", empresaId);
   if (error) throw new Error(error.message);
+  const planActivo = await tieneSuscripcionActiva(supabase, empresaId);
 
   const candidatos: Movimiento[] = [];
   for (const d of datasets ?? []) {
+    if (d.plantilla !== null && !planActivo) continue; // módulo adicional bloqueado
     const columnas = d.columnas as Columna[];
     const tipo = tipoModulo(columnas.map((c) => c.rol), d.nombre);
     if (tipo !== "ventas" && tipo !== "compras") continue;
@@ -197,11 +202,13 @@ export interface ModuloStock { datasetId: string; nombre: string; productos: str
 // cargados -- para que Balance pueda ofrecer el selector de Kardex sin que el
 // usuario tenga que entrar al módulo de Stock puntual.
 export async function modulosStock(supabase: SupabaseClient, empresaId: string): Promise<ModuloStock[]> {
-  const { data: datasets, error } = await supabase.from("datasets").select("id, nombre, columnas").eq("empresa_id", empresaId);
+  const { data: datasets, error } = await supabase.from("datasets").select("id, nombre, columnas, plantilla").eq("empresa_id", empresaId);
   if (error) throw new Error(error.message);
+  const planActivo = await tieneSuscripcionActiva(supabase, empresaId);
 
   const modulos: ModuloStock[] = [];
   for (const d of datasets ?? []) {
+    if (d.plantilla !== null && !planActivo) continue; // módulo adicional bloqueado
     const columnas = d.columnas as Columna[];
     if (!esStock(columnas)) continue;
     const cProducto = columnaConRol(columnas, "producto");
@@ -228,11 +235,13 @@ export interface ProductoCombinado { producto: string; total: number; porAlmacen
 // entre todos para saber el total real disponible, sin cambiar en nada el
 // modelo de datos. Solo tiene sentido mostrarla cuando hay 2+ módulos de Stock.
 export async function stockCombinado(supabase: SupabaseClient, empresaId: string): Promise<ProductoCombinado[]> {
-  const { data: datasets, error } = await supabase.from("datasets").select("id, nombre, columnas").eq("empresa_id", empresaId);
+  const { data: datasets, error } = await supabase.from("datasets").select("id, nombre, columnas, plantilla").eq("empresa_id", empresaId);
   if (error) throw new Error(error.message);
+  const planActivo = await tieneSuscripcionActiva(supabase, empresaId);
 
   const combinados = new Map<string, ProductoCombinado>();
   for (const d of datasets ?? []) {
+    if (d.plantilla !== null && !planActivo) continue; // módulo adicional bloqueado
     const columnas = d.columnas as Columna[];
     if (!esStock(columnas)) continue;
     const cProducto = columnaConRol(columnas, "producto");
