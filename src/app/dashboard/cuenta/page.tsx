@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { crearClienteBrowser } from "@/lib/supabase/client";
 import { empresaDelUsuario } from "@/lib/sesion";
 
@@ -18,6 +19,12 @@ export default function CuentaPage() {
   const [passwordConfirmar, setPasswordConfirmar] = useState("");
   const [mensajePassword, setMensajePassword] = useState<{ tipo: "ok" | "error"; texto: string } | null>(null);
   const [guardandoPassword, setGuardandoPassword] = useState(false);
+
+  const [confirmandoBorrado, setConfirmandoBorrado] = useState(false);
+  const [emailConfirmacion, setEmailConfirmacion] = useState("");
+  const [borrando, setBorrando] = useState(false);
+  const [errorBorrado, setErrorBorrado] = useState<string | null>(null);
+  const router = useRouter();
 
   useEffect(() => {
     (async () => {
@@ -52,6 +59,20 @@ export default function CuentaPage() {
     setPassword("");
     setPasswordConfirmar("");
     setMensajePassword({ tipo: "ok", texto: "Contraseña actualizada." });
+  }
+
+  async function eliminarCuenta() {
+    setErrorBorrado(null);
+    setBorrando(true);
+    const res = await fetch("/api/cuenta/eliminar", { method: "POST" });
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      setBorrando(false);
+      return setErrorBorrado(body.error ?? "No se pudo eliminar la cuenta");
+    }
+    await crearClienteBrowser().auth.signOut();
+    router.push("/");
+    router.refresh();
   }
 
   if (cargando) return null;
@@ -122,6 +143,47 @@ export default function CuentaPage() {
           {guardandoPassword ? "Guardando..." : "Cambiar contraseña"}
         </button>
       </form>
+
+      <div className="tarjeta" style={{ maxWidth: 460, marginTop: 20 }}>
+        <h3 style={{ marginTop: 0 }}>Eliminar cuenta</h3>
+        {!confirmandoBorrado ? (
+          <>
+            <p className="suave pequeno" style={{ margin: "0 0 14px" }}>
+              Borra tu acceso a Frondix. Si eres dueño único de una empresa, se borra toda su información (no se
+              puede deshacer). Si eres dueño junto con más gente en el equipo, primero tienes que quitarlos.
+            </p>
+            <button type="button" className="btn btn-secundario" onClick={() => setConfirmandoBorrado(true)}>
+              Eliminar mi cuenta
+            </button>
+          </>
+        ) : (
+          <div className="alerta alerta-aviso" style={{ marginBottom: 0 }}>
+            <p style={{ marginTop: 0 }}>
+              Esto no se puede deshacer. Para confirmar, escribe tu email (<strong>{email}</strong>) abajo.
+            </p>
+            <input
+              value={emailConfirmacion}
+              onChange={(e) => setEmailConfirmacion(e.target.value)}
+              placeholder={email}
+              style={{ marginBottom: 10 }}
+            />
+            {errorBorrado && <p className="alerta alerta-error" role="alert">{errorBorrado}</p>}
+            <div style={{ display: "flex", gap: 10 }}>
+              <button
+                type="button"
+                className="btn btn-primario"
+                onClick={eliminarCuenta}
+                disabled={borrando || emailConfirmacion.trim().toLowerCase() !== email.toLowerCase()}
+              >
+                {borrando ? "Eliminando..." : "Sí, eliminar mi cuenta"}
+              </button>
+              <button type="button" className="btn btn-fantasma" onClick={() => { setConfirmandoBorrado(false); setEmailConfirmacion(""); setErrorBorrado(null); }} disabled={borrando}>
+                Mejor no
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
     </>
   );
 }
