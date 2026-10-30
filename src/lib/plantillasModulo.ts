@@ -138,6 +138,103 @@ export function plantillaTraslados(): Columna[] {
   ];
 }
 
+// Segundo lote de plantillas extra. Estas SÍ combinan "cliente" con
+// "producto"/"monto" a propósito (cobrar una membresía, un alquiler, un
+// proyecto o un evento es un ingreso real, igual que Órdenes de
+// servicio/Consignación) -- tipoModulo las clasifica "ventas" y eso es lo
+// correcto, no un efecto secundario a evitar. "Importaciones" es la
+// excepción: usa "proveedor" a propósito para clasificar "compras".
+
+export function plantillaMembresias(): Columna[] {
+  return [
+    { key: "fecha_inicio", label: "Fecha de inicio", tipo: "fecha", rol: "fecha", sospechosa: false },
+    { key: "cliente", label: "Cliente", tipo: "texto", rol: "cliente", sospechosa: false },
+    { key: "plan", label: "Plan", tipo: "texto", rol: "producto", sospechosa: false },
+    { key: "monto_mensual", label: "Monto mensual", tipo: "numero", rol: "monto", sospechosa: false },
+    { key: "fecha_vencimiento", label: "Fecha de vencimiento", tipo: "fecha", rol: null, sospechosa: false },
+    { key: "estado", label: "Estado", tipo: "texto", rol: null, sospechosa: false },
+  ];
+}
+
+export function plantillaAlquileres(): Columna[] {
+  return [
+    { key: "fecha_inicio", label: "Fecha de inicio", tipo: "fecha", rol: "fecha", sospechosa: false },
+    { key: "inquilino", label: "Inquilino", tipo: "texto", rol: "cliente", sospechosa: false },
+    { key: "propiedad", label: "Propiedad", tipo: "texto", rol: "producto", sospechosa: false },
+    { key: "monto_mensual", label: "Monto mensual", tipo: "numero", rol: "monto", sospechosa: false },
+    { key: "fecha_pago", label: "Próxima fecha de pago", tipo: "fecha", rol: null, sospechosa: false },
+    { key: "estado", label: "Estado", tipo: "texto", rol: null, sospechosa: false },
+  ];
+}
+
+export function plantillaMatriculas(): Columna[] {
+  return [
+    { key: "fecha_inscripcion", label: "Fecha de inscripción", tipo: "fecha", rol: "fecha", sospechosa: false },
+    { key: "alumno", label: "Alumno", tipo: "texto", rol: "cliente", sospechosa: false },
+    { key: "curso", label: "Curso", tipo: "texto", rol: "producto", sospechosa: false },
+    { key: "mensualidad", label: "Mensualidad", tipo: "numero", rol: "monto", sospechosa: false },
+    { key: "fecha_vencimiento", label: "Fecha de vencimiento", tipo: "fecha", rol: null, sospechosa: false },
+    { key: "estado", label: "Estado", tipo: "texto", rol: null, sospechosa: false },
+  ];
+}
+
+export function plantillaObras(): Columna[] {
+  return [
+    { key: "fecha_inicio", label: "Fecha de inicio", tipo: "fecha", rol: "fecha", sospechosa: false },
+    { key: "cliente", label: "Cliente", tipo: "texto", rol: "cliente", sospechosa: false },
+    { key: "proyecto", label: "Proyecto", tipo: "texto", rol: "producto", sospechosa: false },
+    { key: "presupuesto", label: "Presupuesto", tipo: "numero", rol: "monto", sospechosa: false },
+    { key: "avance", label: "Avance (%)", tipo: "numero", rol: null, sospechosa: false },
+    { key: "fecha_fin_estimada", label: "Fecha fin estimada", tipo: "fecha", rol: null, sospechosa: false },
+    { key: "estado", label: "Estado", tipo: "texto", rol: null, sospechosa: false },
+  ];
+}
+
+export function plantillaEventos(): Columna[] {
+  return [
+    { key: "fecha_evento", label: "Fecha del evento", tipo: "fecha", rol: "fecha", sospechosa: false },
+    { key: "cliente", label: "Cliente", tipo: "texto", rol: "cliente", sospechosa: false },
+    { key: "tipo_evento", label: "Tipo de evento", tipo: "texto", rol: "producto", sospechosa: false },
+    { key: "monto", label: "Monto", tipo: "numero", rol: "monto", sospechosa: false },
+    { key: "estado", label: "Estado", tipo: "texto", rol: null, sospechosa: false },
+  ];
+}
+
+export function plantillaDelivery(): Columna[] {
+  return [
+    { key: "fecha", label: "Fecha", tipo: "fecha", rol: "fecha", sospechosa: false },
+    { key: "cliente", label: "Cliente", tipo: "texto", rol: "cliente", sospechosa: false },
+    { key: "pedido", label: "Pedido", tipo: "texto", rol: "producto", sospechosa: false },
+    { key: "monto", label: "Monto", tipo: "numero", rol: "monto", sospechosa: false },
+    { key: "direccion", label: "Dirección de entrega", tipo: "texto", rol: "direccion", sospechosa: false },
+    { key: "repartidor", label: "Repartidor", tipo: "texto", rol: null, sospechosa: false },
+    { key: "estado", label: "Estado", tipo: "texto", rol: null, sospechosa: false },
+  ];
+}
+
+export function plantillaAlquilerEquipos(): Columna[] {
+  return [
+    { key: "fecha_salida", label: "Fecha de salida", tipo: "fecha", rol: "fecha", sospechosa: false },
+    { key: "cliente", label: "Cliente", tipo: "texto", rol: "cliente", sospechosa: false },
+    { key: "equipo", label: "Equipo", tipo: "texto", rol: "producto", sospechosa: false },
+    { key: "monto", label: "Monto", tipo: "numero", rol: "monto", sospechosa: false },
+    { key: "fecha_devolucion", label: "Fecha de devolución", tipo: "fecha", rol: null, sospechosa: false },
+    { key: "estado", label: "Estado", tipo: "texto", rol: null, sospechosa: false },
+  ];
+}
+
+export function plantillaImportaciones(): Columna[] {
+  return [
+    { key: "fecha", label: "Fecha", tipo: "fecha", rol: "fecha", sospechosa: false },
+    { key: "proveedor", label: "Proveedor", tipo: "texto", rol: "proveedor", sospechosa: false },
+    { key: "producto", label: "Producto", tipo: "texto", rol: "producto", sospechosa: false },
+    { key: "costo_producto", label: "Costo del producto", tipo: "numero", rol: "monto", sospechosa: false },
+    { key: "flete", label: "Flete", tipo: "numero", rol: null, sospechosa: false },
+    { key: "aduana", label: "Aduana / aranceles", tipo: "numero", rol: null, sospechosa: false },
+    { key: "costo_total", label: "Costo total", tipo: "numero", rol: "costo", sospechosa: false },
+  ];
+}
+
 // Catálogo para ofrecerlas en una UI (selector de plantillas, etc.) sin tener
 // que importar cada función una por una en cada lugar que las necesite.
 // Categorías para la pantalla de selección (/dashboard/modulos/nuevo y la app
@@ -147,20 +244,30 @@ export function plantillaTraslados(): Columna[] {
 // orden en que se muestran las categorías.
 export const CATEGORIAS_MODULOS = [
   { clave: "stock_local", titulo: "Tengo un local con stock", descripcion: "Productos físicos que se vencen, se dañan o se mueven entre locales." },
-  { clave: "servicios", titulo: "Cobro por trabajos o servicios", descripcion: "Talleres, reparaciones, citas con hora y cliente." },
+  { clave: "servicios", titulo: "Cobro por trabajos o servicios", descripcion: "Talleres, reparaciones, citas con hora y cliente, delivery." },
   { clave: "produccion", titulo: "Fabrico o produzco algo", descripcion: "Transformas insumos en un producto terminado." },
-  { clave: "finanzas", titulo: "Control financiero", descripcion: "Gastos del negocio, deudas con proveedores, equipos propios." },
+  { clave: "finanzas", titulo: "Control financiero", descripcion: "Gastos del negocio, deudas con proveedores, equipos propios, importaciones." },
   { clave: "consignacion", titulo: "Vendo para otros", descripcion: "Dejas mercadería en otro local para que te la vendan." },
+  { clave: "cobro_recurrente", titulo: "Cobro recurrente o membresías", descripcion: "Un cliente te paga cada mes: gimnasio, academia, alquiler." },
+  { clave: "proyectos", titulo: "Trabajo por proyectos o eventos", descripcion: "Cada cliente es un proyecto u evento con fecha y presupuesto propio." },
 ] as const;
 
 export const PLANTILLAS_EXTRA = [
   { clave: "gastos", nombre: "Gastos operativos", descripcion: "Alquiler, sueldos, servicios: lo que gastas aparte de lo que compras para revender.", categoria: "finanzas", columnas: plantillaGastos },
   { clave: "cuentas_por_pagar", nombre: "Cuentas por pagar", descripcion: "Lo que tú le debes a proveedores o servicios, con fecha de vencimiento.", categoria: "finanzas", columnas: plantillaCuentasPorPagar },
   { clave: "activos_fijos", nombre: "Activos fijos", descripcion: "Maquinaria, computadoras, vehículos del negocio (no para vender).", categoria: "finanzas", columnas: plantillaActivosFijos },
+  { clave: "importaciones", nombre: "Importaciones", descripcion: "Costo real de lo que traes del extranjero: producto, flete y aduana juntos.", categoria: "finanzas", columnas: plantillaImportaciones },
   { clave: "ordenes_servicio", nombre: "Órdenes de servicio", descripcion: "Para talleres y reparaciones: seguir un trabajo desde que entra hasta que se entrega.", categoria: "servicios", columnas: plantillaOrdenesServicio },
+  { clave: "delivery", nombre: "Delivery / pedidos a domicilio", descripcion: "Pedidos con dirección de entrega y repartidor, hasta que se marcan entregados.", categoria: "servicios", columnas: plantillaDelivery },
+  { clave: "alquiler_equipos", nombre: "Alquiler de equipos", descripcion: "Qué prestaste, a quién y cuándo tiene que devolverlo.", categoria: "servicios", columnas: plantillaAlquilerEquipos },
   { clave: "mermas", nombre: "Mermas / pérdidas", descripcion: "Productos vencidos, dañados o perdidos, separado de las ventas reales.", categoria: "stock_local", columnas: plantillaMermas },
   { clave: "produccion", nombre: "Producción / insumos", descripcion: "Cuánto fabricas y qué insumos usas, para calcular el costo real por unidad.", categoria: "produccion", columnas: plantillaProduccion },
   { clave: "consignacion", nombre: "Consignación", descripcion: "Mercadería que dejas en otro local para que te la vendan y te paguen después.", categoria: "consignacion", columnas: plantillaConsignacion },
   { clave: "reservas", nombre: "Reservas / citas", descripcion: "Para salones, clínicas o talleres con cita previa: agenda de turnos.", categoria: "servicios", columnas: plantillaReservas },
   { clave: "traslados", nombre: "Traslados entre almacenes", descripcion: "Mover stock entre locales o almacenes sin que parezca una venta o compra.", categoria: "stock_local", columnas: plantillaTraslados },
+  { clave: "membresias", nombre: "Membresías", descripcion: "Gimnasios, academias, clubes: cobro mensual con fecha de vencimiento.", categoria: "cobro_recurrente", columnas: plantillaMembresias },
+  { clave: "alquileres", nombre: "Alquileres", descripcion: "Propiedades o locales que alquilas, con inquilino y fecha de pago.", categoria: "cobro_recurrente", columnas: plantillaAlquileres },
+  { clave: "matriculas", nombre: "Matrículas", descripcion: "Colegios, institutos, guarderías: mensualidad por alumno.", categoria: "cobro_recurrente", columnas: plantillaMatriculas },
+  { clave: "obras", nombre: "Obras / proyectos", descripcion: "Construcción o contratistas: presupuesto y avance por proyecto.", categoria: "proyectos", columnas: plantillaObras },
+  { clave: "eventos", nombre: "Eventos", descripcion: "Fiestas, catering, eventos corporativos: un cobro por cada evento.", categoria: "proyectos", columnas: plantillaEventos },
 ] as const;

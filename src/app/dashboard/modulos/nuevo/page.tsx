@@ -1,22 +1,35 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense, useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { crearClienteBrowser } from "@/lib/supabase/client";
 import { empresaDelUsuario } from "@/lib/sesion";
 import { CATEGORIAS_MODULOS, PLANTILLAS_EXTRA } from "@/lib/plantillasModulo";
 
 // Catálogo de módulos listos para usar más allá de Ventas/Compras (ver
 // PLANTILLAS_EXTRA en lib/plantillasModulo.ts). Primero se elige el tipo de
-// negocio (CATEGORIAS_MODULOS) para no tener que leer las 9 descripciones de
+// negocio (CATEGORIAS_MODULOS) para no tener que leer las 17 descripciones de
 // una -- mismo patrón que ya usa el menú de Módulos (Ventas/Compras/Stock/
 // Proveedor/Cliente). Un click elige la plantilla, confirma el nombre y crea
 // el módulo ya con sus campos, mismo endpoint que ya usa "Empezar sin Excel"
-// (/api/datasets/crear).
+// (/api/datasets/crear). Si llega con ?categoria=<clave> (desde el onboarding
+// en /auth/completar, que ya preguntó el rubro) arranca directo en esa
+// categoría, sin repetir la pregunta.
 export default function NuevoModuloPage() {
+  return (
+    <Suspense fallback={null}>
+      <NuevoModuloForm />
+    </Suspense>
+  );
+}
+
+function NuevoModuloForm() {
   const router = useRouter();
+  const categoriaInicial = useSearchParams().get("categoria");
   const [empresaId, setEmpresaId] = useState<string | null>(null);
-  const [categoria, setCategoria] = useState<(typeof CATEGORIAS_MODULOS)[number] | null>(null);
+  const [categoria, setCategoria] = useState<(typeof CATEGORIAS_MODULOS)[number] | null>(
+    () => CATEGORIAS_MODULOS.find((c) => c.clave === categoriaInicial) ?? null
+  );
   const [elegida, setElegida] = useState<(typeof PLANTILLAS_EXTRA)[number] | null>(null);
   const [nombre, setNombre] = useState("");
   const [creando, setCreando] = useState(false);

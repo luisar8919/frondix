@@ -4,15 +4,17 @@ import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { crearClienteBrowser } from "@/lib/supabase/client";
 import Logo from "@/components/Logo";
+import { CATEGORIAS_MODULOS } from "@/lib/plantillasModulo";
 
 // Aterriza aquí cualquier login (Google u otro que se sume después), la
 // invitación a un equipo y la recuperación de contraseña. Cuatro casos:
 // 1. Primera vez con Google (sin empresa todavía): pide el nombre del negocio,
-//    igual que el signup por email.
+//    igual que el signup por email, y de ahí pasa al paso "rubro" (nuevo).
 // 2. Invitado (?type=invite, ver /auth/confirm): ya tiene empresa asignada (el
 //    que invita la crea al mandar la invitación) pero nunca puso una contraseña
 //    -- nunca pasó por el formulario de signup, que es donde se define. Se le
-//    pide una antes de entrar.
+//    pide una antes de entrar. Nunca pasa por "rubro": la empresa ya existe,
+//    la creó el que invita.
 // 3. Recuperando su contraseña (?type=recovery, ver /recuperar): mismo paso de
 //    contraseña que el invitado, pero ya tiene cuenta y empresa de antes.
 // 4. Ya tiene cuenta y empresa, sin pedir contraseña (volvió a confirmar un
@@ -27,12 +29,16 @@ export default function CompletarPage() {
 
 function CompletarForm() {
   const [cargando, setCargando] = useState(true);
-  const [paso, setPaso] = useState<"empresa" | "password" | null>(null);
+  const [paso, setPaso] = useState<"empresa" | "password" | "rubro" | null>(null);
   const [nombreEmpresa, setNombreEmpresa] = useState("");
   const [telefono, setTelefono] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [enviando, setEnviando] = useState(false);
+  // Paso "rubro": nace recién al crear la empresa (ver onSubmitEmpresa), antes
+  // no hay empresaId ni tiene sentido preguntar nada de esto.
+  const [empresaId, setEmpresaId] = useState<string | null>(null);
+  const [rubro, setRubro] = useState<(typeof CATEGORIAS_MODULOS)[number] | null>(null);
   const router = useRouter();
   const tipo = useSearchParams().get("type");
   const pidePassword = tipo === "invite" || tipo === "recovery";
@@ -86,12 +92,24 @@ function CompletarForm() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ nombreEmpresa, telefono }),
     });
-    if (!res.ok) {
-      const body = await res.json();
-      setEnviando(false);
-      return setError(body.error ?? "No se pudo crear la empresa");
-    }
-    window.location.href = "/dashboard";
+    const body = await res.json();
+    setEnviando(false);
+    if (!res.ok) return setError(body.error ?? "No se pudo crear la empresa");
+    setEmpresaId(body.empresa.id);
+    setPaso("rubro");
+  }
+
+  // Crea Ventas y Compras (mismo /api/datasets/crear de siempre, tipo fijo) y
+  // manda al selector de módulos ya filtrado por el rubro elegido -- no repite
+  // la pregunta del tipo de negocio, ver ?categoria en dashboard/modulos/nuevo.
+  async function empezarDeCero() {
+    if (!empresaId) return;
+    setEnviando(true);
+    await Promise.all([
+      fetch("/api/datasets/crear", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ empresaId, tipo: "ventas" }) }),
+      fetch("/api/datasets/crear", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ empresaId, tipo: "compras" }) }),
+    ]);
+    window.location.href = rubro ? `/dashboard/modulos/nuevo?categoria=${rubro.clave}` : "/dashboard";
   }
 
   async function onSubmitPassword(e: React.FormEvent) {
@@ -114,7 +132,49 @@ function CompletarForm() {
       </header>
       <main className="auth-centro">
         <div className="tarjeta tarjeta-elevada auth-tarjeta">
-          {paso === "password" ? (
+          {paso === "rubro" ? (
+            <>
+              {!rubro ? (
+                <>
+                  <h1>Ya casi</h1>
+                  <p className="suave">¿A qué rubro perteneces? Según eso te sugerimos las tablas que te podrían servir.</p>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 10 }}>
+                    {CATEGORIAS_MODULOS.map((c) => (
+                      <button
+                        key={c.clave}
+                        type="button"
+                        className="tarjeta tarjeta-tabla"
+                        style={{ textAlign: "left", cursor: "pointer", padding: 14 }}
+                        onClick={() => setRubro(c)}
+                      >
+                        <strong>{c.titulo}</strong>
+                        <p className="suave pequeno" style={{ margin: "2px 0 0" }}>{c.descripcion}</p>
+                      </button>
+                    ))}
+                  </div>
+                  <button type="button" className="btn btn-fantasma btn-bloque" style={{ marginTop: 14 }} onClick={() => (window.location.href = "/dashboard")}>
+                    Ninguna de estas, prefiero elegir después
+                  </button>
+                </>
+              ) : (
+                <>
+                  <h1>Ya casi</h1>
+                  <p className="suave">¿Tienes un Excel con la información que ya manejas, o empezamos las tablas desde cero?</p>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 14 }}>
+                    <button type="button" className="btn btn-primario btn-grande btn-bloque" disabled={enviando} onClick={() => (window.location.href = "/dashboard/upload")}>
+                      Tengo un Excel
+                    </button>
+                    <button type="button" className="btn btn-secundario btn-grande btn-bloque" disabled={enviando} onClick={empezarDeCero}>
+                      {enviando ? "Creando tus módulos..." : "Empezar desde cero"}
+                    </button>
+                  </div>
+                  <button type="button" className="btn btn-fantasma btn-bloque" style={{ marginTop: 14 }} onClick={() => setRubro(null)} disabled={enviando}>
+                    ← Elegir otro rubro
+                  </button>
+                </>
+              )}
+            </>
+          ) : paso === "password" ? (
             <>
               <h1>Ya casi</h1>
               <p className="suave">
