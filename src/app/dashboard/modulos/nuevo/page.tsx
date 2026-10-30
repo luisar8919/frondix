@@ -4,15 +4,19 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { crearClienteBrowser } from "@/lib/supabase/client";
 import { empresaDelUsuario } from "@/lib/sesion";
-import { PLANTILLAS_EXTRA } from "@/lib/plantillasModulo";
+import { CATEGORIAS_MODULOS, PLANTILLAS_EXTRA } from "@/lib/plantillasModulo";
 
 // Catálogo de módulos listos para usar más allá de Ventas/Compras (ver
-// PLANTILLAS_EXTRA en lib/plantillasModulo.ts) -- un click elige la
-// plantilla, confirma el nombre y crea el módulo ya con sus campos, mismo
-// endpoint que ya usa "Empezar sin Excel" (/api/datasets/crear).
+// PLANTILLAS_EXTRA en lib/plantillasModulo.ts). Primero se elige el tipo de
+// negocio (CATEGORIAS_MODULOS) para no tener que leer las 9 descripciones de
+// una -- mismo patrón que ya usa el menú de Módulos (Ventas/Compras/Stock/
+// Proveedor/Cliente). Un click elige la plantilla, confirma el nombre y crea
+// el módulo ya con sus campos, mismo endpoint que ya usa "Empezar sin Excel"
+// (/api/datasets/crear).
 export default function NuevoModuloPage() {
   const router = useRouter();
   const [empresaId, setEmpresaId] = useState<string | null>(null);
+  const [categoria, setCategoria] = useState<(typeof CATEGORIAS_MODULOS)[number] | null>(null);
   const [elegida, setElegida] = useState<(typeof PLANTILLAS_EXTRA)[number] | null>(null);
   const [nombre, setNombre] = useState("");
   const [creando, setCreando] = useState(false);
@@ -53,33 +57,58 @@ export default function NuevoModuloPage() {
     }
   }
 
+  const plantillasDeLaCategoria = categoria ? PLANTILLAS_EXTRA.filter((p) => p.categoria === categoria.clave) : [];
+
   return (
     <>
       <div className="panel-cabecera">
         <div>
           <h1>Agregar módulo</h1>
           <p className="suave" style={{ maxWidth: "62ch" }}>
-            Elige una tabla lista para usar, además de Ventas y Compras. Nace vacía, con los campos ya pensados
-            para eso -- los puedes editar después desde &quot;Editar módulo&quot;.
+            {!categoria
+              ? "¿Qué tipo de negocio tienes? Según eso te mostramos las tablas que te podrían servir, además de Ventas y Compras."
+              : "Elige una tabla lista para usar. Nace vacía, con los campos ya pensados para eso -- los puedes editar después desde “Editar módulo”."}
           </p>
         </div>
       </div>
 
-      {!elegida && (
+      {!categoria && !elegida && (
         <div className="grilla-tablas">
-          {PLANTILLAS_EXTRA.map((p) => (
+          {CATEGORIAS_MODULOS.map((c) => (
             <button
-              key={p.clave}
+              key={c.clave}
               type="button"
               className="tarjeta tarjeta-tabla"
               style={{ textAlign: "left", cursor: "pointer" }}
-              onClick={() => elegir(p)}
+              onClick={() => setCategoria(c)}
             >
-              <h3>{p.nombre}</h3>
-              <p className="suave pequeno">{p.descripcion}</p>
+              <h3>{c.titulo}</h3>
+              <p className="suave pequeno">{c.descripcion}</p>
             </button>
           ))}
         </div>
+      )}
+
+      {categoria && !elegida && (
+        <>
+          <button type="button" className="btn btn-fantasma" style={{ marginBottom: 14 }} onClick={() => setCategoria(null)}>
+            ← Elegir otro tipo de negocio
+          </button>
+          <div className="grilla-tablas">
+            {plantillasDeLaCategoria.map((p) => (
+              <button
+                key={p.clave}
+                type="button"
+                className="tarjeta tarjeta-tabla"
+                style={{ textAlign: "left", cursor: "pointer" }}
+                onClick={() => elegir(p)}
+              >
+                <h3>{p.nombre}</h3>
+                <p className="suave pequeno">{p.descripcion}</p>
+              </button>
+            ))}
+          </div>
+        </>
       )}
 
       {elegida && (
