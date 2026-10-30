@@ -5,7 +5,7 @@ import Link from "next/link";
 import { crearClienteBrowser } from "@/lib/supabase/client";
 import { tieneSuscripcionActiva } from "@/lib/suscripcion";
 import { empresaDelUsuario } from "@/lib/sesion";
-import { ROLES, type RolColumna } from "@/lib/roles";
+import { ROLES, tipoModulo, type RolColumna } from "@/lib/roles";
 import { PLANTILLAS_REPORTE, plantillasCubiertas, rolesFaltantes } from "@/lib/plantillasReporte";
 import type { Columna } from "@/lib/excel-parser";
 
@@ -55,22 +55,29 @@ const pareceStock = (hojas: string[]) => hojas.find((h) => /stock|inventario/i.t
 const aEdicion = (g: GrupoDetectado): EdicionGrupo => {
   const roles = g.columnas.map((c) => c.rol);
   const tieneTipo = roles.includes("tipo_movimiento");
+  const tieneContraparte = roles.includes("cliente") || roles.includes("proveedor");
   const tieneMontoYCosto = roles.includes("monto") && roles.includes("costo");
+  const tipo = tipoModulo(roles, g.nombreSugerido);
   return {
     // Un reporte ya armado no hace falta cargarlo (Frondix arma ese mismo resumen
     // solo, en Reportes): se deja desmarcado por defecto, el usuario lo puede marcar igual.
     incluir: !pareceReporte(g.hojas),
     nombre: g.nombreSugerido,
     columnas: g.columnas.map((c) => ({ key: c.key, label: c.label, rol: (c.rol ?? "") as RolColumna | "" })),
-    // Con columna de Producto ya hay con qué armar un Stock enlazado -- se crea
-    // por defecto, el usuario lo puede desmarcar si de verdad no lo necesita.
-    crearStock: roles.includes("producto"),
-    // Si la tabla ya trae de qué distinguir Ventas de Compras (columna Tipo, o
-    // Monto+Costo juntos en la misma fila), separarla por defecto es lo que casi
-    // siempre se quiere -- el usuario lo puede desmarcar si de verdad prefiere un
-    // solo módulo mixto.
+    // Antes se creaba con cualquier columna Producto, sin importar el contexto --
+    // eso armaba un "Stock - X" redundante hasta en tablas que no son inventario
+    // (Gastos operativos, Membresías, Reservas: "Producto" ahí es un concepto,
+    // una membresía o un servicio, no algo que se compra/vende con cantidad).
+    // Ahora solo por defecto si la tabla ya es de Ventas o Compras, que es donde
+    // enlazar un Stock de verdad tiene sentido.
+    crearStock: roles.includes("producto") && (tipo === "ventas" || tipo === "compras"),
     dividir: tieneTipo,
-    separar: !tieneTipo && tieneMontoYCosto,
+    // Separar en Ventas/Compras es para una tabla AMBIGUA de verdad (Monto y Costo
+    // juntos, sin Cliente ni Proveedor que digan de qué lado está). Si la tabla ya
+    // trae Cliente o Proveedor, ya se sabe que es una sola cosa (una Venta o una
+    // Compra con su costo adentro, como las plantillas de Ventas/Compras de
+    // Frondix) -- separarla solo duplica el módulo en dos mitades inútiles.
+    separar: !tieneTipo && !tieneContraparte && tieneMontoYCosto,
   };
 };
 
