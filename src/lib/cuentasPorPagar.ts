@@ -31,7 +31,7 @@ export async function cuentasPorPagar(supabase: SupabaseClient, empresaId: strin
   const modulosSinConfigurar: ModuloSinSaldoPendiente[] = [];
   for (const d of datasets ?? []) {
     const columnas = d.columnas as Columna[];
-    if (tipoModulo(columnas.map((c) => c.rol)) !== "compras") continue; // cuentas por pagar es cosa de Compras
+    if (tipoModulo(columnas.map((c) => c.rol), d.nombre) !== "compras") continue; // cuentas por pagar es cosa de Compras
 
     const cSaldo = columnaConRol(columnas, "saldo_pendiente");
     if (!cSaldo) {

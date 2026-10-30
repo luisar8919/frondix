@@ -58,7 +58,7 @@ export default function CategoriaMovimientos({ tipo }: { tipo: TipoModulo }) {
     setEmpresaId(sesion.empresaId);
 
     const { data: datasets } = await supabase.from("datasets").select("id, nombre, columnas, moneda").eq("empresa_id", sesion.empresaId);
-    const delTipo = (datasets ?? []).filter((d) => tipoModulo((d.columnas as Columna[]).map((c) => c.rol)) === tipo);
+    const delTipo = (datasets ?? []).filter((d) => tipoModulo((d.columnas as Columna[]).map((c) => c.rol), d.nombre) === tipo);
 
     const resReportes = await fetch("/api/reportes");
     const bodyReportes = await resReportes.json();
@@ -209,6 +209,7 @@ export default function CategoriaMovimientos({ tipo }: { tipo: TipoModulo }) {
                 <DynamicForm
                   key={m.datasetId}
                   columnas={m.columnas}
+                  nombreModulo={m.nombre}
                   textoBoton={`Registrar ${sustantivo}`}
                   onSubmit={(valores) => registrar(m.datasetId, valores)}
                 />

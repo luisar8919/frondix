@@ -168,7 +168,7 @@ async function crearModulo(
   // montos negativos) -- acá solo avisan, nunca bloquean la importación: un
   // Excel real de cientos de filas no debería fallar entero por unas pocas
   // mal cargadas, se le avisa al usuario para que las revise ya importadas.
-  const invalidas = filas.filter((f) => validarCamposRegistro(columnas, f) !== null).length;
+  const invalidas = filas.filter((f) => validarCamposRegistro(columnas, f, nombre) !== null).length;
   if (invalidas > 0) {
     avisos.push(`${invalidas} fila(s) de "${nombre}" tienen un campo obligatorio vacío o un monto negativo -- se importaron igual, revísalas.`);
   }
@@ -326,7 +326,7 @@ export async function POST(request: NextRequest) {
       columnas,
       cTipo,
       division,
-      tipo: tipoModulo(columnas.map((c) => c.rol)),
+      tipo: tipoModulo(columnas.map((c) => c.rol), sel?.nombre?.trim() || grupo.hojas[0]),
       cProducto: columnas.find((c) => c.rol === "producto"),
       cMonto: columnas.find((c) => c.rol === "monto"),
       cFecha: columnas.find((c) => c.rol === "fecha"),

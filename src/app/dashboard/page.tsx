@@ -31,7 +31,7 @@ export default async function DashboardPage() {
   // Un vendedor no ve módulos de Compras (costos, proveedores) -- solo registra
   // ventas y consulta stock, ver src/lib/permisos.ts.
   const datasets = (datasetsCrudos ?? []).filter(
-    (d) => !esVendedor || tipoModulo((d.columnas as Columna[]).map((c) => c.rol as RolColumna | null)) !== "compras"
+    (d) => !esVendedor || tipoModulo((d.columnas as Columna[]).map((c) => c.rol as RolColumna | null), d.nombre) !== "compras"
   );
   const hayModulos = datasets.length > 0;
 

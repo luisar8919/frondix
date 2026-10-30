@@ -32,7 +32,7 @@ export async function valorizacionInventario(supabase: SupabaseClient, empresaId
   const mapas: Map<string, PrecioCompra>[] = [];
   for (const d of todos) {
     const columnas = d.columnas as Columna[];
-    if (tipoModulo(columnas.map((c) => c.rol)) !== "compras") continue;
+    if (tipoModulo(columnas.map((c) => c.rol), d.nombre) !== "compras") continue;
     const cProducto = columnaConRol(columnas, "producto");
     const cMonto = columnaConRol(columnas, "monto");
     if (!cProducto || !cMonto) continue;

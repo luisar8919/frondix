@@ -13,8 +13,8 @@ export default async function RegistrarVentaPage() {
   const sesion = await empresaDelUsuarioServidor(supabase);
   if (!sesion.ok) redirect(sesion.error === "No se pudo identificar tu empresa." ? "/auth/completar" : "/login");
 
-  const { data: datasets } = await supabase.from("datasets").select("id, columnas").eq("empresa_id", sesion.empresaId);
-  const deVentas = (datasets ?? []).filter((d) => tipoModulo((d.columnas as Columna[]).map((c) => c.rol)) === "ventas");
+  const { data: datasets } = await supabase.from("datasets").select("id, nombre, columnas").eq("empresa_id", sesion.empresaId);
+  const deVentas = (datasets ?? []).filter((d) => tipoModulo((d.columnas as Columna[]).map((c) => c.rol), d.nombre) === "ventas");
 
   redirect(deVentas.length === 1 ? `/dashboard/${deVentas[0].id}` : "/dashboard/ventas");
 }

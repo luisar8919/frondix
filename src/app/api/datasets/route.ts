@@ -22,7 +22,7 @@ export async function GET(req: NextRequest) {
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
   const filtrados = (datasets ?? []).filter(
-    (d) => !tipoParam || tipoModulo((d.columnas as Columna[]).map((c) => c.rol)) === tipoParam
+    (d) => !tipoParam || tipoModulo((d.columnas as Columna[]).map((c) => c.rol), d.nombre) === tipoParam
   );
 
   return NextResponse.json({

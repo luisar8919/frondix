@@ -10,8 +10,8 @@ export default async function RegistrarCompraPage() {
   const sesion = await empresaDelUsuarioServidor(supabase);
   if (!sesion.ok) redirect(sesion.error === "No se pudo identificar tu empresa." ? "/auth/completar" : "/login");
 
-  const { data: datasets } = await supabase.from("datasets").select("id, columnas").eq("empresa_id", sesion.empresaId);
-  const deCompras = (datasets ?? []).filter((d) => tipoModulo((d.columnas as Columna[]).map((c) => c.rol)) === "compras");
+  const { data: datasets } = await supabase.from("datasets").select("id, nombre, columnas").eq("empresa_id", sesion.empresaId);
+  const deCompras = (datasets ?? []).filter((d) => tipoModulo((d.columnas as Columna[]).map((c) => c.rol), d.nombre) === "compras");
 
   redirect(deCompras.length === 1 ? `/dashboard/${deCompras[0].id}` : "/dashboard/compras");
 }

@@ -113,7 +113,7 @@ export async function calcularModulosReporte(supabase: SupabaseClient, empresaId
     modulos.push({
       datasetId: d.id,
       nombre: d.nombre,
-      tipo: tipoModulo(columnas.map((c) => c.rol)),
+      tipo: tipoModulo(columnas.map((c) => c.rol), d.nombre),
       plantillas,
       totalesPorMes: conTotales ? totalesPorMes(filas, ahora, 6) : null,
       topProducto: conTopProducto ? topPor(filas.map((f) => ({ clave: f.p, m: f.m })), 5) : null,
@@ -154,7 +154,7 @@ export async function ultimosMovimientos(supabase: SupabaseClient, empresaId: st
   const candidatos: Movimiento[] = [];
   for (const d of datasets ?? []) {
     const columnas = d.columnas as Columna[];
-    const tipo = tipoModulo(columnas.map((c) => c.rol));
+    const tipo = tipoModulo(columnas.map((c) => c.rol), d.nombre);
     if (tipo !== "ventas" && tipo !== "compras") continue;
     const cMonto = columnaConRol(columnas, "monto");
     if (!cMonto) continue;

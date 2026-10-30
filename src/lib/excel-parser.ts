@@ -341,9 +341,9 @@ function mismaFamilia(a: Set<string>, b: Set<string>): boolean {
 // mezclarlas en una sola tabla es justo lo que no se quiere (dificulta
 // sustentar cada una por separado). Se cortan acá, antes de agrupar, aunque
 // el resto de columnas coincida.
-function tiposIncompatibles(a: Columna[], b: Columna[]): boolean {
-  const tipoA = tipoModulo(a.map((c) => c.rol));
-  const tipoB = tipoModulo(b.map((c) => c.rol));
+function tiposIncompatibles(a: Columna[], nombreA: string, b: Columna[], nombreB: string): boolean {
+  const tipoA = tipoModulo(a.map((c) => c.rol), nombreA);
+  const tipoB = tipoModulo(b.map((c) => c.rol), nombreB);
   return tipoA !== "otro" && tipoB !== "otro" && tipoA !== tipoB;
 }
 
@@ -380,7 +380,7 @@ export function agruparHojas(
   for (const hoja of hojas) {
     const keysHoja = new Set(hoja.columnas.map((c) => c.key));
     const grupo = grupos.find(
-      (g) => mismaFamilia(keysHoja, new Set(g[0].columnas.map((c) => c.key))) && !tiposIncompatibles(hoja.columnas, g[0].columnas)
+      (g) => mismaFamilia(keysHoja, new Set(g[0].columnas.map((c) => c.key))) && !tiposIncompatibles(hoja.columnas, hoja.nombre, g[0].columnas, g[0].nombre)
     );
     if (grupo) grupo.push(hoja);
     else grupos.push([hoja]);

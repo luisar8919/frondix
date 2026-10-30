@@ -292,6 +292,7 @@ export default function DatasetPage({
         <div className="plegable-cuerpo">
           <DynamicForm
             columnas={dataset.columnas}
+            nombreModulo={dataset.nombre}
             opciones={opciones}
             etiquetasEnlace={etiquetasEnlace}
             onSubmit={agregarRegistro}
@@ -305,6 +306,7 @@ export default function DatasetPage({
           <DynamicForm
             key={editando.id}
             columnas={dataset.columnas}
+            nombreModulo={dataset.nombre}
             opciones={opciones}
             etiquetasEnlace={etiquetasEnlace}
             inicial={editando.data}

@@ -64,10 +64,10 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ data
   // páginas (no solo la primera), para que paginar no se salte el bloqueo.
   const { data: { user } } = await supabase.auth.getUser();
   if (user) {
-    const { data: dsPermiso } = await supabase.from("datasets").select("empresa_id, columnas").eq("id", datasetId).single();
+    const { data: dsPermiso } = await supabase.from("datasets").select("empresa_id, columnas, nombre").eq("id", datasetId).single();
     if (dsPermiso) {
       const { data: miMembresia } = await supabase.from("miembros").select("rol").eq("empresa_id", dsPermiso.empresa_id).eq("user_id", user.id).single();
-      if (miMembresia?.rol === "vendedor" && tipoModulo((dsPermiso.columnas as Columna[]).map((c) => c.rol)) === "compras") {
+      if (miMembresia?.rol === "vendedor" && tipoModulo((dsPermiso.columnas as Columna[]).map((c) => c.rol), dsPermiso.nombre) === "compras") {
         return NextResponse.json({ error: "Tu rol no tiene acceso a este módulo" }, { status: 403 });
       }
     }
@@ -115,17 +115,17 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ dat
   }
 
   // Si una columna está enlazada a otra tabla, el valor debe existir allí.
-  const { data: dataset, error: errorDataset } = await supabase.from("datasets").select("empresa_id, columnas").eq("id", datasetId).single();
+  const { data: dataset, error: errorDataset } = await supabase.from("datasets").select("empresa_id, columnas, nombre").eq("id", datasetId).single();
   if (errorDataset?.code === "42501") return respuestaError(errorDataset);
   if (!dataset) return NextResponse.json({ error: "Dataset no encontrado" }, { status: 404 });
   const columnas = dataset.columnas as Columna[];
 
-  if (user && tipoModulo(columnas.map((c) => c.rol)) === "compras") {
+  if (user && tipoModulo(columnas.map((c) => c.rol), dataset.nombre) === "compras") {
     const { data: miMembresia } = await supabase.from("miembros").select("rol").eq("empresa_id", dataset.empresa_id).eq("user_id", user.id).single();
     if (miMembresia?.rol === "vendedor") return NextResponse.json({ error: "Tu rol no tiene acceso a este módulo" }, { status: 403 });
   }
 
-  const faltaCampo = validarCamposRegistro(columnas, body);
+  const faltaCampo = validarCamposRegistro(columnas, body, dataset.nombre);
   if (faltaCampo) return NextResponse.json({ error: faltaCampo }, { status: 422 });
 
   // Mejor esfuerzo: si esto falla (ej. un blip de red), no debe tumbar todo el

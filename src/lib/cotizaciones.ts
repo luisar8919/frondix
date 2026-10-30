@@ -30,7 +30,7 @@ export async function aceptarCotizacion(
   if (cot.estado === "aceptada") return { ok: false, error: "Esta cotización ya fue aceptada", status: 422 };
 
   const { data: datasets } = await supabase.from("datasets").select("id, nombre, columnas").eq("empresa_id", empresaId);
-  const deVentas = (datasets ?? []).filter((d) => tipoModulo((d.columnas as Columna[]).map((c) => c.rol)) === "ventas");
+  const deVentas = (datasets ?? []).filter((d) => tipoModulo((d.columnas as Columna[]).map((c) => c.rol), d.nombre) === "ventas");
   if (deVentas.length === 0) {
     return { ok: false, error: "Primero crea un módulo de Ventas para poder aceptar cotizaciones.", status: 422 };
   }

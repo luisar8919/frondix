@@ -97,13 +97,28 @@ export function sugerirRoles(
 // En qué pestaña (Compras/Ventas) cae un módulo, según los roles que ya tiene
 // marcados -- no es un campo nuevo que haya que elegir, se deduce de lo mismo
 // que ya alimenta los reportes. "Proveedor" manda (es la señal más clara de
-// que es un gasto/compra); si no, Producto+Monto o Cliente lo marca como venta.
+// que es un gasto/compra); si no, Producto+Monto o Cliente (con Producto o
+// Monto también presente) lo marca como venta.
+//
+// "Concepto"+"Monto" o un simple "Cliente" también aparecen en módulos que NO
+// son ventas (Gastos operativos, Cuentas por pagar, subidos por Excel con
+// nombres de columna genéricos) -- nombreTabla es la única señal disponible
+// para distinguirlos ahí (el nombre de la hoja/tabla, ej. "Gastos
+// operativos"), así que cuando ese nombre suena claramente a salida de
+// dinero se descarta la clasificación de venta aunque los roles calcen.
+// "Cliente" sin ningún Producto/Monto (ej. una agenda de Reservas) tampoco
+// cuenta como venta: una referencia a un cliente no es, por sí sola, un
+// movimiento de dinero.
 export type TipoModulo = "compras" | "ventas" | "otro";
 
-export function tipoModulo(roles: (RolColumna | null | "")[]): TipoModulo {
+const PALABRAS_NO_VENTA = /\bgastos?\b|\begresos?\b|\bpagar\b|\bdeudas?\b|\bpasivos?\b/;
+
+export function tipoModulo(roles: (RolColumna | null | "")[], nombreTabla?: string): TipoModulo {
   const presentes = new Set(roles.filter(Boolean));
   if (presentes.has("proveedor")) return "compras";
-  if (presentes.has("cliente") || (presentes.has("producto") && presentes.has("monto"))) return "ventas";
+  if (nombreTabla && PALABRAS_NO_VENTA.test(normalizar(nombreTabla))) return "otro";
+  if (presentes.has("cliente") && (presentes.has("producto") || presentes.has("monto"))) return "ventas";
+  if (presentes.has("producto") && presentes.has("monto")) return "ventas";
   return "otro";
 }
 
@@ -137,9 +152,10 @@ export function admiteNegativos(rol: RolColumna | null | ""): boolean {
 // directo sin pasar por él, así que no alcanza con validar solo en el cliente.
 export function validarCamposRegistro(
   columnas: { key: string; label: string; rol: RolColumna | null; tipo: string }[],
-  datos: Record<string, unknown>
+  datos: Record<string, unknown>,
+  nombreTabla?: string
 ): string | null {
-  const obligatorios = new Set(camposObligatorios(tipoModulo(columnas.map((c) => c.rol))));
+  const obligatorios = new Set(camposObligatorios(tipoModulo(columnas.map((c) => c.rol), nombreTabla)));
   for (const c of columnas) {
     if (!c.rol || !obligatorios.has(c.rol)) continue;
     const v = datos[c.key];

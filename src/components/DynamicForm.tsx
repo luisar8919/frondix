@@ -22,6 +22,7 @@ const sustantivoEnlace: Record<string, string> = {
 
 export default function DynamicForm({
   columnas,
+  nombreModulo,
   opciones,
   etiquetasEnlace,
   onSubmit,
@@ -30,6 +31,9 @@ export default function DynamicForm({
   onCancelar,
 }: {
   columnas: Columna[];
+  // nombre de la tabla: única señal para distinguir, ej., "Gastos operativos"
+  // (sin campos obligatorios) de una Venta real con las mismas columnas.
+  nombreModulo?: string;
   // valores permitidos por columna enlazada (autocompletado)
   opciones?: Record<string, string[]>;
   // a qué tabla > columna apunta cada columna enlazada (texto de ayuda)
@@ -77,7 +81,7 @@ export default function DynamicForm({
   const [error, setError] = useState<string | null>(null);
   const [escaneando, setEscaneando] = useState<string | null>(null); // key de la columna que está escaneando
 
-  const tipo = tipoModulo(columnas.map((c) => c.rol));
+  const tipo = tipoModulo(columnas.map((c) => c.rol), nombreModulo);
   const obligatorios = new Set(camposObligatorios(tipo));
 
   // Escanear el código de barras de un artículo comprado y usarlo directo

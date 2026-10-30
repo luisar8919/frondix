@@ -25,8 +25,8 @@ async function cargar(ctx: Ctx) {
 
   // Un vendedor no puede editar/borrar un registro de Compras aunque conozca su
   // ID directo (antes solo se bloqueaba listar/crear, ver /api/records/[datasetId]).
-  const { data: dsPermiso } = await supabase.from("datasets").select("empresa_id, columnas").eq("id", datasetId).single();
-  if (dsPermiso && tipoModulo((dsPermiso.columnas as Columna[]).map((c) => c.rol)) === "compras") {
+  const { data: dsPermiso } = await supabase.from("datasets").select("empresa_id, columnas, nombre").eq("id", datasetId).single();
+  if (dsPermiso && tipoModulo((dsPermiso.columnas as Columna[]).map((c) => c.rol), dsPermiso.nombre) === "compras") {
     const { data: miMembresia } = await supabase.from("miembros").select("rol").eq("empresa_id", dsPermiso.empresa_id).eq("user_id", user.id).single();
     if (miMembresia?.rol === "vendedor") {
       return { error: NextResponse.json({ error: "Tu rol no tiene acceso a este módulo" }, { status: 403 }) };
@@ -53,12 +53,12 @@ export async function PATCH(req: NextRequest, ctx: Ctx) {
       return NextResponse.json({ error: "Body inválido" }, { status: 400 });
     }
 
-    const { data: dataset } = await supabase.from("datasets").select("empresa_id, columnas").eq("id", datasetId).single();
+    const { data: dataset } = await supabase.from("datasets").select("empresa_id, columnas, nombre").eq("id", datasetId).single();
     if (!dataset) return NextResponse.json({ error: "Tabla no encontrada" }, { status: 404 });
     columnas = dataset.columnas as Columna[];
     empresaId = dataset.empresa_id;
 
-    const faltaCampo = validarCamposRegistro(columnas, data);
+    const faltaCampo = validarCamposRegistro(columnas, data, dataset.nombre);
     if (faltaCampo) return NextResponse.json({ error: faltaCampo }, { status: 422 });
 
     const fallo = await validarEnlaces(supabase, columnas, data);

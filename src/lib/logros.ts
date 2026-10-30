@@ -60,6 +60,7 @@ const MARCABLES_A_MANO = new Set(["exportaste_reporte", "whatsapp_enviado"]);
 
 interface DatasetLigero {
   id: string;
+  nombre: string;
   columnas: Columna[];
   moneda: string | null;
   incluye_igv: boolean | null;
@@ -107,11 +108,11 @@ async function detectarLogrosCumplidos(supabase: SupabaseClient, empresaId: stri
   const necesitaDatasets = [...faltantes].some((c) => !NO_NECESITAN_DATASETS.has(c));
 
   const datasets: DatasetLigero[] = necesitaDatasets
-    ? ((await supabase.from("datasets").select("id, columnas, moneda, incluye_igv, archivo_original_url").eq("empresa_id", empresaId)).data as DatasetLigero[] | null) ?? []
+    ? ((await supabase.from("datasets").select("id, nombre, columnas, moneda, incluye_igv, archivo_original_url").eq("empresa_id", empresaId)).data as DatasetLigero[] | null) ?? []
     : [];
 
   const porTipo = (tipo: "ventas" | "compras") =>
-    datasets.filter((d) => tipoModulo((d.columnas as Columna[]).map((c) => c.rol)) === tipo).map((d) => d.id);
+    datasets.filter((d) => tipoModulo((d.columnas as Columna[]).map((c) => c.rol), d.nombre) === tipo).map((d) => d.id);
 
   for (const clave of faltantes) {
     let cumple = false;
