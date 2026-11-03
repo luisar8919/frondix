@@ -94,8 +94,8 @@ export default function SignupPage() {
                 </div>
                 <div className="campo">
                   <label htmlFor="password">Contraseña</label>
-                  <input id="password" type="password" autoComplete="new-password" value={password} onChange={(e) => setPassword(e.target.value)} required minLength={6} />
-                  <p className="ayuda">Mínimo 6 caracteres.</p>
+                  <input id="password" type="password" autoComplete="new-password" value={password} onChange={(e) => setPassword(e.target.value)} required minLength={8} />
+                  <p className="ayuda">Mínimo 8 caracteres.</p>
                 </div>
                 <div className="campo campo-check">
                   <label>

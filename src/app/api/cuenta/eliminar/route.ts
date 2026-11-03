@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { crearClienteServidor } from "@/lib/supabase/server";
 import { crearClienteAdmin } from "@/lib/supabase/admin";
 import { misEmpresas } from "@/lib/sesion";
+import { logEventoSeguridad } from "@/lib/logSeguridad";
 
 // Borra la cuenta del usuario que llama (nunca la de otro). Dos reglas:
 // - Si es dueño de una empresa donde hay más gente en el equipo, se bloquea
@@ -47,6 +48,12 @@ export async function POST() {
 
   const { error } = await admin.auth.admin.deleteUser(user.id);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+  logEventoSeguridad("cuenta_eliminada", {
+    userId: user.id,
+    email: user.email,
+    empresasBorradas: propias.map((e) => e.empresaId),
+  });
 
   return NextResponse.json({ ok: true });
 }

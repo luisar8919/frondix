@@ -192,10 +192,10 @@ function CompletarForm() {
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     required
-                    minLength={6}
+                    minLength={8}
                     autoFocus
                   />
-                  <p className="ayuda">Mínimo 6 caracteres.</p>
+                  <p className="ayuda">Mínimo 8 caracteres.</p>
                 </div>
                 {error && <p className="alerta alerta-error" role="alert">{error}</p>}
                 <button type="submit" className="btn btn-primario btn-grande btn-bloque" disabled={enviando}>

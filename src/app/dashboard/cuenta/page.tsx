@@ -120,7 +120,7 @@ export default function CuentaPage() {
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             required
-            minLength={6}
+            minLength={8}
           />
         </div>
         <div className="campo" style={{ marginBottom: 0 }}>
@@ -132,9 +132,9 @@ export default function CuentaPage() {
             value={passwordConfirmar}
             onChange={(e) => setPasswordConfirmar(e.target.value)}
             required
-            minLength={6}
+            minLength={8}
           />
-          <p className="ayuda">Mínimo 6 caracteres.</p>
+          <p className="ayuda">Mínimo 8 caracteres.</p>
         </div>
 
         {mensajePassword && <p className={`alerta alerta-${mensajePassword.tipo}`} role="status" style={{ marginTop: 14 }}>{mensajePassword.texto}</p>}

@@ -3,6 +3,7 @@ import { crearClienteServidor } from "@/lib/supabase/server";
 import { crearClienteAdmin } from "@/lib/supabase/admin";
 import Logo from "@/components/Logo";
 import { CATEGORIAS_MODULOS, PLANTILLAS_EXTRA } from "@/lib/plantillasModulo";
+import { logEventoSeguridad } from "@/lib/logSeguridad";
 
 // Panel interno (no para clientes): cuándo entró cada empresa por última vez y
 // qué tanto usa la plataforma. Cruza datos de TODAS las empresas, así que nunca
@@ -29,7 +30,11 @@ const fecha = (iso: string | null) =>
 export default async function PanelInternoPage() {
   const supabase = await crearClienteServidor();
   const { data: { user } } = await supabase.auth.getUser();
-  if (!user || user.email !== EMAIL_ADMIN) redirect("/login");
+  if (!user || user.email !== EMAIL_ADMIN) {
+    if (user) logEventoSeguridad("admin_acceso_denegado", { userId: user.id, email: user.email });
+    redirect("/login");
+  }
+  logEventoSeguridad("admin_acceso", { userId: user.id, email: user.email });
 
   const admin = crearClienteAdmin();
 

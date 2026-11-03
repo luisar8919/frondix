@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { crearClienteServidor } from "@/lib/supabase/server";
 import { crearClienteAdmin } from "@/lib/supabase/admin";
+import { logEventoSeguridad } from "@/lib/logSeguridad";
 
 // Pasa la propiedad de una empresa a otro miembro que ya está ahí (admin o
 // miembro). Solo el dueño actual puede hacerlo. El dueño actual no desaparece,
@@ -52,6 +53,8 @@ export async function POST(req: NextRequest) {
     await admin.from("miembros").update({ rol: destino.rol }).eq("empresa_id", empresaId).eq("user_id", nuevoDuenoId);
     return NextResponse.json({ error: errorViejo.message }, { status: 500 });
   }
+
+  logEventoSeguridad("empresa_transferida", { empresaId, duenoAnteriorId: user.id, nuevoDuenoId });
 
   return NextResponse.json({ ok: true });
 }
