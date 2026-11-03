@@ -96,7 +96,6 @@ async function crearMaestroYEnlazar(
 async function crearModuloStockSiPedido(
   supabase: SupabaseClient,
   empresaId: string,
-  nombreBase: string,
   productos: string[],
   stockGlobal: Map<string, number>,
   datasetsAEnlazar: { datasetId: string; columnaKey: string }[]
@@ -110,7 +109,7 @@ async function crearModuloStockSiPedido(
   ];
   const { data: datasetStock, error } = await supabase
     .from("datasets")
-    .insert({ empresa_id: empresaId, nombre: `${nombreBase} - Stock`, columnas: columnasStock })
+    .insert({ empresa_id: empresaId, nombre: "Stock", columnas: columnasStock })
     .select()
     .single();
   if (error || !datasetStock) return null;
@@ -470,26 +469,26 @@ export async function POST(request: NextRequest) {
       // al vuelo, ver /api/records/[datasetId]).
       if (datasetVentasId) {
         const clientes = valoresDistintos(separacion.ventas, "cliente");
-        const maestro = await crearTablaMaestra(supabase, empresaId, `Clientes - ${nombreDataset}`, clientes);
+        const maestro = await crearTablaMaestra(supabase, empresaId, "Clientes", clientes);
         if (maestro) {
           const { data: ds } = await supabase.from("datasets").select("columnas").eq("id", datasetVentasId).single();
           if (ds) {
             const cols = (ds.columnas as Columna[]).map((c) => (c.key === "cliente" ? { ...c, enlace: maestro } : c));
             await supabase.from("datasets").update({ columnas: cols }).eq("id", datasetVentasId);
           }
-          creados.push({ datasetId: maestro.datasetId, nombre: `Clientes - ${nombreDataset}`, hojas: [], filasImportadas: clientes.length });
+          creados.push({ datasetId: maestro.datasetId, nombre: "Clientes", hojas: [], filasImportadas: clientes.length });
         }
       }
       if (datasetComprasId && info.cProveedor) {
         const proveedores = valoresDistintos(separacion.compras, "proveedor");
-        const maestro = await crearTablaMaestra(supabase, empresaId, `Proveedores - ${nombreDataset}`, proveedores);
+        const maestro = await crearTablaMaestra(supabase, empresaId, "Proveedores", proveedores);
         if (maestro) {
           const { data: ds } = await supabase.from("datasets").select("columnas").eq("id", datasetComprasId).single();
           if (ds) {
             const cols = (ds.columnas as Columna[]).map((c) => (c.key === "proveedor" ? { ...c, enlace: maestro } : c));
             await supabase.from("datasets").update({ columnas: cols }).eq("id", datasetComprasId);
           }
-          creados.push({ datasetId: maestro.datasetId, nombre: `Proveedores - ${nombreDataset}`, hojas: [], filasImportadas: proveedores.length });
+          creados.push({ datasetId: maestro.datasetId, nombre: "Proveedores", hojas: [], filasImportadas: proveedores.length });
         }
       }
 
@@ -499,7 +498,7 @@ export async function POST(request: NextRequest) {
           ...(datasetVentasId ? [{ datasetId: datasetVentasId, columnaKey: "producto" }] : []),
           ...(datasetComprasId ? [{ datasetId: datasetComprasId, columnaKey: "producto" }] : []),
         ];
-        const r = await crearModuloStockSiPedido(supabase, empresaId, nombreDataset, productos, stockGlobal, enlazar);
+        const r = await crearModuloStockSiPedido(supabase, empresaId, productos, stockGlobal, enlazar);
         if (r) creados.push({ ...r, hojas: [] });
       }
       continue;
@@ -549,12 +548,12 @@ export async function POST(request: NextRequest) {
 
       const cClienteVentas = datasetVentasId && columnasVentas.find((c) => c.rol === "cliente");
       if (datasetVentasId && cClienteVentas) {
-        const maestro = await crearMaestroYEnlazar(supabase, empresaId, datasetVentasId, division.ventas, cClienteVentas.key, `Clientes - ${nombreDataset}`);
+        const maestro = await crearMaestroYEnlazar(supabase, empresaId, datasetVentasId, division.ventas, cClienteVentas.key, "Clientes");
         if (maestro) creados.push({ ...maestro, hojas: [] });
       }
       const cProveedorCompras = datasetComprasId && columnasCompras.find((c) => c.rol === "proveedor");
       if (datasetComprasId && cProveedorCompras) {
-        const maestro = await crearMaestroYEnlazar(supabase, empresaId, datasetComprasId, division.compras, cProveedorCompras.key, `Proveedores - ${nombreDataset}`);
+        const maestro = await crearMaestroYEnlazar(supabase, empresaId, datasetComprasId, division.compras, cProveedorCompras.key, "Proveedores");
         if (maestro) creados.push({ ...maestro, hojas: [] });
       }
 
@@ -565,7 +564,7 @@ export async function POST(request: NextRequest) {
           ...(datasetVentasId ? [{ datasetId: datasetVentasId, columnaKey: claveProducto }] : []),
           ...(datasetComprasId ? [{ datasetId: datasetComprasId, columnaKey: claveProducto }] : []),
         ];
-        const r = await crearModuloStockSiPedido(supabase, empresaId, nombreDataset, productos, stockGlobal, enlazar);
+        const r = await crearModuloStockSiPedido(supabase, empresaId, productos, stockGlobal, enlazar);
         if (r) creados.push({ ...r, hojas: [] });
       }
       continue;
@@ -586,7 +585,7 @@ export async function POST(request: NextRequest) {
     // dos caminos (dividir por Tipo, separar), ver crearMaestroYEnlazar.
     const cContraparte = columnasFinal.find((c) => c.rol === "cliente" || c.rol === "proveedor");
     if (cContraparte) {
-      const nombreTabla = `${cContraparte.rol === "cliente" ? "Clientes" : "Proveedores"} - ${nombreDataset}`;
+      const nombreTabla = cContraparte.rol === "cliente" ? "Clientes" : "Proveedores";
       const maestro = await crearMaestroYEnlazar(supabase, empresaId, r.datasetId, grupo.filas, cContraparte.key, nombreTabla);
       if (maestro) creados.push({ ...maestro, hojas: [] });
     }
@@ -599,7 +598,7 @@ export async function POST(request: NextRequest) {
     if (sel?.crearStock && info.cProducto) {
       const claveProducto = info.cProducto.key;
       const productos = valoresDistintos(grupo.filas, claveProducto);
-      const stock = await crearModuloStockSiPedido(supabase, empresaId, nombreDataset, productos, stockGlobal, [
+      const stock = await crearModuloStockSiPedido(supabase, empresaId, productos, stockGlobal, [
         { datasetId: r.datasetId, columnaKey: claveProducto },
       ]);
       if (stock) creados.push({ ...stock, hojas: [] });
