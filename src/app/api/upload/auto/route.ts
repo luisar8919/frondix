@@ -110,7 +110,7 @@ async function crearModuloStockSiPedido(
   ];
   const { data: datasetStock, error } = await supabase
     .from("datasets")
-    .insert({ empresa_id: empresaId, nombre: `Stock - ${nombreBase}`, columnas: columnasStock })
+    .insert({ empresa_id: empresaId, nombre: `${nombreBase} - Stock`, columnas: columnasStock })
     .select()
     .single();
   if (error || !datasetStock) return null;
@@ -446,14 +446,19 @@ export async function POST(request: NextRequest) {
 
       let datasetVentasId: string | null = null;
       if (separacion.ventas.length > 0) {
-        const r = await crearModulo(supabase, empresaId, `${nombreDataset} - Ventas`, columnasVentas, separacion.ventas, avisos);
+        const r = await crearModulo(supabase, empresaId, `${nombreDataset} - Ingresos`, columnasVentas, separacion.ventas, avisos);
         if ("error" in r) return NextResponse.json({ error: r.error, creadosHastaAhora: creados }, { status: 500 });
         creados.push({ ...r, hojas: grupo.hojas });
         datasetVentasId = r.datasetId;
       }
       let datasetComprasId: string | null = null;
       if (separacion.compras.length > 0) {
-        const r = await crearModulo(supabase, empresaId, `${nombreDataset} - Compras`, columnasCompras, separacion.compras, avisos);
+        // No es una compra real (no vino de una columna "Tipo" que distinga
+        // filas de venta y de compra, ver separarVentaYCosto) -- es el costo de
+        // la MISMA fila de venta, separado para que el flujo de caja funcione.
+        // Llamarla "Compras" confundía al dueño del negocio (parecía que el
+        // sistema había inventado proveedores que nunca cargó).
+        const r = await crearModulo(supabase, empresaId, `${nombreDataset} - Costos`, columnasCompras, separacion.compras, avisos);
         if ("error" in r) return NextResponse.json({ error: r.error, creadosHastaAhora: creados }, { status: 500 });
         creados.push({ ...r, hojas: grupo.hojas });
         datasetComprasId = r.datasetId;
