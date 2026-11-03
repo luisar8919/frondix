@@ -214,6 +214,13 @@ export default function UploadPage() {
   }
 
   const hayIncluidos = ediciones.some((e) => e.incluir);
+  // Mismo cálculo que modulosNuevos en /api/upload/auto: dividir/separar
+  // reemplazan 1 módulo por 2, +1 neto cada uno; crearStock suma 1 más. Las
+  // tablas maestras de Clientes/Proveedores no se cuentan (tampoco las cuenta
+  // el servidor al validar el tope de módulos del plan).
+  const incluidos = ediciones.filter((e) => e.incluir);
+  const cantidadModulosAcrear =
+    incluidos.length + incluidos.filter((e) => e.crearStock).length + incluidos.filter((e) => e.dividir).length + incluidos.filter((e) => e.separar).length;
   const g = grupos?.[pestanaActiva];
   const ed = ediciones[pestanaActiva];
 
@@ -501,7 +508,7 @@ export default function UploadPage() {
 
           <div className="centrado" style={{ marginTop: 10 }}>
             <button type="button" className="btn btn-primario btn-grande" onClick={onConfirmar} disabled={cargando || !hayIncluidos}>
-              {cargando ? "Creando..." : `Crear ${ediciones.filter((e) => e.incluir).length} módulo(s)`}
+              {cargando ? "Creando..." : `Crear ${cantidadModulosAcrear} módulo(s)`}
             </button>
           </div>
         </>
