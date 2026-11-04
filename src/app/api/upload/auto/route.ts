@@ -85,6 +85,32 @@ async function crearMaestroYEnlazar(
   return { datasetId: maestro.datasetId, nombre: nombreTabla, filasImportadas: valores.length };
 }
 
+// Mismo "dato maestro" que Clientes/Proveedores, para la columna Categoría
+// (rol "categoria", ver roles.ts) -- a diferencia de Cliente/Proveedor, una
+// categoría no distingue Ventas de Compras, así que UNA sola tabla
+// "Categorías" se enlaza a la vez en Ventas Y Compras cuando el camino
+// "dividir por Tipo" generó los dos módulos con esa misma columna. Así el
+// registro manual (web) autocompleta contra las categorías ya usadas, en vez
+// de texto libre sin estandarizar ("alimentación" vs "fiestas" vs "Fiesta").
+async function crearMaestroCategoriaYEnlazar(
+  supabase: SupabaseClient,
+  empresaId: string,
+  objetivos: { datasetId: string; filas: Record<string, unknown>[]; claveColumna: string }[]
+): Promise<{ datasetId: string; nombre: string; filasImportadas: number } | null> {
+  if (objetivos.length === 0) return null;
+  const valores = [...new Set(objetivos.flatMap((o) => valoresDistintos(o.filas, o.claveColumna)))].sort((a, b) => a.localeCompare(b, "es"));
+  const maestro = await crearTablaMaestra(supabase, empresaId, "Categorías", valores);
+  if (!maestro) return null;
+  for (const o of objetivos) {
+    const { data: ds } = await supabase.from("datasets").select("columnas").eq("id", o.datasetId).single();
+    if (ds) {
+      const cols = (ds.columnas as Columna[]).map((c) => (c.key === o.claveColumna ? { ...c, enlace: maestro } : c));
+      await supabase.from("datasets").update({ columnas: cols }).eq("id", o.datasetId);
+    }
+  }
+  return { datasetId: maestro.datasetId, nombre: "Categorías", filasImportadas: valores.length };
+}
+
 // Crea el módulo Stock opcional (Producto + Cantidad, una fila por producto
 // distinto) y lo enlaza SIMÉTRICAMENTE con cada módulo que lo pidió: Stock ->
 // primer módulo (para que el formulario de Stock autocomplete con productos ya
@@ -557,6 +583,14 @@ export async function POST(request: NextRequest) {
         if (maestro) creados.push({ ...maestro, hojas: [] });
       }
 
+      const objetivosCategoria: { datasetId: string; filas: Record<string, unknown>[]; claveColumna: string }[] = [];
+      const cCategoriaVentas = columnasVentas.find((c) => c.rol === "categoria");
+      if (datasetVentasId && cCategoriaVentas) objetivosCategoria.push({ datasetId: datasetVentasId, filas: division.ventas, claveColumna: cCategoriaVentas.key });
+      const cCategoriaCompras = columnasCompras.find((c) => c.rol === "categoria");
+      if (datasetComprasId && cCategoriaCompras) objetivosCategoria.push({ datasetId: datasetComprasId, filas: division.compras, claveColumna: cCategoriaCompras.key });
+      const maestroCategoria = await crearMaestroCategoriaYEnlazar(supabase, empresaId, objetivosCategoria);
+      if (maestroCategoria) creados.push({ ...maestroCategoria, hojas: [] });
+
       if (sel?.crearStock && info.cProducto) {
         const claveProducto = info.cProducto.key;
         const productos = valoresDistintos([...division.ventas, ...division.compras], claveProducto);
@@ -588,6 +622,15 @@ export async function POST(request: NextRequest) {
       const nombreTabla = cContraparte.rol === "cliente" ? "Clientes" : "Proveedores";
       const maestro = await crearMaestroYEnlazar(supabase, empresaId, r.datasetId, grupo.filas, cContraparte.key, nombreTabla);
       if (maestro) creados.push({ ...maestro, hojas: [] });
+    }
+
+    // Tabla maestra de Categorías -- mismo criterio que Clientes/Proveedores.
+    const cCategoria = columnasFinal.find((c) => c.rol === "categoria");
+    if (cCategoria) {
+      const maestroCategoria = await crearMaestroCategoriaYEnlazar(supabase, empresaId, [
+        { datasetId: r.datasetId, filas: grupo.filas, claveColumna: cCategoria.key },
+      ]);
+      if (maestroCategoria) creados.push({ ...maestroCategoria, hojas: [] });
     }
 
     // Módulo Stock opcional: Producto (enlazado al producto de este módulo) +
