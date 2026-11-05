@@ -38,7 +38,7 @@ module.exports = {
       "style-src 'self' 'unsafe-inline'",
       "img-src 'self' data: https://www.paypalobjects.com",
       "font-src 'self' data:",
-      "connect-src 'self' https://*.supabase.co https://api-m.paypal.com https://api-m.sandbox.paypal.com https://api.paddle.com https://sandbox-api.paddle.com",
+      "connect-src 'self' https://*.supabase.co https://api-m.paypal.com https://api-m.sandbox.paypal.com https://www.paypal.com https://www.sandbox.paypal.com https://api.paddle.com https://sandbox-api.paddle.com",
       "frame-src 'self' https://www.paypal.com https://www.sandbox.paypal.com https://*.paddle.com",
       "object-src 'none'",
       "base-uri 'self'",
