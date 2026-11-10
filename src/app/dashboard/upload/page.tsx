@@ -7,6 +7,7 @@ import { crearClienteBrowser } from "@/lib/supabase/client";
 import { tieneSuscripcionActiva } from "@/lib/suscripcion";
 import { empresaDelUsuario } from "@/lib/sesion";
 import { ROLES, tipoModulo, type RolColumna } from "@/lib/roles";
+import { esStock } from "@/lib/stock";
 import { PLANTILLAS_REPORTE, plantillasCubiertas, rolesFaltantes } from "@/lib/plantillasReporte";
 import type { Columna } from "@/lib/excel-parser";
 
@@ -102,6 +103,15 @@ export default function UploadPage() {
   const [resultado, setResultado] = useState<{ tablas: ModuloCreado[]; avisos?: string[] } | null>(null);
   const [empresaId, setEmpresaId] = useState<string | null>(null);
   const [planActivo, setPlanActivo] = useState<boolean | null>(null);
+  // Módulos que ya existen en la empresa, por tipo -- para avisar si lo que se está
+  // por crear choca con algo que ya tienes (dos fuentes de módulos distintas: el
+  // selector por rubro del onboarding y esta carga de Excel no se coordinan solas,
+  // ver dashboard/modulos/nuevo/page.tsx).
+  const [modulosExistentes, setModulosExistentes] = useState<{ ventas: string[]; compras: string[]; stock: string[] }>({
+    ventas: [],
+    compras: [],
+    stock: [],
+  });
 
   useEffect(() => {
     const supabase = crearClienteBrowser();
@@ -110,6 +120,17 @@ export default function UploadPage() {
       if (!r.ok) return; // silencioso al cargar la página; se vuelve a chequear (con aviso) al confirmar
       setEmpresaId(r.empresaId);
       setPlanActivo(await tieneSuscripcionActiva(supabase, r.empresaId));
+
+      const { data: datasetsCrudos } = await supabase.from("datasets").select("nombre, columnas").eq("empresa_id", r.empresaId);
+      const ventas: string[] = [], compras: string[] = [], stock: string[] = [];
+      for (const d of datasetsCrudos ?? []) {
+        const cols = d.columnas as Columna[];
+        const tipo = tipoModulo(cols.map((c) => c.rol), d.nombre);
+        if (tipo === "ventas") ventas.push(d.nombre);
+        else if (tipo === "compras") compras.push(d.nombre);
+        if (esStock(cols)) stock.push(d.nombre);
+      }
+      setModulosExistentes({ ventas, compras, stock });
     })();
   }, []);
 
@@ -334,6 +355,26 @@ export default function UploadPage() {
               </label>
               <span className="suave pequeno">{g.filasCount} filas, de: {g.hojas.join(", ")}</span>
             </div>
+
+            {ed.incluir && (() => {
+              const tipoEd = tipoModulo(ed.columnas.map((c) => c.rol || null), ed.nombre);
+              const produceVentas = ed.dividir || ed.separar || tipoEd === "ventas";
+              const produceCompras = ed.dividir || ed.separar || tipoEd === "compras";
+              const choques: { tipo: string; nombres: string[] }[] = [
+                produceVentas && modulosExistentes.ventas.length > 0 ? { tipo: "Ventas", nombres: modulosExistentes.ventas } : null,
+                produceCompras && modulosExistentes.compras.length > 0 ? { tipo: "Compras", nombres: modulosExistentes.compras } : null,
+                ed.crearStock && modulosExistentes.stock.length > 0 ? { tipo: "Stock", nombres: modulosExistentes.stock } : null,
+              ].filter((x): x is { tipo: string; nombres: string[] } => !!x);
+              if (choques.length === 0) return null;
+              return (
+                <p className="alerta alerta-aviso" style={{ marginTop: 14 }}>
+                  Ya tienes {choques.map((c) => `un módulo de ${c.tipo} (${c.nombres.join(", ")})`).join(" y ")}. Esto va a crear{" "}
+                  {choques.length > 1 ? "módulos NUEVOS y separados" : "un módulo NUEVO y separado"} -- tus datos no se van a mezclar
+                  automáticamente. Si prefieres juntarlo, renombra este módulo para distinguirlo (ej. "{ed.nombre} 2026"), o descarta
+                  este y carga los datos a mano dentro del módulo existente.
+                </p>
+              );
+            })()}
 
             {g.filasVaciasDescartadas > 0 && ed.incluir && (
               <p className="suave pequeno" style={{ marginTop: 10 }}>
