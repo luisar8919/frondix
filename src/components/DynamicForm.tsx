@@ -18,6 +18,7 @@ const sustantivoEnlace: Record<string, string> = {
   cliente: "cliente",
   proveedor: "proveedor",
   producto: "producto",
+  categoria: "categoría",
 };
 
 export default function DynamicForm({
