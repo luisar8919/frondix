@@ -137,6 +137,24 @@ export default function DynamicTable({
   const mostrados = registros.slice(0, visibles);
   const restantes = registros.length - mostrados.length;
 
+  // Highlight de Stock: la columna de cantidad del propio módulo Stock (rol
+  // null, key "cantidad" -- distinta de la columna "cantidad" con rol
+  // "cantidad" que tienen Ventas/Compras, esa es unidades por transacción, no
+  // nivel de inventario) se resalta en rojo/negrita si está en o por debajo
+  // del "Stock mínimo" marcado en esa misma fila, o verde/negrita si no. Solo
+  // aplica si el módulo tiene una columna "Stock mínimo" de verdad (mismo
+  // criterio que alertasStock.ts) -- si nadie la marcó, la celda se ve normal.
+  const cStockMinimo = columnas.find((c) => c.rol === "stock_minimo");
+  function estiloStock(c: Columna, r: { data: Record<string, unknown> }): { texto: string; color: string; negrita: boolean } | null {
+    if (!cStockMinimo || c.rol !== null || c.key !== "cantidad") return null;
+    const cantidad = Number(r.data[c.key]);
+    const minimo = Number(r.data[cStockMinimo.key]);
+    if (!Number.isFinite(cantidad) || !Number.isFinite(minimo) || minimo <= 0) return null;
+    return cantidad <= minimo
+      ? { texto: "⚠️", color: "var(--error)", negrita: true }
+      : { texto: "✓", color: "var(--verde-700)", negrita: true };
+  }
+
   return (
     <>
       {onGuardarFila && (
@@ -214,6 +232,10 @@ export default function DynamicTable({
                         />
                       ) : c.enlace && texto ? (
                         <Link href={urlFiltrada(c.enlace.datasetId, c.enlace.columnaKey, valor)}>{texto}</Link>
+                      ) : estiloStock(c, r) ? (
+                        <span style={{ color: estiloStock(c, r)!.color, fontWeight: estiloStock(c, r)!.negrita ? 700 : undefined }}>
+                          {estiloStock(c, r)!.texto} {texto}
+                        </span>
                       ) : (
                         texto
                       )}

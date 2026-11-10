@@ -120,6 +120,25 @@ tbody tr:hover { background: var(--verde-50); }
 th.num, td.num { text-align: right; font-variant-numeric: tabular-nums; }
 .vacio { text-align: center; padding: 48px 20px; color: var(--suave); }
 
+/* En móvil: la tabla sigue con scroll horizontal (demasiadas columnas no
+   entran en una pantalla chica), pero la primera columna (casi siempre el
+   dato que identifica la fila: producto, cliente, fecha) queda fija al
+   costado para no perder de vista "de qué fila" son los valores mientras se
+   desliza. Padding más chico para que entren más columnas sin reducir tanto
+   el texto. */
+@media (max-width: 680px) {
+  table { font-size: 13.5px; }
+  th, td { padding: 10px 12px; }
+  thead th:first-child, tbody td:first-child {
+    position: sticky;
+    left: 0;
+    z-index: 2;
+    background: var(--papel);
+    box-shadow: 2px 0 4px rgba(0, 0, 0, 0.08);
+  }
+  thead th:first-child { background: var(--verde-50); z-index: 3; }
+}
+
 /* ----- Cabecera publica ----- */
 .cabecera { position: sticky; top: 0; z-index: 10; background: rgba(250, 248, 243, 0.92); backdrop-filter: blur(8px); border-bottom: 1px solid var(--linea); }
 .cabecera-fila { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 64px; }
