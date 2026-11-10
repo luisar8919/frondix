@@ -1,11 +1,49 @@
 import { NextRequest, NextResponse } from "next/server";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { crearClienteServidor } from "@/lib/supabase/server";
 import { limiteModulos } from "@/lib/limites";
 import { tieneSuscripcionActiva } from "@/lib/suscripcion";
 import { plantillaVentas, plantillaCompras, PLANTILLAS_EXTRA } from "@/lib/plantillasModulo";
+import { tipoModulo } from "@/lib/roles";
+import { esStock } from "@/lib/stock";
 import type { Columna } from "@/lib/excel-parser";
 
 const CLAVES_PLANTILLA_EXTRA = new Set(PLANTILLAS_EXTRA.map((p) => p.clave));
+
+// La carga de Excel enlaza Producto->Stock sola (crearModuloStockSiPedido en
+// upload/auto/route.ts); crear módulos vacíos acá (modo lote del selector por
+// rubro, "+ Registrar venta/compra", un módulo Stock agregado después) no lo
+// hacía -- las compras/ventas nunca ajustaban el Stock aunque las 3 tablas
+// existieran, porque ajustarStockDesdeRegistro necesita ese enlace para
+// encontrar el Stock (ver datasetStockDe en lib/stock.ts). Mejor esfuerzo:
+// mira TODOS los módulos de la empresa (no solo los recién creados, para
+// cubrir también agregar un Stock cuando Ventas/Compras ya existían) y
+// enlaza cualquier columna Producto sin enlace de un módulo Ventas/Compras
+// al primer módulo que "parezca" Stock.
+async function enlazarStockAutomatico(supabase: SupabaseClient, empresaId: string) {
+  try {
+    const { data: todos } = await supabase.from("datasets").select("id, nombre, columnas").eq("empresa_id", empresaId);
+    if (!todos) return;
+    const stock = todos.find((d) => esStock(d.columnas as Columna[]));
+    if (!stock) return;
+    const cProductoStock = (stock.columnas as Columna[]).find((c) => c.rol === "producto");
+    if (!cProductoStock) return;
+
+    for (const d of todos) {
+      if (d.id === stock.id) continue;
+      const columnas = d.columnas as Columna[];
+      const tipo = tipoModulo(columnas.map((c) => c.rol), d.nombre);
+      if (tipo !== "ventas" && tipo !== "compras") continue;
+      const idx = columnas.findIndex((c) => c.rol === "producto");
+      if (idx === -1 || columnas[idx].enlace) continue;
+      const nuevasColumnas = columnas.map((c, i) => (i === idx ? { ...c, enlace: { datasetId: stock.id, columnaKey: cProductoStock.key } } : c));
+      await supabase.from("datasets").update({ columnas: nuevasColumnas }).eq("id", d.id);
+    }
+  } catch {
+    // mejor esfuerzo: si falla, los módulos ya se crearon bien, no vale la
+    // pena devolver un error genérico por esta limpieza secundaria.
+  }
+}
 
 // Crea uno o varios módulos vacíos sin pasar por subir un Excel -- mismo tope
 // de módulos que /api/upload/auto, y la inserción pasa por el cliente de
@@ -73,6 +111,8 @@ export async function POST(req: NextRequest) {
     .insert(aCrear.map((m) => ({ empresa_id: empresaId, nombre: m.nombre, columnas: m.columnas, plantilla: m.plantilla })))
     .select();
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+  await enlazarStockAutomatico(supabase, empresaId);
 
   return NextResponse.json({ dataset: datasets?.[0], datasets });
 }
