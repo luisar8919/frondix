@@ -25,6 +25,17 @@ export function plantillaCompras(): Columna[] {
   ];
 }
 
+// Mismas columnas que crea el detector de Excel para Stock (crearModuloStockSiPedido
+// en upload/auto/route.ts), acá para armarlo también sin Excel: nace vacío, sin
+// enlazar a ningún Producto todavía (se enlaza solo, igual que cualquier columna, desde
+// "Editar tabla y campos" una vez que haya un módulo de Ventas con productos reales).
+export function plantillaStock(): Columna[] {
+  return [
+    { key: "producto", label: "Producto", tipo: "texto", rol: "producto", sospechosa: false },
+    { key: "cantidad", label: "Cantidad", tipo: "numero", rol: null, sospechosa: false },
+  ];
+}
+
 // Plantillas extra (más allá de Ventas/Compras) para negocios que ya pasaron
 // el estadio básico. Regla seguida en TODAS: nunca combinar "producto" con
 // "monto" en el mismo módulo (tipoModulo las clasificaría como "ventas" y
