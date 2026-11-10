@@ -1,6 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { claveValida } from "./enlaces.ts";
-import { agruparClientes, normalizarTexto, type FilaCruda, type ClienteResumen } from "./seguimiento.ts";
+import { agruparClientes, normalizarTexto, formatearNombre, type FilaCruda, type ClienteResumen } from "./seguimiento.ts";
 import type { Columna } from "./excel-parser.ts";
 
 const PAGINA = 1000;
@@ -8,6 +8,7 @@ const TOPE_FILAS = 20000;
 
 export interface ClienteLista extends ClienteResumen {
   totalGastado: number;
+  manual: boolean; // agregado a mano, todavía sin ninguna compra
 }
 
 const columnaConRol = (columnas: Columna[], rol: string) => columnas.find((c) => c.rol === rol && claveValida(c.key));
@@ -60,7 +61,36 @@ export async function listaClientes(supabase: SupabaseClient, empresaId: string)
     }
   }
 
-  return agruparClientes(todasLasFilas)
-    .map((c) => ({ ...c, totalGastado: Math.round((totalesPorClave.get(c.clave) ?? 0) * 100) / 100 }))
-    .sort((a, b) => b.ultimaFecha.localeCompare(a.ultimaFecha));
+  const deVentas = agruparClientes(todasLasFilas).map((c) => ({
+    ...c,
+    totalGastado: Math.round((totalesPorClave.get(c.clave) ?? 0) * 100) / 100,
+    manual: false,
+  }));
+
+  // El teléfono editado a mano (clientes_manual) gana sobre el que vino en
+  // alguna fila de Ventas -- es el único lugar donde el usuario puede corregirlo
+  // de verdad (una fila de Ventas vieja no se reescribe sola al editar acá),
+  // mismo criterio que listaProveedores.
+  const clavesConCompra = new Set(deVentas.map((c) => c.clave));
+  const { data: manuales } = await supabase.from("clientes_manual").select("clave, nombre, telefono, created_at").eq("empresa_id", empresaId);
+  const manualesPorClave = new Map((manuales ?? []).map((m) => [m.clave, m]));
+
+  const deVentasConTelefono = deVentas.map((c) => {
+    const manual = manualesPorClave.get(c.clave);
+    return manual?.telefono ? { ...c, telefono: manual.telefono } : c;
+  });
+
+  const soloManuales = (manuales ?? [])
+    .filter((m) => !clavesConCompra.has(m.clave))
+    .map((m) => ({
+      clave: m.clave,
+      nombre: formatearNombre(m.nombre),
+      ultimaFecha: m.created_at.slice(0, 10),
+      visitas: 0,
+      telefono: m.telefono,
+      totalGastado: 0,
+      manual: true,
+    }));
+
+  return [...deVentasConTelefono, ...soloManuales].sort((a, b) => b.ultimaFecha.localeCompare(a.ultimaFecha));
 }

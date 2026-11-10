@@ -77,6 +77,18 @@ export async function listaProveedores(supabase: SupabaseClient, empresaId: stri
 
   const clavesConCompra = new Set(deCompras.map((p) => p.clave));
   const { data: manuales } = await supabase.from("proveedores_manual").select("clave, nombre, telefono, created_at").eq("empresa_id", empresaId);
+  const manualesPorClave = new Map((manuales ?? []).map((m) => [m.clave, m]));
+
+  // El teléfono editado a mano gana sobre el que vino en alguna fila de
+  // Compras -- es el único lugar donde el usuario puede corregirlo de verdad
+  // (una fila de Compras vieja no se reescribe sola al editar acá). Antes el
+  // registro manual se descartaba por completo si ya había compras, así que
+  // "editar" el teléfono de un proveedor con compras no hacía nada visible.
+  const deComprasConTelefono = deCompras.map((p) => {
+    const manual = manualesPorClave.get(p.clave);
+    return manual?.telefono ? { ...p, telefono: manual.telefono } : p;
+  });
+
   const soloManuales = (manuales ?? [])
     .filter((m) => !clavesConCompra.has(m.clave))
     .map((m) => ({
@@ -89,7 +101,7 @@ export async function listaProveedores(supabase: SupabaseClient, empresaId: stri
       manual: true,
     }));
 
-  return [...deCompras, ...soloManuales].sort((a, b) => b.ultimaFecha.localeCompare(a.ultimaFecha));
+  return [...deComprasConTelefono, ...soloManuales].sort((a, b) => b.ultimaFecha.localeCompare(a.ultimaFecha));
 }
 
 // Espejo de historialCliente (src/lib/historialCliente.ts), rol "proveedor".

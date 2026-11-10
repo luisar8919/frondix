@@ -14,8 +14,11 @@ export default function ListaProveedores() {
   const [proveedores, setProveedores] = useState<Proveedor[] | null>(null);
   const [error, setError] = useState("");
   const [busqueda, setBusqueda] = useState("");
+  const [editando, setEditando] = useState<string | null>(null); // clave del proveedor cuyo teléfono se está editando
+  const [telefonoEditado, setTelefonoEditado] = useState("");
+  const [guardando, setGuardando] = useState(false);
 
-  useEffect(() => {
+  function cargar() {
     fetch("/api/proveedores")
       .then(async (res) => {
         const body = await res.json();
@@ -23,7 +26,25 @@ export default function ListaProveedores() {
         setProveedores(body.proveedores);
       })
       .catch(() => setError("No se pudo conectar con el servidor."));
-  }, []);
+  }
+
+  useEffect(cargar, []);
+
+  async function guardarTelefono(nombre: string) {
+    setGuardando(true);
+    const res = await fetch("/api/proveedores", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ nombre, telefono: telefonoEditado }),
+    });
+    setGuardando(false);
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      return setError(body.error ?? "No se pudo guardar el teléfono");
+    }
+    setEditando(null);
+    cargar();
+  }
 
   const filtrados = proveedores?.filter((p) => p.nombre.toLowerCase().includes(busqueda.toLowerCase())) ?? [];
 
@@ -73,7 +94,35 @@ export default function ListaProveedores() {
                 {filtrados.map((p) => (
                   <tr key={p.clave}>
                     <td><Link href={`/dashboard/proveedores/${encodeURIComponent(p.nombre)}`}>{p.nombre}</Link></td>
-                    <td>{p.telefono ?? "-"}</td>
+                    <td>
+                      {editando === p.clave ? (
+                        <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                          <input
+                            value={telefonoEditado}
+                            onChange={(e) => setTelefonoEditado(e.target.value)}
+                            maxLength={30}
+                            style={{ width: 130 }}
+                            autoFocus
+                          />
+                          <button type="button" className="btn btn-fantasma pequeno" disabled={guardando} onClick={() => guardarTelefono(p.nombre)}>
+                            {guardando ? "..." : "Guardar"}
+                          </button>
+                          <button type="button" className="btn btn-fantasma pequeno" onClick={() => setEditando(null)}>Cancelar</button>
+                        </div>
+                      ) : (
+                        <>
+                          {p.telefono ?? "-"}{" "}
+                          <button
+                            type="button"
+                            className="btn btn-fantasma pequeno"
+                            style={{ padding: "0 6px" }}
+                            onClick={() => { setEditando(p.clave); setTelefonoEditado(p.telefono ?? ""); }}
+                          >
+                            Editar
+                          </button>
+                        </>
+                      )}
+                    </td>
                     <td className="num">{p.visitas}</td>
                     <td>{p.manual ? <span className="suave pequeno">Sin compras aún</span> : fechaCorta(p.ultimaFecha)}</td>
                     <td className="num" style={{ fontWeight: 600 }}>{soles(p.totalComprado)}</td>
