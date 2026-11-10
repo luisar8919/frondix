@@ -279,13 +279,29 @@ export async function POST(request: NextRequest) {
   }
 
   // Dividir/separar reemplaza 1 módulo por 2 (Ventas + Compras): +1 neto por cada
-  // grupo así. Las tablas maestras de Clientes/Proveedores no se cuentan acá (son
-  // un extra condicionado a que haya datos, como el módulo Stock antes de esto).
+  // grupo así. Cliente/Proveedor/Categoría también crean su propia tabla maestra
+  // como efecto secundario (ver crearMaestroYEnlazar/crearMaestroCategoriaYEnlazar
+  // más abajo) -- antes NO se contaban acá, así que una carga con esas columnas
+  // podía superar el tope real sin que este chequeo lo viera venir. Mismo criterio
+  // por grupo que usa la creación real: dividir separa Cliente (lado Ventas) de
+  // Proveedor (lado Compras) en 2 maestros posibles; cualquier otro camino junta
+  // ambos roles en 1 sola maestra (Clientes o Proveedores, nunca las dos a la vez
+  // en la misma tabla). Categoría es una maestra COMPARTIDA entre todo lo que se
+  // está por crear en este request, así que suma como máximo +1 en total, no por grupo.
+  let hayCategoria = false;
+  const maestrosPorGrupo = gruposAImportar.reduce((suma, { sel }) => {
+    const roles = new Set((sel?.columnas ?? []).map((c) => c.rol));
+    if (roles.has("categoria")) hayCategoria = true;
+    if (sel?.dividir) return suma + (roles.has("cliente") ? 1 : 0) + (roles.has("proveedor") ? 1 : 0);
+    return suma + (roles.has("cliente") || roles.has("proveedor") ? 1 : 0);
+  }, 0);
   const modulosNuevos =
     gruposAImportar.length +
     gruposAImportar.filter(({ sel }) => sel?.crearStock).length +
     gruposAImportar.filter(({ sel }) => sel?.dividir).length +
-    gruposAImportar.filter(({ sel }) => sel?.separar).length;
+    gruposAImportar.filter(({ sel }) => sel?.separar).length +
+    maestrosPorGrupo +
+    (hayCategoria ? 1 : 0);
   const { actuales: modulosActuales, limite } = await limiteModulos(supabase, empresaId);
   if (modulosActuales + modulosNuevos > limite) {
     return NextResponse.json(

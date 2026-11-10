@@ -215,12 +215,24 @@ export default function UploadPage() {
 
   const hayIncluidos = ediciones.some((e) => e.incluir);
   // Mismo cálculo que modulosNuevos en /api/upload/auto: dividir/separar
-  // reemplazan 1 módulo por 2, +1 neto cada uno; crearStock suma 1 más. Las
-  // tablas maestras de Clientes/Proveedores no se cuentan (tampoco las cuenta
-  // el servidor al validar el tope de módulos del plan).
+  // reemplazan 1 módulo por 2, +1 neto cada uno; crearStock suma 1 más; y las
+  // tablas maestras de Clientes/Proveedores/Categoría (que SÍ se cuentan ahí
+  // contra el tope del plan) también se estiman acá, mismo criterio por grupo.
   const incluidos = ediciones.filter((e) => e.incluir);
+  let hayCategoria = false;
+  const maestrosPorGrupo = incluidos.reduce((suma, e) => {
+    const roles = new Set(e.columnas.map((c) => c.rol));
+    if (roles.has("categoria")) hayCategoria = true;
+    if (e.dividir) return suma + (roles.has("cliente") ? 1 : 0) + (roles.has("proveedor") ? 1 : 0);
+    return suma + (roles.has("cliente") || roles.has("proveedor") ? 1 : 0);
+  }, 0);
   const cantidadModulosAcrear =
-    incluidos.length + incluidos.filter((e) => e.crearStock).length + incluidos.filter((e) => e.dividir).length + incluidos.filter((e) => e.separar).length;
+    incluidos.length +
+    incluidos.filter((e) => e.crearStock).length +
+    incluidos.filter((e) => e.dividir).length +
+    incluidos.filter((e) => e.separar).length +
+    maestrosPorGrupo +
+    (hayCategoria ? 1 : 0);
   const g = grupos?.[pestanaActiva];
   const ed = ediciones[pestanaActiva];
 
