@@ -12,6 +12,7 @@ import type { Columna } from "@/lib/excel-parser";
 import { filtrarRegistros } from "@/lib/buscar";
 import { filtrarPorColumna, relacionesEntrantes, type DatasetResumen } from "@/lib/enlaces";
 import { esStock } from "@/lib/stock";
+import { tipoModulo } from "@/lib/roles";
 import { crearClienteBrowser } from "@/lib/supabase/client";
 import { empresaDelUsuario } from "@/lib/sesion";
 import { Capacitor } from "@capacitor/core";
@@ -304,6 +305,7 @@ export default function DatasetPage({
   const registrosFiltrados = filtrarRegistros(filtradas, busqueda);
   const colFiltro = dataset.columnas.find((c) => c.key === filtrarCol);
   const incompleta = total > registros.length;
+  const tipo = tipoModulo(dataset.columnas.map((c) => c.rol), dataset.nombre);
 
   return (
     <>
@@ -319,6 +321,15 @@ export default function DatasetPage({
         {!esVendedor && (
           <div className="acciones">
             <a href={`/api/export/${datasetId}`} className="btn btn-secundario">Descargar Excel</a>
+            {(tipo === "ventas" || tipo === "compras") && (
+              <a
+                href={`/api/export/${datasetId}?formato=sunat`}
+                className="btn btn-fantasma"
+                title="Fecha, cliente/proveedor, producto, valor de venta, IGV y total por fila -- para copiar a mano en EOL u otro portal de SUNAT. Frondix no emite comprobantes ni se conecta con SUNAT."
+              >
+                Exportar para SUNAT
+              </a>
+            )}
           </div>
         )}
       </div>

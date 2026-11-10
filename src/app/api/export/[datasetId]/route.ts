@@ -3,16 +3,37 @@ import * as XLSX from "xlsx";
 import { crearClienteServidor } from "@/lib/supabase/server";
 import { empresaDelUsuarioServidor } from "@/lib/sesionServidor";
 import { esVendedor, rolEnEmpresa } from "@/lib/permisos";
+import { tipoModulo } from "@/lib/roles";
+import { claveValida } from "@/lib/enlaces";
 import type { Columna } from "@/lib/excel-parser";
 
 const PAGINA = 1000;
 const TOPE_FILAS = 20000; // mismo tope que la importación (ver MAX_FILAS_IMPORTACION en insertar.ts)
 
-// Descarga un módulo completo como .xlsx -- una columna por cada columna del
-// módulo (con su label, no su key interna), en el mismo orden que se ve en
-// pantalla. Para que un contador o cualquier otra herramienta lo pueda abrir
-// directo, sin pasar por la app.
-export async function GET(_req: NextRequest, { params }: { params: Promise<{ datasetId: string }> }) {
+const columnaConRol = (columnas: Columna[], rol: string) => columnas.find((c) => c.rol === rol && claveValida(c.key));
+
+// Para un módulo de Ventas/Compras: el Valor de Venta/Compra (sin IGV), el IGV
+// (18%) y el Total, por fila -- mismos campos que pide SUNAT para registrar un
+// comprobante (Boleta/Factura) a mano en un portal como EOL. Frondix no emite
+// comprobantes ni se conecta con SUNAT/un PSE -- esto solo deja los montos ya
+// descompuestos para copiarlos ahí, en vez de que el dueño del negocio tenga
+// que sacar la cuenta de cabeza por cada venta. Misma fórmula que ya usa
+// flujoCaja() en reportes.ts, aplicada fila por fila en vez de al total.
+function descomponerIgv(monto: number, incluyeIgv: boolean) {
+  const valorVenta = incluyeIgv ? monto / 1.18 : monto;
+  const igv = incluyeIgv ? monto - valorVenta : monto * 0.18;
+  const total = incluyeIgv ? monto : monto + igv;
+  return { valorVenta: Math.round(valorVenta * 100) / 100, igv: Math.round(igv * 100) / 100, total: Math.round(total * 100) / 100 };
+}
+
+// Descarga un módulo completo como .xlsx. Dos formatos:
+// - Normal (por defecto): una columna por cada columna del módulo (con su
+//   label, no su key interna), en el mismo orden que se ve en pantalla.
+// - `?formato=sunat` (solo si el módulo es Ventas o Compras): columnas
+//   reordenadas al formato que pide SUNAT para registrar un comprobante a
+//   mano (Fecha, Cliente/Proveedor, Documento si se marcó esa columna,
+//   Producto, Cantidad, Valor de Venta, IGV, Total) -- ver descomponerIgv.
+export async function GET(req: NextRequest, { params }: { params: Promise<{ datasetId: string }> }) {
   const { datasetId } = await params;
   const supabase = await crearClienteServidor();
   const sesion = await empresaDelUsuarioServidor(supabase);
@@ -23,7 +44,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ dat
 
   const { data: dataset, error: errorDataset } = await supabase
     .from("datasets")
-    .select("nombre, columnas")
+    .select("nombre, columnas, incluye_igv")
     .eq("id", datasetId)
     .eq("empresa_id", sesion.empresaId) // RLS ya lo filtra, doble chequeo explícito
     .single();
@@ -43,13 +64,50 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ dat
     if (records.length < PAGINA) break;
   }
 
-  const filasPlanas = filas.map((f) => Object.fromEntries(columnas.map((c) => [c.label, f[c.key] ?? ""])));
-  const hoja = XLSX.utils.json_to_sheet(filasPlanas, { header: columnas.map((c) => c.label) });
+  const paraSunat = req.nextUrl.searchParams.get("formato") === "sunat";
+  const tipo = paraSunat ? tipoModulo(columnas.map((c) => c.rol), dataset.nombre) : null;
+
+  let filasPlanas: Record<string, unknown>[];
+  let headers: string[];
+  let hojaNombre = dataset.nombre.slice(0, 31) || "Datos"; // Excel no acepta nombres de hoja > 31 chars
+
+  if (paraSunat && (tipo === "ventas" || tipo === "compras")) {
+    const cFecha = columnas.find((c) => c.rol === "fecha" && c.tipo === "fecha" && claveValida(c.key));
+    const cContraparte = columnaConRol(columnas, tipo === "ventas" ? "cliente" : "proveedor");
+    const cDocumento = columnaConRol(columnas, "documento");
+    const cProducto = columnaConRol(columnas, "producto");
+    const cCantidad = columnaConRol(columnas, "cantidad");
+    const cMonto = columnaConRol(columnas, "monto");
+    const etiquetaContraparte = tipo === "ventas" ? "Cliente" : "Proveedor";
+
+    headers = ["Fecha", etiquetaContraparte, "N° Documento", "Producto", "Cantidad", "Valor de Venta", "IGV (18%)", "Total"];
+    filasPlanas = filas.map((f) => {
+      const monto = cMonto ? Number(f[cMonto.key]) : NaN;
+      const { valorVenta, igv, total } = Number.isFinite(monto) ? descomponerIgv(monto, !!dataset.incluye_igv) : { valorVenta: "", igv: "", total: "" };
+      return {
+        Fecha: cFecha ? String(f[cFecha.key] ?? "").slice(0, 10) : "",
+        [etiquetaContraparte]: cContraparte ? f[cContraparte.key] ?? "" : "",
+        "N° Documento": cDocumento ? f[cDocumento.key] ?? "" : "",
+        Producto: cProducto ? f[cProducto.key] ?? "" : "",
+        Cantidad: cCantidad ? f[cCantidad.key] ?? "" : "",
+        "Valor de Venta": valorVenta,
+        "IGV (18%)": igv,
+        Total: total,
+      };
+    });
+    hojaNombre = "SUNAT";
+  } else {
+    headers = columnas.map((c) => c.label);
+    filasPlanas = filas.map((f) => Object.fromEntries(columnas.map((c) => [c.label, f[c.key] ?? ""])));
+  }
+
+  const hoja = XLSX.utils.json_to_sheet(filasPlanas, { header: headers });
   const libro = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(libro, hoja, dataset.nombre.slice(0, 31) || "Datos"); // Excel no acepta nombres de hoja > 31 chars
+  XLSX.utils.book_append_sheet(libro, hoja, hojaNombre);
   const buffer = XLSX.write(libro, { type: "buffer", bookType: "xlsx" });
 
-  const nombreArchivo = `${dataset.nombre.replace(/[^a-z0-9]+/gi, "_")}.xlsx`;
+  const sufijo = paraSunat ? "_sunat" : "";
+  const nombreArchivo = `${dataset.nombre.replace(/[^a-z0-9]+/gi, "_")}${sufijo}.xlsx`;
   return new NextResponse(buffer, {
     headers: {
       "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
