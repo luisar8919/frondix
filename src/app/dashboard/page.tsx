@@ -169,19 +169,22 @@ export default async function DashboardPage() {
             )}
           </div>
 
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: 20, marginTop: 20 }}>
-            {mesesVentas.length > 1 && (
-              <div>
-                <p className="suave pequeno" style={{ margin: "0 0 8px" }}>Ventas por mes</p>
-                {mesesVentas.map((t) => (
+          {(() => {
+            // Cada gráfico es su propio "campo": separador vertical entre ellos (como
+            // columnas de una tabla) y título centrado, en vez de quedar todo pegado
+            // en un solo grid sin límites visuales entre secciones.
+            const campos = [
+              mesesVentas.length > 1 && {
+                key: "meses",
+                titulo: "Ventas por mes",
+                contenido: mesesVentas.map((t) => (
                   <Barra key={t.mes} valor={t.total} maximo={maxMes} etiqueta={nombreMes(t.mes)} texto={soles(t.total)} />
-                ))}
-              </div>
-            )}
-            {topProductos.length > 0 && (
-              <div>
-                <p className="suave pequeno" style={{ margin: "0 0 8px" }}>Top productos</p>
-                {topProductos.map((p) => (
+                )),
+              },
+              topProductos.length > 0 && {
+                key: "productos",
+                titulo: "Top productos",
+                contenido: topProductos.map((p) => (
                   <Barra
                     key={p.clave}
                     valor={p.total || p.veces}
@@ -189,31 +192,45 @@ export default async function DashboardPage() {
                     etiqueta={p.clave.length > 14 ? p.clave.slice(0, 13) + "…" : p.clave}
                     texto={p.total > 0 ? soles(p.total) : `${p.veces}x`}
                   />
-                ))}
-              </div>
-            )}
-            {categorias.length > 0 && (
-              <div>
-                <p className="suave pequeno" style={{ margin: "0 0 8px" }}>Composición por categoría</p>
-                <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-                  <div
-                    aria-hidden="true"
-                    style={{ width: 88, height: 88, borderRadius: "50%", flexShrink: 0, background: `conic-gradient(${segmentosPastel.join(", ")})` }}
-                  />
-                  <div style={{ minWidth: 0 }}>
-                    {categorias.map((c) => (
-                      <div key={c.clave} style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}>
-                        <span style={{ width: 10, height: 10, borderRadius: "50%", background: c.color, flexShrink: 0 }} aria-hidden="true" />
-                        <span className="pequeno" style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                          {c.clave} <span className="suave">({totalCategorias > 0 ? Math.round((c.total / totalCategorias) * 100) : 0}%)</span>
-                        </span>
-                      </div>
-                    ))}
+                )),
+              },
+              categorias.length > 0 && {
+                key: "categorias",
+                titulo: "Composición por categoría",
+                contenido: (
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 16 }}>
+                    <div
+                      aria-hidden="true"
+                      style={{ width: 88, height: 88, borderRadius: "50%", flexShrink: 0, background: `conic-gradient(${segmentosPastel.join(", ")})` }}
+                    />
+                    <div style={{ minWidth: 0, textAlign: "left" }}>
+                      {categorias.map((c) => (
+                        <div key={c.clave} style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}>
+                          <span style={{ width: 10, height: 10, borderRadius: "50%", background: c.color, flexShrink: 0 }} aria-hidden="true" />
+                          <span className="pequeno" style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                            {c.clave} <span className="suave">({totalCategorias > 0 ? Math.round((c.total / totalCategorias) * 100) : 0}%)</span>
+                          </span>
+                        </div>
+                      ))}
+                    </div>
                   </div>
+                ),
+              },
+            ].filter(Boolean) as { key: string; titulo: string; contenido: React.ReactNode }[];
+
+            return (
+              <div style={{ overflowX: "auto", marginTop: 20 }}>
+                <div style={{ display: "grid", gridTemplateColumns: `repeat(${campos.length}, minmax(220px, 1fr))`, gap: 0, minWidth: campos.length * 220 }}>
+                  {campos.map((c, i) => (
+                    <div key={c.key} style={{ padding: "0 28px", borderLeft: i > 0 ? "1px solid var(--linea)" : "none" }}>
+                      <p className="suave pequeno" style={{ margin: "0 0 12px", textAlign: "center" }}>{c.titulo}</p>
+                      {c.contenido}
+                    </div>
+                  ))}
                 </div>
               </div>
-            )}
-          </div>
+            );
+          })()}
 
           <p className="suave pequeno" style={{ marginTop: 10 }}>
             Detalle completo (flujo de caja, top 5, metas) en <Link href="/dashboard/reportes">Reportes</Link>.

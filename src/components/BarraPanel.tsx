@@ -204,18 +204,35 @@ function FilaConFlyout({
 
 type ModulosDisponibles = { ventas: boolean; compras: boolean; stock: boolean; proveedor: boolean; cliente: boolean };
 
-export default function BarraPanel({ rol, modulosDisponibles }: { rol?: string; modulosDisponibles: ModulosDisponibles }) {
+export default function BarraPanel({
+  rol,
+  modulosDisponibles,
+  otrosModulos,
+}: {
+  rol?: string;
+  modulosDisponibles: ModulosDisponibles;
+  // Módulos reales que no encajan en Ventas/Compras/Stock (ej. "Fiados"): antes
+  // tenían tarjeta en Inicio pero ningún camino desde este desplegable.
+  otrosModulos: { id: string; nombre: string }[];
+}) {
   const esVendedor = rol === "vendedor";
   // Cada grupo del desplegable solo se ofrece si la empresa ya tiene ese tipo de
   // módulo (ver dashboard/layout.tsx); "Más módulos" (agregar uno nuevo) se deja
   // siempre que haya al menos uno de los otros -- sin ninguno, el botón se bloquea
   // entero en vez de abrir un desplegable casi vacío.
-  const hayAlgunModulo = Object.values(modulosDisponibles).some(Boolean);
-  const gruposVisibles = modulosGrupos.filter((g) => {
+  const hayAlgunModulo = Object.values(modulosDisponibles).some(Boolean) || otrosModulos.length > 0;
+  const gruposBase = modulosGrupos.filter((g) => {
     if (g.grupo === "Más módulos") return hayAlgunModulo;
     const clave = g.grupo.toLowerCase() as keyof ModulosDisponibles;
     return modulosDisponibles[clave];
   });
+  const grupoOtros = otrosModulos.length > 0
+    ? [{ grupo: "Otros módulos", items: otrosModulos.map((m) => ({ href: `/dashboard/${m.id}`, texto: m.nombre })) }]
+    : [];
+  // "Más módulos" (agregar uno nuevo) siempre al final.
+  const sinMas = gruposBase.filter((g) => g.grupo !== "Más módulos");
+  const masModulos = gruposBase.filter((g) => g.grupo === "Más módulos");
+  const gruposVisibles = [...sinMas, ...grupoOtros, ...masModulos];
   const ruta = usePathname();
   const router = useRouter();
   const [menuAbierto, setMenuAbierto] = useState(false);

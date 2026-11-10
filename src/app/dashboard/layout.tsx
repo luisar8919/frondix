@@ -24,11 +24,13 @@ export default async function DashboardLayout({ children }: { children: React.Re
   // siempre, aunque la cuenta estuviera vacía. Se detecta igual que el resto
   // del sistema: por tipoModulo/esStock (nunca por nombre de tabla).
   let modulosDisponibles = { ventas: false, compras: false, stock: false, proveedor: false, cliente: false };
+  let otrosModulos: { id: string; nombre: string }[] = [];
   if (sesion.ok) {
-    const { data: datasetsCrudos } = await supabase.from("datasets").select("nombre, columnas").eq("empresa_id", sesion.empresaId);
-    const datasets = (datasetsCrudos ?? []).map((d) => ({ nombre: d.nombre, columnas: d.columnas as Columna[] }));
+    const { data: datasetsCrudos } = await supabase.from("datasets").select("id, nombre, columnas").eq("empresa_id", sesion.empresaId);
+    const datasets = (datasetsCrudos ?? []).map((d) => ({ id: d.id, nombre: d.nombre, columnas: d.columnas as Columna[] }));
     const roles = new Set(datasets.flatMap((d) => d.columnas.map((c) => c.rol)));
-    const tipos = new Set(datasets.map((d) => tipoModulo(d.columnas.map((c) => c.rol), d.nombre)));
+    const conTipo = datasets.map((d) => ({ ...d, tipo: tipoModulo(d.columnas.map((c) => c.rol), d.nombre) }));
+    const tipos = new Set(conTipo.map((d) => d.tipo));
     modulosDisponibles = {
       ventas: tipos.has("ventas"),
       compras: tipos.has("compras"),
@@ -36,12 +38,20 @@ export default async function DashboardLayout({ children }: { children: React.Re
       proveedor: roles.has("proveedor"),
       cliente: roles.has("cliente"),
     };
+    // Lo que no encaja en Ventas/Compras/Stock (ej. "Fiados", "Gastos operativos")
+    // antes era invisible en el desplegable aunque tuviera su propia tarjeta en
+    // Inicio -- se lista por nombre real. Las tablas maestras puras (todas sus
+    // columnas con rol null, ej. "Categorías") quedan afuera: no tienen pantalla
+    // propia, se llega a ellas desde el módulo que las enlaza.
+    otrosModulos = conTipo
+      .filter((d) => d.tipo === "otro" && !esStock(d.columnas) && d.columnas.some((c) => c.rol !== null))
+      .map((d) => ({ id: d.id, nombre: d.nombre }));
   }
 
   return (
     <>
       <RegistrarPush />
-      <BarraPanel rol={rol} modulosDisponibles={modulosDisponibles} />
+      <BarraPanel rol={rol} modulosDisponibles={modulosDisponibles} otrosModulos={otrosModulos} />
       <main className="contenedor panel">{children}</main>
     </>
   );
