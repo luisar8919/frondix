@@ -202,8 +202,20 @@ function FilaConFlyout({
   );
 }
 
-export default function BarraPanel({ rol }: { rol?: string }) {
+type ModulosDisponibles = { ventas: boolean; compras: boolean; stock: boolean; proveedor: boolean; cliente: boolean };
+
+export default function BarraPanel({ rol, modulosDisponibles }: { rol?: string; modulosDisponibles: ModulosDisponibles }) {
   const esVendedor = rol === "vendedor";
+  // Cada grupo del desplegable solo se ofrece si la empresa ya tiene ese tipo de
+  // módulo (ver dashboard/layout.tsx); "Más módulos" (agregar uno nuevo) se deja
+  // siempre que haya al menos uno de los otros -- sin ninguno, el botón se bloquea
+  // entero en vez de abrir un desplegable casi vacío.
+  const hayAlgunModulo = Object.values(modulosDisponibles).some(Boolean);
+  const gruposVisibles = modulosGrupos.filter((g) => {
+    if (g.grupo === "Más módulos") return hayAlgunModulo;
+    const clave = g.grupo.toLowerCase() as keyof ModulosDisponibles;
+    return modulosDisponibles[clave];
+  });
   const ruta = usePathname();
   const router = useRouter();
   const [menuAbierto, setMenuAbierto] = useState(false);
@@ -246,12 +258,17 @@ export default function BarraPanel({ rol }: { rol?: string }) {
               {e.texto}
             </Link>
           ))}
-          {!esVendedor && (
+          {!esVendedor && hayAlgunModulo && (
             <BotonSubmenu
               texto="Módulos"
               activo={activoModulos}
-              render={(cerrar) => modulosGrupos.map((g) => <FilaConFlyout key={g.grupo} grupo={g.grupo} items={g.items} onNavegar={cerrar} />)}
+              render={(cerrar) => gruposVisibles.map((g) => <FilaConFlyout key={g.grupo} grupo={g.grupo} items={g.items} onNavegar={cerrar} />)}
             />
+          )}
+          {!esVendedor && !hayAlgunModulo && (
+            <span className="nav-link" aria-disabled="true" title="Sube tu primer Excel para ver tus módulos aquí" style={{ opacity: 0.4, cursor: "not-allowed" }}>
+              Módulos
+            </span>
           )}
           {!esVendedor && <BotonSubmenu texto="Resumen" items={resumenSubmenu} activo={activoResumen} />}
           {!esVendedor && <BotonSubmenu texto="Seguimiento" items={seguimientoSubmenu} activo={activoSeguimiento} />}
