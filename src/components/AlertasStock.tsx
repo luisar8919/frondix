@@ -78,5 +78,16 @@ export default function AlertasStock() {
     );
   }
 
+  // Sin alertas y sin nada por configurar (o ya cerraste el tip): antes esto no
+  // dibujaba nada, y la pantalla de Alertas quedaba en blanco -- parecía rota
+  // aunque en realidad significa "todo tu stock está bien".
+  if (alertas && alertas.length === 0) {
+    return (
+      <div className="tarjeta" style={{ marginBottom: 20 }}>
+        <p className="suave" style={{ margin: 0 }}>✓ Todo tu stock está por encima del mínimo que marcaste. Sin nada que avisarte por ahora.</p>
+      </div>
+    );
+  }
+
   return null;
 }
