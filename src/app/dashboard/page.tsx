@@ -9,9 +9,15 @@ import { rolEnEmpresa } from "@/lib/permisos";
 import { tipoModulo, type RolColumna } from "@/lib/roles";
 import { tieneSuscripcionActiva } from "@/lib/suscripcion";
 import { calcularModulosReporte } from "@/lib/datosReportes";
+import { recortarMesesSinDatos } from "@/lib/reportes";
+import Barra from "@/components/Barra";
 import type { Columna } from "@/lib/excel-parser";
 
 const soles = (n: number) => `S/ ${n.toLocaleString("es-PE", { maximumFractionDigits: 2 })}`;
+const nombreMes = (clave: string) => {
+  const [anio, mes] = clave.split("-").map(Number);
+  return new Date(Date.UTC(anio, mes - 1, 1)).toLocaleDateString("es-PE", { month: "short", year: "2-digit" });
+};
 
 export default async function DashboardPage() {
   const supabase = await crearClienteServidor();
@@ -61,6 +67,40 @@ export default async function DashboardPage() {
     .sort((a, b) => (b.total || b.veces) - (a.total || a.veces))[0];
   const hayDashboard = modulosReporte && (gananciaNeta !== 0 || ventasTotal !== 0 || topProductoGlobal);
 
+  // Evolución en el tiempo (ventas por mes, juntando todos los módulos de Ventas) y
+  // comparación por categoría (top productos, juntando todos los módulos) -- los 2
+  // tipos de gráfico que de verdad sirven acá, con el mismo componente Barra.tsx que
+  // ya usa Reportes (sin agregar una librería de gráficos nueva).
+  const mesesPorClave = new Map<string, { total: number; registros: number }>();
+  for (const m of modulosReporte ?? []) {
+    if (m.tipo !== "ventas") continue;
+    for (const t of m.totalesPorMes ?? []) {
+      const actual = mesesPorClave.get(t.mes) ?? { total: 0, registros: 0 };
+      actual.total += t.total;
+      actual.registros += t.registros;
+      mesesPorClave.set(t.mes, actual);
+    }
+  }
+  const mesesVentas = recortarMesesSinDatos(
+    [...mesesPorClave.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([mes, v]) => ({ mes, ...v }))
+  ).slice(-6);
+  const maxMes = Math.max(1, ...mesesVentas.map((m) => m.total));
+
+  const productosPorClave = new Map<string, { total: number; veces: number }>();
+  for (const m of modulosReporte ?? []) {
+    for (const p of m.topProducto ?? []) {
+      const actual = productosPorClave.get(p.clave) ?? { total: 0, veces: 0 };
+      actual.total += p.total;
+      actual.veces += p.veces;
+      productosPorClave.set(p.clave, actual);
+    }
+  }
+  const topProductos = [...productosPorClave.entries()]
+    .map(([clave, v]) => ({ clave, ...v }))
+    .sort((a, b) => (b.total || b.veces) - (a.total || a.veces))
+    .slice(0, 5);
+  const maxProducto = Math.max(1, ...topProductos.map((p) => p.total || p.veces));
+
   return (
     <>
       <div className="panel-cabecera">
@@ -106,6 +146,32 @@ export default async function DashboardPage() {
               </div>
             )}
           </div>
+
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: 20, marginTop: 20 }}>
+            {mesesVentas.length > 1 && (
+              <div>
+                <p className="suave pequeno" style={{ margin: "0 0 8px" }}>Ventas por mes</p>
+                {mesesVentas.map((t) => (
+                  <Barra key={t.mes} valor={t.total} maximo={maxMes} etiqueta={nombreMes(t.mes)} texto={soles(t.total)} />
+                ))}
+              </div>
+            )}
+            {topProductos.length > 0 && (
+              <div>
+                <p className="suave pequeno" style={{ margin: "0 0 8px" }}>Top productos</p>
+                {topProductos.map((p) => (
+                  <Barra
+                    key={p.clave}
+                    valor={p.total || p.veces}
+                    maximo={maxProducto}
+                    etiqueta={p.clave.length > 14 ? p.clave.slice(0, 13) + "…" : p.clave}
+                    texto={p.total > 0 ? soles(p.total) : `${p.veces}x`}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
+
           <p className="suave pequeno" style={{ marginTop: 10 }}>
             Detalle completo (flujo de caja, top 5, metas) en <Link href="/dashboard/reportes">Reportes</Link>.
           </p>
