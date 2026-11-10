@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { crearClienteBrowser } from "@/lib/supabase/client";
 import { tieneSuscripcionActiva } from "@/lib/suscripcion";
 import { empresaDelUsuario } from "@/lib/sesion";
@@ -36,6 +37,11 @@ interface EdicionGrupo {
   // las distinga -- cada venta ya trae su costo de adquisición), el usuario puede
   // pedir separarla en Ventas y Compras en vez de una venta con un costo adentro.
   separar: boolean;
+  // Nombre editable de cada mitad cuando dividir/separar está marcado -- por
+  // defecto "<nombre> - Ventas"/"- Compras", el usuario los puede cambiar antes
+  // de crear (en vez de tener que renombrar después desde "Editar módulo").
+  nombreVentas: string;
+  nombreCompras: string;
 }
 
 interface ModuloCreado {
@@ -78,10 +84,13 @@ const aEdicion = (g: GrupoDetectado): EdicionGrupo => {
     // Compra con su costo adentro, como las plantillas de Ventas/Compras de
     // Frondix) -- separarla solo duplica el módulo en dos mitades inútiles.
     separar: !tieneTipo && !tieneContraparte && tieneMontoYCosto,
+    nombreVentas: `${g.nombreSugerido} - Ventas`,
+    nombreCompras: `${g.nombreSugerido} - Compras`,
   };
 };
 
 export default function UploadPage() {
+  const router = useRouter();
   const [archivo, setArchivo] = useState<File | null>(null);
   const [cargando, setCargando] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -186,6 +195,8 @@ export default function UploadPage() {
             crearStock: e.crearStock,
             dividir: e.dividir,
             separar: e.separar,
+            nombreVentas: e.nombreVentas,
+            nombreCompras: e.nombreCompras,
           }))
         )
       );
@@ -204,6 +215,12 @@ export default function UploadPage() {
       if (!res.ok) return setError(body.error ?? `El servidor no pudo procesar el archivo (código ${res.status}). Si es un archivo grande, prueba dividirlo en partes.`);
       setResultado(body);
       setGrupos(null);
+      // La barra (Módulos) y cualquier otra cosa que el layout calculó en el
+      // servidor quedan congeladas en lo que había ANTES de esta carga -- Next.js
+      // no vuelve a correr un layout compartido en navegaciones del lado del
+      // cliente. router.refresh() lo fuerza, así "Módulos" ya no se ve bloqueado
+      // ni desactualizado al tocar cualquier Link de acá en adelante.
+      router.refresh();
     } catch (e) {
       setError(e instanceof DOMException && e.name === "AbortError"
         ? "El servidor tardó demasiado en responder (más de 30 s) y se canceló. Intenta de nuevo o avisa si sigue pasando."
@@ -356,6 +373,18 @@ export default function UploadPage() {
                 >
                   {ed.dividir ? "✓ Se va a dividir en Ventas y Compras" : "Dividir en Ventas y Compras"}
                 </button>
+                {ed.dividir && (
+                  <div style={{ display: "flex", gap: 10, marginTop: 10, flexWrap: "wrap" }}>
+                    <div className="campo" style={{ margin: 0, flex: "1 1 200px" }}>
+                      <label htmlFor="nombre-ventas-dividir" className="pequeno">Nombre del módulo de Ventas</label>
+                      <input id="nombre-ventas-dividir" value={ed.nombreVentas} maxLength={120} onChange={(e) => cambiarGrupo(pestanaActiva, { nombreVentas: e.target.value })} />
+                    </div>
+                    <div className="campo" style={{ margin: 0, flex: "1 1 200px" }}>
+                      <label htmlFor="nombre-compras-dividir" className="pequeno">Nombre del módulo de Compras</label>
+                      <input id="nombre-compras-dividir" value={ed.nombreCompras} maxLength={120} onChange={(e) => cambiarGrupo(pestanaActiva, { nombreCompras: e.target.value })} />
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 
@@ -378,6 +407,18 @@ export default function UploadPage() {
                   >
                     {ed.separar ? "✓ Se va a separar en Ventas y Compras" : "Separar en Ventas y Compras"}
                   </button>
+                  {ed.separar && (
+                    <div style={{ display: "flex", gap: 10, marginTop: 10, flexWrap: "wrap" }}>
+                      <div className="campo" style={{ margin: 0, flex: "1 1 200px" }}>
+                        <label htmlFor="nombre-ventas-separar" className="pequeno">Nombre del módulo de Ventas</label>
+                        <input id="nombre-ventas-separar" value={ed.nombreVentas} maxLength={120} onChange={(e) => cambiarGrupo(pestanaActiva, { nombreVentas: e.target.value })} />
+                      </div>
+                      <div className="campo" style={{ margin: 0, flex: "1 1 200px" }}>
+                        <label htmlFor="nombre-compras-separar" className="pequeno">Nombre del módulo de Compras</label>
+                        <input id="nombre-compras-separar" value={ed.nombreCompras} maxLength={120} onChange={(e) => cambiarGrupo(pestanaActiva, { nombreCompras: e.target.value })} />
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
 

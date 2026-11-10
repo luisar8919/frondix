@@ -108,6 +108,7 @@ function NuevoModuloForm() {
       });
       const body = await res.json();
       if (!res.ok) return setError(body.error ?? "No se pudieron crear los módulos");
+      router.refresh(); // el layout (desplegable "Módulos") quedaría desactualizado si no
       router.push("/dashboard");
     } catch {
       setError("No se pudo conectar con el servidor. Revisa tu conexión e intenta de nuevo.");
@@ -158,6 +159,7 @@ function NuevoModuloForm() {
       });
       const body = await res.json();
       if (!res.ok) return setError(body.error ?? "No se pudo crear el módulo");
+      router.refresh();
       router.push(`/dashboard/${body.dataset.id}`);
     } catch {
       setError("No se pudo conectar con el servidor. Revisa tu conexión e intenta de nuevo.");

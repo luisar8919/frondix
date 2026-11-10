@@ -33,6 +33,10 @@ interface SeleccionGrupo {
   // Si esta tabla tiene Monto y Costo en la MISMA fila (sin Tipo), el usuario
   // pudo pedir separarla en Ventas y Compras (ver separarVentaYCosto).
   separar?: boolean;
+  // Nombre elegido a mano para cada mitad cuando dividir/separar está marcado
+  // -- si no vienen (o vienen vacíos), se usa "<nombre> - Ventas"/"- Compras".
+  nombreVentas?: string;
+  nombreCompras?: string;
 }
 
 // Crea una tabla maestra (Clientes/Proveedores) con un valor por fila, para
@@ -459,6 +463,8 @@ export async function POST(request: NextRequest) {
   for (const info of infos) {
     const { grupo, sel, columnas, cTipo, division, separacion } = info;
     const nombreDataset = sel?.nombre?.trim() || (grupo.hojas.length > 1 ? `${grupo.hojas[0]} y otras` : grupo.hojas[0]);
+    const nombreVentas = sel?.nombreVentas?.trim() || `${nombreDataset} - Ventas`;
+    const nombreCompras = sel?.nombreCompras?.trim() || `${nombreDataset} - Compras`;
 
     if (separacion) {
       // Columnas fijas: separarVentaYCosto ya normalizó las filas a estas keys
@@ -487,7 +493,7 @@ export async function POST(request: NextRequest) {
 
       let datasetVentasId: string | null = null;
       if (separacion.ventas.length > 0) {
-        const r = await crearModulo(supabase, empresaId, `${nombreDataset} - Ventas`, columnasVentas, separacion.ventas, avisos);
+        const r = await crearModulo(supabase, empresaId, nombreVentas, columnasVentas, separacion.ventas, avisos);
         if ("error" in r) return NextResponse.json({ error: r.error, creadosHastaAhora: creados }, { status: 500 });
         creados.push({ ...r, hojas: grupo.hojas });
         datasetVentasId = r.datasetId;
@@ -499,7 +505,7 @@ export async function POST(request: NextRequest) {
         // mismo nombre que el camino "dividir" por columna Tipo. Solo se crea
         // si el usuario marcó explícitamente un campo como "Costo" al revisar
         // la carga (`info.cCosto`, chequeado más arriba antes de armar `separacion`).
-        const r = await crearModulo(supabase, empresaId, `${nombreDataset} - Compras`, columnasCompras, separacion.compras, avisos);
+        const r = await crearModulo(supabase, empresaId, nombreCompras, columnasCompras, separacion.compras, avisos);
         if ("error" in r) return NextResponse.json({ error: r.error, creadosHastaAhora: creados }, { status: 500 });
         creados.push({ ...r, hojas: grupo.hojas });
         datasetComprasId = r.datasetId;
@@ -575,14 +581,14 @@ export async function POST(request: NextRequest) {
 
       let datasetVentasId: string | null = null;
       if (division.ventas.length > 0) {
-        const r = await crearModulo(supabase, empresaId, `${nombreDataset} - Ventas`, columnasVentas, division.ventas, avisos);
+        const r = await crearModulo(supabase, empresaId, nombreVentas, columnasVentas, division.ventas, avisos);
         if ("error" in r) return NextResponse.json({ error: r.error, creadosHastaAhora: creados }, { status: 500 });
         creados.push({ ...r, hojas: grupo.hojas });
         datasetVentasId = r.datasetId;
       }
       let datasetComprasId: string | null = null;
       if (division.compras.length > 0) {
-        const r = await crearModulo(supabase, empresaId, `${nombreDataset} - Compras`, columnasCompras, division.compras, avisos);
+        const r = await crearModulo(supabase, empresaId, nombreCompras, columnasCompras, division.compras, avisos);
         if ("error" in r) return NextResponse.json({ error: r.error, creadosHastaAhora: creados }, { status: 500 });
         creados.push({ ...r, hojas: grupo.hojas });
         datasetComprasId = r.datasetId;
