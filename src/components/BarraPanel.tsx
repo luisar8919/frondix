@@ -97,6 +97,7 @@ function BotonSubmenu({
 export default function BarraPanel({
   rol,
   modulos,
+  extras,
 }: {
   rol?: string;
   // Los módulos reales de la empresa (mismos que la tarjeta de Inicio, ver
@@ -104,12 +105,18 @@ export default function BarraPanel({
   // sin agrupar por tipo. Sin ninguno, el botón se bloquea en vez de abrir un
   // desplegable vacío.
   modulos: { id: string; nombre: string }[];
+  // Clientes/Proveedores/Cotizaciones/Órdenes de compra: no tienen tarjeta en
+  // Inicio, pero el layout ya los filtró para mandar solo los que tienen al
+  // menos un dato real (ver dashboard/layout.tsx).
+  extras: { href: string; texto: string }[];
 }) {
   const esVendedor = rol === "vendedor";
   const modulosSubmenu = [
     ...modulos.map((m) => ({ href: `/dashboard/${m.id}`, texto: m.nombre })),
+    ...extras,
     { href: "/dashboard/modulos/nuevo", texto: "+ Agregar módulo" },
   ];
+  const hayAlgo = modulos.length > 0 || extras.length > 0;
   const ruta = usePathname();
   const router = useRouter();
   const [menuAbierto, setMenuAbierto] = useState(false);
@@ -152,10 +159,10 @@ export default function BarraPanel({
               {e.texto}
             </Link>
           ))}
-          {!esVendedor && modulos.length > 0 && (
+          {!esVendedor && hayAlgo && (
             <BotonSubmenu texto="Módulos" items={modulosSubmenu} activo={activoModulos} />
           )}
-          {!esVendedor && modulos.length === 0 && (
+          {!esVendedor && !hayAlgo && (
             <span className="nav-link" aria-disabled="true" title="Sube tu primer Excel para ver tus módulos aquí" style={{ opacity: 0.4, cursor: "not-allowed" }}>
               Módulos
             </span>
