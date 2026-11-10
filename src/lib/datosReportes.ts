@@ -41,6 +41,7 @@ export interface ModuloReporte {
   topProducto: ReturnType<typeof topPor> | null;
   topCliente: ReturnType<typeof topPor> | null;
   topProveedor: ReturnType<typeof topPor> | null;
+  porCategoria: ReturnType<typeof topPor> | null;
   sumaTotal: number | null;
   sumaGastos: number | null;
   flujoCaja: ReturnType<typeof flujoCaja> | null;
@@ -73,15 +74,20 @@ export async function calcularModulosReporte(supabase: SupabaseClient, empresaId
     const cCliente = columnaConRol(columnas, "cliente");
     const cProveedor = columnaConRol(columnas, "proveedor");
     const cGastos = columnaConRol(columnas, "gastos");
+    // Genérico para cualquier rubro (no solo videojuegos): cualquier módulo con una
+    // columna marcada como rol "categoria" + Monto arma su propia composición por
+    // categoría -- el pastel de Inicio solo suma lo que cada negocio ya clasificó.
+    const cCategoria = columnaConRol(columnas, "categoria");
 
     const conTotales = !!(cFecha && cMonto);
     const conTopProducto = !!cProducto;
     const conTopCliente = !!cCliente;
     const conTopProveedor = !!cProveedor;
+    const conCategoria = !!(cCategoria && cMonto);
     const conFlujoCaja = !!(cMonto && cCosto);
     const conSumaTotal = !!cMonto && !conTotales && !conFlujoCaja;
     const conGastos = !!cGastos;
-    if (!conTotales && !conTopProducto && !conTopCliente && !conTopProveedor && !conSumaTotal && !conFlujoCaja && !conGastos) continue;
+    if (!conTotales && !conTopProducto && !conTopCliente && !conTopProveedor && !conSumaTotal && !conFlujoCaja && !conGastos && !conCategoria) continue;
 
     const filas = await leerFilas(supabase, d.id, {
       ...(cFecha && { f: cFecha.key }),
@@ -91,6 +97,7 @@ export async function calcularModulosReporte(supabase: SupabaseClient, empresaId
       ...(cCliente && { c: cCliente.key }),
       ...(cProveedor && { pr: cProveedor.key }),
       ...(cGastos && { g: cGastos.key }),
+      ...(cCategoria && { cat: cCategoria.key }),
     });
 
     const plantillas = [
@@ -101,6 +108,7 @@ export async function calcularModulosReporte(supabase: SupabaseClient, empresaId
       conTopProveedor && "top_proveedores",
       conSumaTotal && "total_simple",
       conGastos && "gastos_adicionales",
+      conCategoria && "por_categoria",
     ].filter((x): x is string => !!x);
 
     let metas: ModuloReporte["metas"] = null;
@@ -122,6 +130,9 @@ export async function calcularModulosReporte(supabase: SupabaseClient, empresaId
       topProducto: conTopProducto ? topPor(filas.map((f) => ({ clave: f.p, m: f.m })), 5) : null,
       topCliente: conTopCliente ? topPor(filas.map((f) => ({ clave: f.c, m: f.m })), 5) : null,
       topProveedor: conTopProveedor ? topPor(filas.map((f) => ({ clave: f.pr, m: f.m })), 5) : null,
+      // n=20: a diferencia de un "top 5", acá se quiere la composición completa (pocas
+      // categorías típicamente), no solo las más grandes.
+      porCategoria: conCategoria ? topPor(filas.map((f) => ({ clave: f.cat, m: f.m })), 20) : null,
       sumaTotal: conSumaTotal ? sumaMonto(filas) : null,
       sumaGastos: conGastos ? sumaMonto(filas.map((f) => ({ m: f.g }))) : null,
       flujoCaja: conFlujoCaja ? flujoCaja(filas.map((f) => ({ m: f.m, costo: f.co })), !!d.incluye_igv) : null,

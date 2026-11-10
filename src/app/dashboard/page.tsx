@@ -101,6 +101,28 @@ export default async function DashboardPage() {
     .slice(0, 5);
   const maxProducto = Math.max(1, ...topProductos.map((p) => p.total || p.veces));
 
+  // Composición por categoría (pastel): genérico, no específico a videojuegos --
+  // suma lo que cada negocio ya clasificó en su propia columna "Categoría" (rol
+  // categoria), sea cual sea su rubro. Paleta fija de 8 colores, suficiente para
+  // el puñado de categorías típico de una pyme; si hay más, el resto cae en gris.
+  const PALETA_CATEGORIAS = ["#237a50", "#e8a33d", "#3d7ae8", "#c44d6e", "#7a5de8", "#2db5a8", "#d9802b", "#8c8c8c"];
+  const categoriasPorClave = new Map<string, number>();
+  for (const m of modulosReporte ?? []) {
+    for (const c of m.porCategoria ?? []) {
+      categoriasPorClave.set(c.clave, (categoriasPorClave.get(c.clave) ?? 0) + c.total);
+    }
+  }
+  const totalCategorias = [...categoriasPorClave.values()].reduce((s, v) => s + v, 0);
+  const categorias = [...categoriasPorClave.entries()]
+    .map(([clave, total], i) => ({ clave, total, color: PALETA_CATEGORIAS[i % PALETA_CATEGORIAS.length] }))
+    .sort((a, b) => b.total - a.total);
+  let acumulado = 0;
+  const segmentosPastel = categorias.map((c) => {
+    const desde = acumulado;
+    acumulado += totalCategorias > 0 ? (c.total / totalCategorias) * 360 : 0;
+    return `${c.color} ${desde}deg ${acumulado}deg`;
+  });
+
   return (
     <>
       <div className="panel-cabecera">
@@ -168,6 +190,27 @@ export default async function DashboardPage() {
                     texto={p.total > 0 ? soles(p.total) : `${p.veces}x`}
                   />
                 ))}
+              </div>
+            )}
+            {categorias.length > 0 && (
+              <div>
+                <p className="suave pequeno" style={{ margin: "0 0 8px" }}>Composición por categoría</p>
+                <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+                  <div
+                    aria-hidden="true"
+                    style={{ width: 88, height: 88, borderRadius: "50%", flexShrink: 0, background: `conic-gradient(${segmentosPastel.join(", ")})` }}
+                  />
+                  <div style={{ minWidth: 0 }}>
+                    {categorias.map((c) => (
+                      <div key={c.clave} style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}>
+                        <span style={{ width: 10, height: 10, borderRadius: "50%", background: c.color, flexShrink: 0 }} aria-hidden="true" />
+                        <span className="pequeno" style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                          {c.clave} <span className="suave">({totalCategorias > 0 ? Math.round((c.total / totalCategorias) * 100) : 0}%)</span>
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
               </div>
             )}
           </div>
