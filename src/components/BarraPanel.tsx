@@ -12,47 +12,6 @@ const enlaces = [
   { href: "/dashboard/upload", texto: "Subir Excel" },
 ];
 
-// Cada entrada de negocio (Ventas, Compras, Stock, Proveedor, Cliente) con sus
-// dos puertas: Registrar (cargar algo nuevo) y Reporte (ver lo acumulado).
-// "Registrar" de Ventas/Compras es un redirect inteligente (ver
-// dashboard/ventas/registrar) a tu único módulo de ese tipo si tienes uno
-// solo; con 0 o varios cae al Reporte, que ya deja elegir/expandir cada uno.
-const modulosGrupos = [
-  {
-    grupo: "Ventas",
-    items: [
-      { href: "/dashboard/ventas/registrar", texto: "Registrar" },
-      { href: "/dashboard/ventas", texto: "Reporte" },
-      { href: "/dashboard/cotizaciones", texto: "Cotizaciones" },
-    ],
-  },
-  {
-    grupo: "Compras",
-    items: [
-      { href: "/dashboard/compras/registrar", texto: "Registrar" },
-      { href: "/dashboard/compras", texto: "Reporte" },
-      { href: "/dashboard/ordenes-compra", texto: "Órdenes de compra" },
-    ],
-  },
-  { grupo: "Stock", items: [{ href: "/dashboard/inventario", texto: "Reporte" }] },
-  {
-    grupo: "Proveedor",
-    items: [
-      { href: "/dashboard/proveedores/nuevo", texto: "Registrar" },
-      { href: "/dashboard/proveedores", texto: "Reporte" },
-    ],
-  },
-  {
-    grupo: "Cliente",
-    items: [
-      { href: "/dashboard/pipeline", texto: "Registrar" },
-      { href: "/dashboard/clientes", texto: "Reporte" },
-    ],
-  },
-  { grupo: "Más módulos", items: [{ href: "/dashboard/modulos/nuevo", texto: "Agregar módulo" }] },
-];
-const modulosSubmenu = modulosGrupos.flatMap((g) => g.items);
-
 const resumenSubmenu = [
   { href: "/dashboard/reportes/resumen", texto: "General" },
   { href: "/dashboard/logros", texto: "Hitos" },
@@ -83,15 +42,10 @@ function BotonSubmenu({
   texto,
   items,
   activo,
-  render,
 }: {
   texto: string;
-  items?: { href: string; texto: string }[];
+  items: { href: string; texto: string }[];
   activo: boolean;
-  // Para Módulos: en vez de la lista plana de Links, cada fila abre su propio
-  // flyout (ver FilaConFlyout). Recibe "cerrar" para que navegar adentro del
-  // flyout también cierre este desplegable exterior.
-  render?: (cerrar: () => void) => React.ReactNode;
 }) {
   const [abierto, setAbierto] = useState(false);
   const [pos, setPos] = useState({ top: 0, left: 0 });
@@ -129,110 +83,33 @@ function BotonSubmenu({
       </button>
       {abierto && (
         <div ref={listaRef} className="menu-cuenta-lista" role="menu" style={{ position: "fixed", top: pos.top, left: pos.left, right: "auto" }}>
-          {render
-            ? render(() => setAbierto(false))
-            : items?.map((s) => (
-                <Link key={s.href} href={s.href} className="menu-cuenta-item" role="menuitem" onClick={() => setAbierto(false)}>
-                  {s.texto}
-                </Link>
-              ))}
+          {items.map((s) => (
+            <Link key={s.href} href={s.href} className="menu-cuenta-item" role="menuitem" onClick={() => setAbierto(false)}>
+              {s.texto}
+            </Link>
+          ))}
         </div>
       )}
     </>
   );
 }
 
-// Una fila de grupo (Ventas, Compras...) dentro del desplegable de Módulos:
-// al pasar el mouse por encima (o tocarla, para que funcione sin mouse) abre
-// una segunda cajita pegada a su derecha con Registrar/Reporte/etc -- un
-// pequeño margen de demora al salir evita que se cierre si el cursor pasa por
-// el huequito entre la fila y la cajita.
-function FilaConFlyout({
-  grupo,
-  items,
-  onNavegar,
-}: {
-  grupo: string;
-  items: { href: string; texto: string }[];
-  onNavegar: () => void;
-}) {
-  const [abierto, setAbierto] = useState(false);
-  const [pos, setPos] = useState({ top: 0, left: 0 });
-  const filaRef = useRef<HTMLDivElement>(null);
-  const cierreRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  function abrir() {
-    if (cierreRef.current) clearTimeout(cierreRef.current);
-    const r = filaRef.current?.getBoundingClientRect();
-    if (r) setPos({ top: r.top, left: r.right + 4 });
-    setAbierto(true);
-  }
-  function cerrarConDemora() {
-    cierreRef.current = setTimeout(() => setAbierto(false), 200);
-  }
-
-  return (
-    <div ref={filaRef} onMouseEnter={abrir} onMouseLeave={cerrarConDemora}>
-      <button
-        type="button"
-        className="menu-cuenta-item"
-        style={{ display: "flex", justifyContent: "space-between", alignItems: "center", width: "100%", background: "transparent", border: "none", cursor: "pointer", fontFamily: "inherit" }}
-        aria-haspopup="menu"
-        aria-expanded={abierto}
-        onClick={() => (abierto ? setAbierto(false) : abrir())}
-      >
-        {grupo} <span aria-hidden="true" className="suave">›</span>
-      </button>
-      {abierto && (
-        <div
-          onMouseEnter={abrir}
-          onMouseLeave={cerrarConDemora}
-          className="menu-cuenta-lista"
-          role="menu"
-          style={{ position: "fixed", top: pos.top, left: pos.left, right: "auto" }}
-        >
-          {items.map((it) => (
-            <Link key={it.href} href={it.href} className="menu-cuenta-item" role="menuitem" onClick={() => { setAbierto(false); onNavegar(); }}>
-              {it.texto}
-            </Link>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
-type ModulosDisponibles = { ventas: boolean; compras: boolean; stock: boolean; proveedor: boolean; cliente: boolean };
-
 export default function BarraPanel({
   rol,
-  modulosDisponibles,
-  otrosModulos,
+  modulos,
 }: {
   rol?: string;
-  modulosDisponibles: ModulosDisponibles;
-  // Módulos reales que no encajan en Ventas/Compras/Stock (ej. "Fiados"): antes
-  // tenían tarjeta en Inicio pero ningún camino desde este desplegable.
-  otrosModulos: { id: string; nombre: string }[];
+  // Los módulos reales de la empresa (mismos que la tarjeta de Inicio, ver
+  // dashboard/layout.tsx) -- el desplegable "Módulos" lista exactamente esto,
+  // sin agrupar por tipo. Sin ninguno, el botón se bloquea en vez de abrir un
+  // desplegable vacío.
+  modulos: { id: string; nombre: string }[];
 }) {
   const esVendedor = rol === "vendedor";
-  // Cada grupo del desplegable solo se ofrece si la empresa ya tiene ese tipo de
-  // módulo (ver dashboard/layout.tsx); "Más módulos" (agregar uno nuevo) se deja
-  // siempre que haya al menos uno de los otros -- sin ninguno, el botón se bloquea
-  // entero en vez de abrir un desplegable casi vacío.
-  const hayAlgunModulo = Object.values(modulosDisponibles).some(Boolean) || otrosModulos.length > 0;
-  const gruposBase = modulosGrupos.filter((g) => {
-    if (g.grupo === "Más módulos") return hayAlgunModulo;
-    const clave = g.grupo.toLowerCase() as keyof ModulosDisponibles;
-    return modulosDisponibles[clave];
-  });
-  const grupoOtros = otrosModulos.length > 0
-    ? [{ grupo: "Otros módulos", items: otrosModulos.map((m) => ({ href: `/dashboard/${m.id}`, texto: m.nombre })) }]
-    : [];
-  // "Más módulos" (agregar uno nuevo) siempre al final.
-  const sinMas = gruposBase.filter((g) => g.grupo !== "Más módulos");
-  const masModulos = gruposBase.filter((g) => g.grupo === "Más módulos");
-  const gruposVisibles = [...sinMas, ...grupoOtros, ...masModulos];
+  const modulosSubmenu = [
+    ...modulos.map((m) => ({ href: `/dashboard/${m.id}`, texto: m.nombre })),
+    { href: "/dashboard/modulos/nuevo", texto: "+ Agregar módulo" },
+  ];
   const ruta = usePathname();
   const router = useRouter();
   const [menuAbierto, setMenuAbierto] = useState(false);
@@ -275,14 +152,10 @@ export default function BarraPanel({
               {e.texto}
             </Link>
           ))}
-          {!esVendedor && hayAlgunModulo && (
-            <BotonSubmenu
-              texto="Módulos"
-              activo={activoModulos}
-              render={(cerrar) => gruposVisibles.map((g) => <FilaConFlyout key={g.grupo} grupo={g.grupo} items={g.items} onNavegar={cerrar} />)}
-            />
+          {!esVendedor && modulos.length > 0 && (
+            <BotonSubmenu texto="Módulos" items={modulosSubmenu} activo={activoModulos} />
           )}
-          {!esVendedor && !hayAlgunModulo && (
+          {!esVendedor && modulos.length === 0 && (
             <span className="nav-link" aria-disabled="true" title="Sube tu primer Excel para ver tus módulos aquí" style={{ opacity: 0.4, cursor: "not-allowed" }}>
               Módulos
             </span>
