@@ -8,7 +8,10 @@ import ConsejosInicio from "@/components/ConsejosInicio";
 import { rolEnEmpresa } from "@/lib/permisos";
 import { tipoModulo, type RolColumna } from "@/lib/roles";
 import { tieneSuscripcionActiva } from "@/lib/suscripcion";
+import { calcularModulosReporte } from "@/lib/datosReportes";
 import type { Columna } from "@/lib/excel-parser";
+
+const soles = (n: number) => `S/ ${n.toLocaleString("es-PE", { maximumFractionDigits: 2 })}`;
 
 export default async function DashboardPage() {
   const supabase = await crearClienteServidor();
@@ -37,6 +40,27 @@ export default async function DashboardPage() {
   );
   const hayModulos = datasets.length > 0;
 
+  // Dashboard de reportería: el plan gratis es para REGISTRAR (Ventas, Compras,
+  // Stock, Clientes/Proveedores libres para siempre); este resumen -- ganancia
+  // real, qué se vende más -- es lo que distingue al plan pago, reusando el
+  // mismo cálculo de /api/reportes (ver src/lib/datosReportes.ts) sin duplicar
+  // lógica. Oculto para vendedor, mismo criterio que Cuentas por cobrar/pagar.
+  const modulosReporte = hayModulos && !esVendedor && planActivo ? await calcularModulosReporte(supabase, sesion.empresaId) : null;
+  // Total de un módulo: sumaTotal y totalesPorMes nunca coexisten (son excluyentes en
+  // datosReportes.ts, según tenga o no columna Fecha) -- sumar ambos es seguro.
+  const totalModulo = (m: NonNullable<typeof modulosReporte>[number]) =>
+    (m.sumaTotal ?? 0) + (m.flujoCaja?.ventas ?? 0) + (m.totalesPorMes?.reduce((s, t) => s + t.total, 0) ?? 0);
+  const ventasTotal = modulosReporte?.filter((m) => m.tipo === "ventas").reduce((s, m) => s + totalModulo(m), 0) ?? 0;
+  const comprasTotal = modulosReporte?.filter((m) => m.tipo === "compras").reduce((s, m) => s + totalModulo(m), 0) ?? 0;
+  const flujoCajaNeta = modulosReporte?.reduce((s, m) => s + (m.flujoCaja?.gananciaNeta ?? 0), 0) ?? 0;
+  // Si ningún módulo tiene Flujo de caja armado (necesita Monto + Costo en el mismo
+  // módulo), se aproxima la ganancia como Ventas - Compras entre módulos separados.
+  const gananciaNeta = flujoCajaNeta !== 0 ? flujoCajaNeta : ventasTotal - comprasTotal;
+  const topProductoGlobal = (modulosReporte ?? [])
+    .flatMap((m) => m.topProducto ?? [])
+    .sort((a, b) => (b.total || b.veces) - (a.total || a.veces))[0];
+  const hayDashboard = modulosReporte && (gananciaNeta !== 0 || ventasTotal !== 0 || topProductoGlobal);
+
   return (
     <>
       <div className="panel-cabecera">
@@ -60,6 +84,42 @@ export default async function DashboardPage() {
             Sube el Excel que ya usas: detectamos tus datos y armamos un módulo por cada tipo de información, con formulario de carga y buscador.
           </p>
           <Link href="/dashboard/upload" className="btn btn-primario btn-grande">Subir mi primer Excel</Link>
+        </div>
+      )}
+
+      {hayModulos && !esVendedor && planActivo && hayDashboard && (
+        <div className="tarjeta tarjeta-elevada" style={{ marginBottom: 20 }}>
+          <h3 style={{ margin: 0 }}>Tu negocio en números</h3>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 14, marginTop: 14 }}>
+            <div>
+              <p className="suave pequeno" style={{ margin: 0 }}>Ventas</p>
+              <p style={{ margin: 0, fontWeight: 700, fontSize: 22 }}>{soles(ventasTotal)}</p>
+            </div>
+            <div>
+              <p className="suave pequeno" style={{ margin: 0 }}>Ganancia neta</p>
+              <p style={{ margin: 0, fontWeight: 700, fontSize: 22, color: "var(--verde-700)" }}>{soles(gananciaNeta)}</p>
+            </div>
+            {topProductoGlobal && (
+              <div>
+                <p className="suave pequeno" style={{ margin: 0 }}>Más vendido</p>
+                <p style={{ margin: 0, fontWeight: 700, fontSize: 22 }}>{topProductoGlobal.clave}</p>
+              </div>
+            )}
+          </div>
+          <p className="suave pequeno" style={{ marginTop: 10 }}>
+            Detalle completo (flujo de caja, top 5, metas) en <Link href="/dashboard/reportes">Reportes</Link>.
+          </p>
+        </div>
+      )}
+
+      {hayModulos && !esVendedor && !planActivo && (
+        <div className="tarjeta" style={{ marginBottom: 20 }}>
+          <h3 style={{ margin: 0 }}>Tu negocio en números</h3>
+          <p className="suave pequeno" style={{ marginTop: 10 }}>
+            Registrar tus ventas, compras y stock es gratis para siempre. Ver tu ganancia real, qué se
+            vende más y los módulos adicionales es parte del plan pago.{" "}
+            <Link href="/dashboard/billing">Activa tu prueba gratis</Link>.
+          </p>
         </div>
       )}
 
