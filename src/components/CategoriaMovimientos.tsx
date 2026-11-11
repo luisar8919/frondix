@@ -225,7 +225,7 @@ export default function CategoriaMovimientos({ tipo }: { tipo: TipoModulo }) {
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 10, marginTop: 10 }}>
                   <div><p className="suave pequeno" style={{ margin: 0 }}>Ventas</p><p style={{ margin: 0, fontWeight: 600 }}>{soles(r.flujoCaja.ventas)}</p></div>
                   <div><p className="suave pequeno" style={{ margin: 0 }}>Costos</p><p style={{ margin: 0, fontWeight: 600 }}>{soles(r.flujoCaja.costos)}</p></div>
-                  <div><p className="suave pequeno" style={{ margin: 0 }}>Ganancia Neta</p><p style={{ margin: 0, fontWeight: 700, color: "var(--verde-700)" }}>{soles(r.flujoCaja.gananciaNeta)}</p></div>
+                  <div><p className="suave pequeno" style={{ margin: 0 }}>Ganancia Neta</p><p style={{ margin: 0, fontWeight: 700, color: r.flujoCaja.gananciaNeta >= 0 ? "var(--verde-700)" : "var(--error)" }}>{r.flujoCaja.gananciaNeta >= 0 ? "🌱 " : "📉 "}{soles(r.flujoCaja.gananciaNeta)}</p></div>
                 </div>
               </div>
             )}

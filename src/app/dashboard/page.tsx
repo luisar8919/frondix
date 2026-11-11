@@ -159,7 +159,9 @@ export default async function DashboardPage() {
             </div>
             <div>
               <p className="suave pequeno" style={{ margin: 0 }}>Ganancia neta</p>
-              <p style={{ margin: 0, fontWeight: 700, fontSize: 22, color: "var(--verde-700)" }}>{soles(gananciaNeta)}</p>
+              <p style={{ margin: 0, fontWeight: 700, fontSize: 22, color: gananciaNeta >= 0 ? "var(--verde-700)" : "var(--error)" }}>
+                {gananciaNeta >= 0 ? "🌱 " : "📉 "}{soles(gananciaNeta)}
+              </p>
             </div>
             {topProductoGlobal && (
               <div>

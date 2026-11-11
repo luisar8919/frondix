@@ -9,6 +9,7 @@ export function plantillaVentas(): Columna[] {
     { key: "fecha", label: "Fecha", tipo: "fecha", rol: "fecha", sospechosa: false },
     { key: "cliente", label: "Cliente", tipo: "texto", rol: "cliente", sospechosa: false },
     { key: "producto", label: "Producto", tipo: "texto", rol: "producto", sospechosa: false },
+    { key: "cantidad", label: "Cantidad", tipo: "numero", rol: "cantidad", sospechosa: false },
     { key: "monto", label: "Monto", tipo: "numero", rol: "monto", sospechosa: false },
     { key: "costo", label: "Costo", tipo: "numero", rol: "costo", sospechosa: false },
     { key: "gastos_venta", label: "Gastos de venta", tipo: "numero", rol: "gastos", sospechosa: false },
@@ -20,6 +21,7 @@ export function plantillaCompras(): Columna[] {
     { key: "fecha", label: "Fecha", tipo: "fecha", rol: "fecha", sospechosa: false },
     { key: "proveedor", label: "Proveedor", tipo: "texto", rol: "proveedor", sospechosa: false },
     { key: "producto", label: "Producto o concepto", tipo: "texto", rol: "producto", sospechosa: false },
+    { key: "cantidad", label: "Cantidad", tipo: "numero", rol: "cantidad", sospechosa: false },
     { key: "monto", label: "Monto", tipo: "numero", rol: "monto", sospechosa: false },
     { key: "gastos_compra", label: "Gastos de compra", tipo: "numero", rol: "gastos", sospechosa: false },
   ];
@@ -91,6 +93,7 @@ export function plantillaOrdenesServicio(): Columna[] {
   return [
     { key: "fecha", label: "Fecha", tipo: "fecha", rol: "fecha", sospechosa: false },
     { key: "cliente", label: "Cliente", tipo: "texto", rol: null, sospechosa: false },
+    { key: "telefono", label: "Teléfono", tipo: "texto", rol: "telefono", sospechosa: false },
     { key: "trabajo", label: "Trabajo a realizar", tipo: "texto", rol: "producto", sospechosa: false },
     { key: "estado", label: "Estado", tipo: "texto", rol: null, sospechosa: false },
     { key: "monto", label: "Monto cobrado", tipo: "numero", rol: "costo", sospechosa: false },
@@ -160,6 +163,7 @@ export function plantillaMembresias(): Columna[] {
   return [
     { key: "fecha_inicio", label: "Fecha de inicio", tipo: "fecha", rol: "fecha", sospechosa: false },
     { key: "cliente", label: "Cliente", tipo: "texto", rol: "cliente", sospechosa: false },
+    { key: "telefono", label: "Teléfono", tipo: "texto", rol: "telefono", sospechosa: false },
     { key: "plan", label: "Plan", tipo: "texto", rol: "producto", sospechosa: false },
     { key: "monto_mensual", label: "Monto mensual", tipo: "numero", rol: "monto", sospechosa: false },
     { key: "fecha_vencimiento", label: "Fecha de vencimiento", tipo: "fecha", rol: null, sospechosa: false },
@@ -171,6 +175,7 @@ export function plantillaAlquileres(): Columna[] {
   return [
     { key: "fecha_inicio", label: "Fecha de inicio", tipo: "fecha", rol: "fecha", sospechosa: false },
     { key: "inquilino", label: "Inquilino", tipo: "texto", rol: "cliente", sospechosa: false },
+    { key: "telefono", label: "Teléfono", tipo: "texto", rol: "telefono", sospechosa: false },
     { key: "propiedad", label: "Propiedad", tipo: "texto", rol: "producto", sospechosa: false },
     { key: "monto_mensual", label: "Monto mensual", tipo: "numero", rol: "monto", sospechosa: false },
     { key: "fecha_pago", label: "Próxima fecha de pago", tipo: "fecha", rol: null, sospechosa: false },
@@ -182,6 +187,7 @@ export function plantillaMatriculas(): Columna[] {
   return [
     { key: "fecha_inscripcion", label: "Fecha de inscripción", tipo: "fecha", rol: "fecha", sospechosa: false },
     { key: "alumno", label: "Alumno", tipo: "texto", rol: "cliente", sospechosa: false },
+    { key: "telefono_apoderado", label: "Teléfono del apoderado", tipo: "texto", rol: "telefono", sospechosa: false },
     { key: "curso", label: "Curso", tipo: "texto", rol: "producto", sospechosa: false },
     { key: "mensualidad", label: "Mensualidad", tipo: "numero", rol: "monto", sospechosa: false },
     { key: "fecha_vencimiento", label: "Fecha de vencimiento", tipo: "fecha", rol: null, sospechosa: false },
@@ -205,6 +211,7 @@ export function plantillaEventos(): Columna[] {
   return [
     { key: "fecha_evento", label: "Fecha del evento", tipo: "fecha", rol: "fecha", sospechosa: false },
     { key: "cliente", label: "Cliente", tipo: "texto", rol: "cliente", sospechosa: false },
+    { key: "telefono", label: "Teléfono", tipo: "texto", rol: "telefono", sospechosa: false },
     { key: "tipo_evento", label: "Tipo de evento", tipo: "texto", rol: "producto", sospechosa: false },
     { key: "monto", label: "Monto", tipo: "numero", rol: "monto", sospechosa: false },
     { key: "estado", label: "Estado", tipo: "texto", rol: null, sospechosa: false },
@@ -215,6 +222,7 @@ export function plantillaDelivery(): Columna[] {
   return [
     { key: "fecha", label: "Fecha", tipo: "fecha", rol: "fecha", sospechosa: false },
     { key: "cliente", label: "Cliente", tipo: "texto", rol: "cliente", sospechosa: false },
+    { key: "telefono", label: "Teléfono", tipo: "texto", rol: "telefono", sospechosa: false },
     { key: "pedido", label: "Pedido", tipo: "texto", rol: "producto", sospechosa: false },
     { key: "monto", label: "Monto", tipo: "numero", rol: "monto", sospechosa: false },
     { key: "direccion", label: "Dirección de entrega", tipo: "texto", rol: "direccion", sospechosa: false },
@@ -227,6 +235,7 @@ export function plantillaAlquilerEquipos(): Columna[] {
   return [
     { key: "fecha_salida", label: "Fecha de salida", tipo: "fecha", rol: "fecha", sospechosa: false },
     { key: "cliente", label: "Cliente", tipo: "texto", rol: "cliente", sospechosa: false },
+    { key: "telefono", label: "Teléfono", tipo: "texto", rol: "telefono", sospechosa: false },
     { key: "equipo", label: "Equipo", tipo: "texto", rol: "producto", sospechosa: false },
     { key: "monto", label: "Monto", tipo: "numero", rol: "monto", sospechosa: false },
     { key: "fecha_devolucion", label: "Fecha de devolución", tipo: "fecha", rol: null, sospechosa: false },

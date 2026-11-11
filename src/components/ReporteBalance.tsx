@@ -113,7 +113,7 @@ export default function ReporteBalance() {
                       <td style={{ whiteSpace: "nowrap" }}>{fechaCorta(m.fecha)}</td>
                       <td>
                         <span style={{ fontWeight: 700, color: m.tipo === "venta" ? "var(--verde-700)" : "var(--error)" }}>
-                          {m.tipo === "venta" ? "Venta" : "Compra"}
+                          {m.tipo === "venta" ? "📈 Venta" : "📉 Compra"}
                         </span>
                       </td>
                       <td>{m.producto ?? "-"}</td>

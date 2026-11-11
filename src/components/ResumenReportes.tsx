@@ -241,7 +241,9 @@ export default function ResumenReportes() {
                   </div>
                   <div>
                     <p className="suave pequeno" style={{ margin: 0 }}>Ganancia Neta</p>
-                    <p style={{ margin: 0, fontWeight: 700, color: "var(--verde-700)" }}>{soles(m.flujoCaja.gananciaNeta)}</p>
+                    <p style={{ margin: 0, fontWeight: 700, color: m.flujoCaja.gananciaNeta >= 0 ? "var(--verde-700)" : "var(--error)" }}>
+                      {m.flujoCaja.gananciaNeta >= 0 ? "🌱 " : "📉 "}{soles(m.flujoCaja.gananciaNeta)}
+                    </p>
                   </div>
                 </div>
                 <p className="ayuda" style={{ marginTop: 8 }}>

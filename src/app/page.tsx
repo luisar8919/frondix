@@ -21,6 +21,20 @@ const pasos = [
   { titulo: "Carga y busca", texto: "Tienes tu módulo, un formulario para agregar registros y un buscador. Sin configurar nada." },
 ];
 
+// Lo que diferencia a Frondix de "armar un Excel más bonito" -- estructuración
+// automática primero (el punto fuerte real: ningún otro sistema arma el
+// módulo solo a partir de un Excel desordenado), seguido de lo que ya
+// funciona hoy en el producto y es vendible: stock que se ajusta solo,
+// reportes listos para decidir, datos para SUNAT, multi-moneda y celular.
+const diferenciadores = [
+  { icono: "🧩", titulo: "Se estructura solo", texto: "Subes tu Excel desordenado y Frondix detecta qué es cada columna (producto, cliente, monto, fecha) y arma el módulo. No hay plantillas que llenar ni campos que inventar." },
+  { icono: "📦", titulo: "Stock que se ajusta solo", texto: "Cada venta o compra suma o descuenta stock automáticamente, con alertas cuando un producto está por acabarse." },
+  { icono: "📊", titulo: "Visibilidad para decidir", texto: "Ganancia neta, productos más vendidos y flujo de caja, actualizados solos cada vez que registras algo." },
+  { icono: "🧾", titulo: "Listo para tu facturación", texto: "Exporta tus ventas y compras con los datos que pide SUNAT (valor de venta, IGV, total) para registrar tus comprobantes donde ya facturas." },
+  { icono: "🌎", titulo: "Para toda Latinoamérica", texto: "Soles, dólares, pesos mexicanos, colombianos, chilenos, argentinos, reales o euros: cada módulo con su propia moneda." },
+  { icono: "📱", titulo: "Pensado para el celular", texto: "Tablas legibles desde el teléfono, no solo desde la computadora de la oficina." },
+];
+
 export default function Portada() {
   return (
     <>
@@ -115,6 +129,23 @@ export default function Portada() {
           </div>
         </section>
 
+        <section className="seccion contenedor">
+          <div className="seccion-titulo seccion-titulo-centrado">
+            <span className="eyebrow">Por qué Frondix</span>
+            <h2>Tú no estructuras nada. Nosotros sí.</h2>
+            <p>Ningún otro sistema arma tus módulos solo a partir de tu Excel desordenado. Esto es lo que ganas apenas lo subes.</p>
+          </div>
+          <div className="grilla-3">
+            {diferenciadores.map((d) => (
+              <div key={d.titulo} className="tarjeta">
+                <span aria-hidden="true" style={{ fontSize: 28, display: "block", marginBottom: 10 }}>{d.icono}</span>
+                <h3>{d.titulo}</h3>
+                <p className="suave" style={{ margin: 0 }}>{d.texto}</p>
+              </div>
+            ))}
+          </div>
+        </section>
+
         <section id="precios" className="seccion seccion-suave">
           <div className="contenedor">
             <div className="seccion-titulo">
@@ -131,6 +162,7 @@ export default function Portada() {
                   <li>Un usuario</li>
                   <li>Todos los módulos que quieras</li>
                   <li>Formulario de carga y buscador</li>
+                  <li>Stock que se ajusta solo, con alertas</li>
                 </ul>
                 <Link href="/signup" className="btn btn-secundario btn-bloque">Crear cuenta gratis</Link>
               </div>
