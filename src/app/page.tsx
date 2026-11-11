@@ -15,6 +15,16 @@ const dolores = [
   { titulo: "Ya no encuentras nada", texto: "el Excel creció tanto que buscar un dato es recorrer la hoja sin fin." },
 ];
 
+// Posicionamiento explícito frente a la objeción más común ("¿y la
+// facturación?"): Frondix no es un POS ni un facturador -- es el ERP liviano
+// que ordena lo que esos sistemas no muestran (stock, ventas, ganancia real),
+// a propósito sin meterse en la parte fiscal. Dos públicos, cada uno con su
+// propio motivo para no necesitar esa capa aquí.
+const publicos = [
+  { icono: "🛍️", titulo: "¿Todavía no facturas cada venta?", texto: "Si tu negocio es informal o semi-formal, Frondix es tu sistema completo: ventas, compras, stock y clientes ordenados, sin obligarte a facturar lo que hoy no facturas." },
+  { icono: "🤝", titulo: "¿Ya facturas en otro sistema?", texto: "Frondix se monta al lado del que ya usas para facturar: tú sigues emitiendo tus comprobantes ahí, y acá tienes la visibilidad real de tu negocio que ese sistema no te da. Si necesitas los datos para SUNAT, te los dejamos listos para copiar." },
+];
+
 const pasos = [
   { titulo: "Sube tu Excel", texto: "El que ya usas, aunque esté desordenado. Si tiene varias hojas, las ordenamos por ti." },
   { titulo: "Revisa las columnas", texto: "Confirmas qué es cada dato: producto, cliente, monto, fecha. Toma un minuto." },
@@ -137,6 +147,26 @@ export default function Portada() {
           </div>
           <div className="grilla-3">
             {diferenciadores.map((d) => (
+              <div key={d.titulo} className="tarjeta">
+                <span aria-hidden="true" style={{ fontSize: 28, display: "block", marginBottom: 10 }}>{d.icono}</span>
+                <h3>{d.titulo}</h3>
+                <p className="suave" style={{ margin: 0 }}>{d.texto}</p>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        <section className="seccion contenedor">
+          <div className="seccion-titulo seccion-titulo-centrado">
+            <span className="eyebrow">Sin rodeos</span>
+            <h2>Frondix no factura. Y es a propósito.</h2>
+            <p>
+              No competimos contra tu facturador ni contra un POS completo. Ordenamos lo que ninguno de los dos te
+              muestra: tu stock, tus ventas y tu ganancia real, listos en minutos desde tu propio Excel.
+            </p>
+          </div>
+          <div className="grilla-2">
+            {publicos.map((d) => (
               <div key={d.titulo} className="tarjeta">
                 <span aria-hidden="true" style={{ fontSize: 28, display: "block", marginBottom: 10 }}>{d.icono}</span>
                 <h3>{d.titulo}</h3>

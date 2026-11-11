@@ -177,6 +177,7 @@ th.num, td.num { text-align: right; font-variant-numeric: tabular-nums; }
 .seccion-titulo { max-width: 640px; margin-bottom: 32px; }
 .seccion-titulo-centrado { max-width: none; margin-left: auto; margin-right: auto; text-align: center; }
 .seccion-titulo p { color: var(--suave); font-size: 17px; }
+.grilla-2 { display: grid; gap: 16px; grid-template-columns: repeat(2, 1fr); }
 .grilla-3 { display: grid; gap: 16px; grid-template-columns: repeat(3, 1fr); }
 .grilla-4 { display: grid; gap: 16px; grid-template-columns: repeat(4, 1fr); }
 .dolor { position: relative; padding-top: 28px; }
@@ -244,7 +245,7 @@ th.num, td.num { text-align: right; font-variant-numeric: tabular-nums; }
 /* ----- Movil ----- */
 @media (max-width: 860px) {
   .hero { grid-template-columns: 1fr; gap: 32px; padding-block: 40px 32px; }
-  .grilla-3, .grilla-4 { grid-template-columns: 1fr; }
+  .grilla-2, .grilla-3, .grilla-4 { grid-template-columns: 1fr; }
   .precios { grid-template-columns: 1fr; }
   .seccion { padding-block: 40px; }
   .banda-cta { padding: 36px 20px; }
