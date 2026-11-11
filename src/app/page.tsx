@@ -183,7 +183,7 @@ export default function Portada() {
               <h2>Empieza gratis, crece cuando lo necesites</h2>
               <p>Frondix ya funciona gratis para cargar tu Excel y ordenarlo. Pagar no es para empezar, es para cuando quieras subir de nivel la gestión.</p>
             </div>
-            <div className="precios">
+            <div className="precios precios-3">
               <div className="tarjeta precio">
                 <h3>Gratis</h3>
                 <div className="precio-monto">S/ 0</div>
@@ -197,9 +197,9 @@ export default function Portada() {
                 <Link href="/signup" className="btn btn-secundario btn-bloque">Crear cuenta gratis</Link>
               </div>
               <div className="tarjeta precio precio-destacado">
-                <h3>Completo <span className="insignia" style={{ marginLeft: 6 }}>Recomendado</span></h3>
-                <div className="precio-monto">S/ 35<small> /mes</small></div>
-                <p className="suave pequeno">Para trabajar en equipo.</p>
+                <h3>Mensual <span className="insignia" style={{ marginLeft: 6 }}>Recomendado</span></h3>
+                <div className="precio-monto">S/ 30<small> /mes</small></div>
+                <p className="suave pequeno">Para trabajar en equipo. Equivalente en tu moneda.</p>
                 <p className="pequeno" style={{ fontWeight: 700, color: "var(--verde-700)", margin: "2px 0 0" }}>
                   Primer mes gratis. No pedimos tarjeta.
                 </p>
@@ -211,6 +211,19 @@ export default function Portada() {
                   </li>
                 </ul>
                 <Link href="/signup" className="btn btn-primario btn-bloque">Empezar ahora</Link>
+              </div>
+              <div className="tarjeta precio">
+                <h3>Anual</h3>
+                <div className="precio-monto">S/ 300<small> /año</small></div>
+                <p className="suave pequeno">Lo mismo que el plan mensual, pagando una vez al año.</p>
+                <p className="pequeno" style={{ fontWeight: 700, color: "var(--verde-700)", margin: "2px 0 0" }}>
+                  Ahorras S/ 60 al año (2 meses gratis).
+                </p>
+                <ul>
+                  <li>Todo lo del plan mensual</li>
+                  <li>Un solo cobro al año, sin recordatorios</li>
+                </ul>
+                <Link href="/signup" className="btn btn-secundario btn-bloque">Empezar ahora</Link>
               </div>
             </div>
           </div>

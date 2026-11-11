@@ -14,9 +14,14 @@ declare global {
 }
 
 const PAYPAL_CLIENT_ID = process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID;
-const PAYPAL_PLAN_ID = process.env.NEXT_PUBLIC_PAYPAL_PLAN_ID;
+const PAYPAL_PLAN_ID_MENSUAL = process.env.NEXT_PUBLIC_PAYPAL_PLAN_ID;
+const PAYPAL_PLAN_ID_ANUAL = process.env.NEXT_PUBLIC_PAYPAL_PLAN_ID_ANUAL;
 const PADDLE_CLIENT_TOKEN = process.env.NEXT_PUBLIC_PADDLE_CLIENT_TOKEN;
-const PADDLE_PRICE_ID = process.env.NEXT_PUBLIC_PADDLE_PRICE_ID;
+const PADDLE_PRICE_ID_MENSUAL = process.env.NEXT_PUBLIC_PADDLE_PRICE_ID;
+const PADDLE_PRICE_ID_ANUAL = process.env.NEXT_PUBLIC_PADDLE_PRICE_ID_ANUAL;
+
+type Ciclo = "mensual" | "anual";
+const PRECIO_POR_CICLO: Record<Ciclo, string> = { mensual: "S/ 30 /mes", anual: "S/ 300 /año (2 meses gratis)" };
 
 export default function BillingPage() {
   const [mensaje, setMensaje] = useState<string | null>(null);
@@ -28,7 +33,10 @@ export default function BillingPage() {
   const [cancelando, setCancelando] = useState(false);
   const [confirmando, setConfirmando] = useState(false);
   const [activandoPrueba, setActivandoPrueba] = useState(false);
-  const paypalRenderizado = useRef(false);
+  const [ciclo, setCiclo] = useState<Ciclo>("mensual");
+  const paypalRenderizadoPara = useRef<string | null>(null);
+  const planIdPaypal = ciclo === "anual" ? PAYPAL_PLAN_ID_ANUAL : PAYPAL_PLAN_ID_MENSUAL;
+  const priceIdPaddle = ciclo === "anual" ? PADDLE_PRICE_ID_ANUAL : PADDLE_PRICE_ID_MENSUAL;
 
   async function cargarEstado() {
     const supabase = crearClienteBrowser();
@@ -44,15 +52,18 @@ export default function BillingPage() {
     cargarEstado();
   }, []);
 
-  // Botones de PayPal: se renderizan una sola vez, cuando el SDK ya cargó y ya
-  // sabemos a qué empresa facturar (si se renderizan de nuevo con el mismo div, PayPal tira error).
+  // Botones de PayPal: se renderizan de nuevo solo si cambió el plan (mensual <-> anual)
+  // -- PayPal tira error si se renderiza 2 veces con el mismo plan en el mismo div, así
+  // que el ref guarda PARA QUÉ plan ya se renderizó, no un simple "ya se hizo".
   useEffect(() => {
-    if (!scriptPaypalListo || !empresaId || planActivo || paypalRenderizado.current || !PAYPAL_PLAN_ID) return;
-    paypalRenderizado.current = true;
+    if (!scriptPaypalListo || !empresaId || planActivo || !planIdPaypal || paypalRenderizadoPara.current === planIdPaypal) return;
+    const contenedor = document.getElementById("paypal-buttons");
+    if (contenedor) contenedor.innerHTML = "";
+    paypalRenderizadoPara.current = planIdPaypal;
     window.paypal
       .Buttons({
         style: { label: "subscribe" },
-        createSubscription: (_: unknown, actions: any) => actions.subscription.create({ plan_id: PAYPAL_PLAN_ID }),
+        createSubscription: (_: unknown, actions: any) => actions.subscription.create({ plan_id: planIdPaypal }),
         onApprove: async (data: { subscriptionID: string }) => {
           const res = await fetch("/api/billing/paypal/checkout", {
             method: "POST",
@@ -66,7 +77,7 @@ export default function BillingPage() {
         onError: () => setMensaje("No se pudo procesar el pago con PayPal."),
       })
       .render("#paypal-buttons");
-  }, [scriptPaypalListo, empresaId, planActivo]);
+  }, [scriptPaypalListo, empresaId, planActivo, planIdPaypal]);
 
   async function bajarAGratis() {
     if (!empresaId) return;
@@ -103,9 +114,9 @@ export default function BillingPage() {
   }
 
   function cobrarConPaddle() {
-    if (!scriptPaddleListo || !empresaId || !PADDLE_PRICE_ID) return;
+    if (!scriptPaddleListo || !empresaId || !priceIdPaddle) return;
     window.Paddle.Checkout.open({
-      items: [{ priceId: PADDLE_PRICE_ID, quantity: 1 }],
+      items: [{ priceId: priceIdPaddle, quantity: 1 }],
       customData: { empresaId },
       settings: { displayMode: "overlay" },
     });
@@ -113,13 +124,13 @@ export default function BillingPage() {
 
   return (
     <>
-      {PAYPAL_CLIENT_ID && PAYPAL_PLAN_ID && (
+      {PAYPAL_CLIENT_ID && (PAYPAL_PLAN_ID_MENSUAL || PAYPAL_PLAN_ID_ANUAL) && (
         <Script
           src={`https://www.paypal.com/sdk/js?client-id=${PAYPAL_CLIENT_ID}&vault=true&intent=subscription`}
           onLoad={() => setScriptPaypalListo(true)}
         />
       )}
-      {PADDLE_CLIENT_TOKEN && PADDLE_PRICE_ID && (
+      {PADDLE_CLIENT_TOKEN && (PADDLE_PRICE_ID_MENSUAL || PADDLE_PRICE_ID_ANUAL) && (
         <Script
           src="https://cdn.paddle.com/paddle/v2/paddle.js"
           onLoad={() => {
@@ -148,7 +159,19 @@ export default function BillingPage() {
 
       <div className="tarjeta tarjeta-elevada precio precio-destacado" style={{ maxWidth: 460 }}>
         <h3>Plan Completo</h3>
-        <div className="precio-monto">$ 9.99<small> /mes</small></div>
+
+        {!planActivo && (
+          <div style={{ display: "flex", gap: 8, margin: "4px 0 2px" }}>
+            <button type="button" className={`btn ${ciclo === "mensual" ? "btn-primario" : "btn-fantasma"}`} onClick={() => setCiclo("mensual")}>
+              Mensual
+            </button>
+            <button type="button" className={`btn ${ciclo === "anual" ? "btn-primario" : "btn-fantasma"}`} onClick={() => setCiclo("anual")}>
+              Anual
+            </button>
+          </div>
+        )}
+
+        <div className="precio-monto" style={{ fontSize: 32 }}>{PRECIO_POR_CICLO[ciclo]}</div>
         <ul>
           <li>Invita a tu equipo con accesos por rol</li>
           <li>Todos los módulos y registros que necesites</li>
@@ -170,7 +193,7 @@ export default function BillingPage() {
             ) : (
               <div className="alerta alerta-aviso" style={{ marginBottom: 0 }}>
                 <p style={{ marginTop: 0 }}>
-                  Al pasarte al plan gratis dejas de pagar $ 9.99/mes, pero también pierdes invitar a tu equipo y
+                  Al pasarte al plan gratis dejas de pagar tu plan actual, pero también pierdes invitar a tu equipo y
                   el seguimiento por WhatsApp. Tus datos no se borran, se quedan tal como están.
                 </p>
                 <div style={{ display: "flex", gap: 10 }}>
@@ -196,11 +219,11 @@ export default function BillingPage() {
               </p>
             )}
 
-            {PAYPAL_CLIENT_ID && PAYPAL_PLAN_ID && (
-              <div id="paypal-buttons" style={{ marginBottom: 10 }} />
+            {PAYPAL_CLIENT_ID && planIdPaypal && (
+              <div id="paypal-buttons" key={ciclo} style={{ marginBottom: 10 }} />
             )}
 
-            {PADDLE_CLIENT_TOKEN && PADDLE_PRICE_ID && (
+            {PADDLE_CLIENT_TOKEN && priceIdPaddle && (
               <button type="button" className="btn btn-secundario btn-grande btn-bloque" onClick={cobrarConPaddle} disabled={!scriptPaddleListo}>
                 {scriptPaddleListo ? "Pagar con Paddle (tarjeta internacional)" : "Cargando Paddle..."}
               </button>

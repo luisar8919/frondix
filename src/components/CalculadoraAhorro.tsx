@@ -2,9 +2,9 @@
 
 import { useState } from "react";
 
-// Mismo precio que la sección de Precios (S/ 35/mes, plan Completo) -- si ese
+// Mismo precio que la sección de Precios (S/ 30/mes, plan Completo) -- si ese
 // precio cambia, cambiarlo también acá.
-const PRECIO_FRONDIX = 35;
+const PRECIO_FRONDIX = 30;
 const SUELDO_SUGERIDO = 1500; // referencia: asistente administrativo part-time en Lima, no RMV (ese es para jornada completa)
 
 // Beneficios de ley que se suman al sueldo bruto al contratar a alguien en
