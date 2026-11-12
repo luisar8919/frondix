@@ -6,12 +6,18 @@ import ReglasModulo from "@/components/ReglasModulo";
 import type { Columna } from "@/lib/excel-parser";
 import type { Regla } from "@/lib/reglas";
 
+interface AjustarStockInfo {
+  tipoModulo: "ventas" | "compras";
+  stockNombre: string;
+  cantidadLabel: string | null;
+}
+
 interface ModuloConReglas {
   datasetId: string;
   nombre: string;
   columnas: Columna[];
   reglas: Regla[];
-  puedeAjustarStock: boolean;
+  ajustarStockInfo: AjustarStockInfo | null;
 }
 
 // Un solo lugar para ver y armar TODAS las reglas de la empresa, módulo por
@@ -66,7 +72,7 @@ export default function ReglasPage() {
           nombre={m.nombre}
           columnas={m.columnas}
           reglas={m.reglas}
-          puedeAjustarStock={m.puedeAjustarStock}
+          ajustarStockInfo={m.ajustarStockInfo}
         />
       ))}
     </>

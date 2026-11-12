@@ -29,19 +29,24 @@ export async function GET() {
     .order("created_at", { ascending: false });
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-  const todos = (datasets ?? []).map((d) => ({ id: d.id as string, columnas: d.columnas as Columna[] }));
+  const todos = (datasets ?? []).map((d) => ({ id: d.id as string, nombre: d.nombre as string, columnas: d.columnas as Columna[] }));
 
   // Lo mismo que datasetStockDe()/esStock() en stock.ts (servidor, no se puede
   // importar directo porque necesita el cliente de Supabase) -- si este módulo
   // tiene una columna Producto enlazada a un dataset que "parece" Stock, puede
   // ofrecer "Ajustar Stock automáticamente" como acción seleccionable, no solo
-  // como algo que el sistema crea solo al enlazar.
-  function puedeAjustarStock(columnas: Columna[], nombre: string): boolean {
-    if (tipoModulo(columnas.map((c) => c.rol), nombre) === "otro") return false;
+  // como algo que el sistema crea solo al enlazar. Devuelve el detalle real
+  // (tipo ventas/compras, a qué Stock le pega, qué columna de Cantidad usa) para
+  // que la UI lo muestre armado con su propia estructura, no solo un título.
+  function infoAjustarStock(columnas: Columna[], nombre: string) {
+    const tipo = tipoModulo(columnas.map((c) => c.rol), nombre);
+    if (tipo === "otro") return null;
     const cProducto = columnas.find((c) => c.rol === "producto" && c.enlace && claveValida(c.enlace.columnaKey));
-    if (!cProducto?.enlace) return false;
+    if (!cProducto?.enlace) return null;
     const stockDs = todos.find((d) => d.id === cProducto.enlace!.datasetId);
-    return !!stockDs && esStock(stockDs.columnas);
+    if (!stockDs || !esStock(stockDs.columnas)) return null;
+    const cCantidad = columnas.find((c) => c.rol === "cantidad");
+    return { tipoModulo: tipo as "ventas" | "compras", stockNombre: stockDs.nombre, cantidadLabel: cCantidad?.label ?? null };
   }
 
   const modulos = (datasets ?? [])
@@ -50,9 +55,9 @@ export async function GET() {
       nombre: d.nombre as string,
       columnas: d.columnas as Columna[],
       reglas: (d.reglas as Regla[]) ?? [],
-      puedeAjustarStock: puedeAjustarStock(d.columnas as Columna[], d.nombre as string),
+      ajustarStockInfo: infoAjustarStock(d.columnas as Columna[], d.nombre as string),
     }))
-    .filter((m) => m.reglas.length > 0 || m.columnas.some((c) => c.rol !== null) || m.puedeAjustarStock);
+    .filter((m) => m.reglas.length > 0 || m.columnas.some((c) => c.rol !== null) || m.ajustarStockInfo);
 
   return NextResponse.json({ modulos });
 }

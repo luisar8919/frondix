@@ -15,12 +15,18 @@ import { enviarConfirmando } from "@/lib/confirmar";
 // mapeado del módulo (no solo "Estado" -- Monto, Cantidad, Stock mínimo...),
 // con el operador que corresponda a su tipo (igual/distinto para texto,
 // también mayor/menor para número) -- mismo "umbral" que en el juego.
+interface AjustarStockInfo {
+  tipoModulo: "ventas" | "compras";
+  stockNombre: string;
+  cantidadLabel: string | null;
+}
+
 export default function ReglasModulo({
   datasetId,
   nombre,
   columnas,
   reglas,
-  puedeAjustarStock,
+  ajustarStockInfo,
 }: {
   datasetId: string;
   nombre: string;
@@ -30,9 +36,12 @@ export default function ReglasModulo({
   // dataset que "parece" Stock -- habilita "Ajustar Stock automáticamente"
   // como acción SELECCIONABLE (antes solo el sistema la creaba sola al
   // enlazar; un enlace armado a mano desde /dashboard/enlaces nunca la
-  // generaba, así que no había forma de agregarla para ese caso).
-  puedeAjustarStock: boolean;
+  // generaba, así que no había forma de agregarla para ese caso). El detalle
+  // real (tipo, a qué Stock, con qué columna) se usa para mostrarla armada
+  // con su propia estructura "Si... entonces...", no solo un título.
+  ajustarStockInfo: AjustarStockInfo | null;
 }) {
+  const puedeAjustarStock = !!ajustarStockInfo;
   const [reglasLocal, setReglasLocal] = useState<Regla[]>(reglas);
   const [ocupado, setOcupado] = useState(false);
   const [mensaje, setMensaje] = useState<{ tipo: "ok" | "error"; texto: string } | null>(null);
@@ -177,10 +186,26 @@ export default function ReglasModulo({
                   {valorInput(r.accion.columnaKey, r.accion.valor, (v) => cambiarRegla(i, { accion: { tipo: "cambiar_estado", columnaKey: (r.accion as { columnaKey: string }).columnaKey, valor: v } }), "Nuevo valor")}
                 </>
               )}
-              {r.accion.tipo === "ajustar_stock" && (
-                <p className="ayuda" style={{ margin: 0 }}>
-                  Toda venta resta, toda compra suma -- la cantidad exacta de cada movimiento (columna "Cantidad" de este módulo, 1 si no tiene) en el producto correspondiente del Stock enlazado.
-                </p>
+              {r.accion.tipo === "ajustar_stock" && ajustarStockInfo && (
+                <>
+                  <span className="suave pequeno">Si</span>
+                  <select disabled aria-label="Campo de la condición (fijo)"><option>Este módulo registra</option></select>
+                  <select disabled aria-label="Operador (fijo)"><option>es</option></select>
+                  <select disabled aria-label="Valor (fijo)">
+                    <option>{ajustarStockInfo.tipoModulo === "ventas" ? "una Venta" : "una Compra"}</option>
+                  </select>
+                  <span className="suave pequeno">entonces</span>
+                  <select disabled aria-label="Acción (fija)">
+                    <option>{ajustarStockInfo.tipoModulo === "ventas" ? "Restar de" : "Sumar a"}</option>
+                  </select>
+                  <select disabled aria-label="Campo destino (fijo)"><option>Cantidad en "{ajustarStockInfo.stockNombre}"</option></select>
+                  <select disabled aria-label="Cuánto (fijo)">
+                    <option>{ajustarStockInfo.cantidadLabel ? `la "${ajustarStockInfo.cantidadLabel}" de cada movimiento` : "1 por movimiento (no hay campo Cantidad en este módulo)"}</option>
+                  </select>
+                  <p className="ayuda" style={{ margin: "4px 0 0", width: "100%" }}>
+                    Fija: busca el producto exacto de cada venta/compra en el Stock enlazado, no un valor configurable como las demás reglas.
+                  </p>
+                </>
               )}
             </div>
             <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
