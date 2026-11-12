@@ -11,6 +11,7 @@ interface ModuloConReglas {
   nombre: string;
   columnas: Columna[];
   reglas: Regla[];
+  puedeAjustarStock: boolean;
 }
 
 // Un solo lugar para ver y armar TODAS las reglas de la empresa, módulo por
@@ -51,16 +52,22 @@ export default function ReglasPage() {
         <div className="tarjeta">
           <h3>Todavía no hay ningún módulo con reglas</h3>
           <p className="suave">
-            Las reglas se arman sobre un campo marcado como "Estado" (Pendiente, En proceso, Cancelado...). Entra a un
-            módulo, abre "Editar tabla y campos" y marca el significado "Estado" en el campo que corresponda -- después
-            reaparece acá.
+            Las reglas se arman sobre campos ya mapeados (Estado, Monto, Cantidad, Stock mínimo...). Entra a un módulo,
+            abre "Editar tabla y campos" y marcale un significado a alguno -- después reaparece acá.
           </p>
           <Link href="/dashboard" className="btn btn-primario">Ir a Inicio</Link>
         </div>
       )}
 
       {modulos?.map((m) => (
-        <ReglasModulo key={m.datasetId} datasetId={m.datasetId} nombre={m.nombre} columnas={m.columnas} reglas={m.reglas} />
+        <ReglasModulo
+          key={m.datasetId}
+          datasetId={m.datasetId}
+          nombre={m.nombre}
+          columnas={m.columnas}
+          reglas={m.reglas}
+          puedeAjustarStock={m.puedeAjustarStock}
+        />
       ))}
     </>
   );

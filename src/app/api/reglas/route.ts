@@ -2,6 +2,9 @@ import { NextResponse } from "next/server";
 import { crearClienteServidor } from "@/lib/supabase/server";
 import { empresaDelUsuarioServidor } from "@/lib/sesionServidor";
 import { esVendedor, rolEnEmpresa } from "@/lib/permisos";
+import { tipoModulo } from "@/lib/roles";
+import { esStock } from "@/lib/stock";
+import { claveValida } from "@/lib/enlaces";
 import type { Columna } from "@/lib/excel-parser";
 import type { Regla } from "@/lib/reglas";
 
@@ -26,9 +29,30 @@ export async function GET() {
     .order("created_at", { ascending: false });
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
+  const todos = (datasets ?? []).map((d) => ({ id: d.id as string, columnas: d.columnas as Columna[] }));
+
+  // Lo mismo que datasetStockDe()/esStock() en stock.ts (servidor, no se puede
+  // importar directo porque necesita el cliente de Supabase) -- si este módulo
+  // tiene una columna Producto enlazada a un dataset que "parece" Stock, puede
+  // ofrecer "Ajustar Stock automáticamente" como acción seleccionable, no solo
+  // como algo que el sistema crea solo al enlazar.
+  function puedeAjustarStock(columnas: Columna[], nombre: string): boolean {
+    if (tipoModulo(columnas.map((c) => c.rol), nombre) === "otro") return false;
+    const cProducto = columnas.find((c) => c.rol === "producto" && c.enlace && claveValida(c.enlace.columnaKey));
+    if (!cProducto?.enlace) return false;
+    const stockDs = todos.find((d) => d.id === cProducto.enlace!.datasetId);
+    return !!stockDs && esStock(stockDs.columnas);
+  }
+
   const modulos = (datasets ?? [])
-    .map((d) => ({ datasetId: d.id as string, nombre: d.nombre as string, columnas: d.columnas as Columna[], reglas: (d.reglas as Regla[]) ?? [] }))
-    .filter((m) => m.reglas.length > 0 || m.columnas.some((c) => c.rol !== null));
+    .map((d) => ({
+      datasetId: d.id as string,
+      nombre: d.nombre as string,
+      columnas: d.columnas as Columna[],
+      reglas: (d.reglas as Regla[]) ?? [],
+      puedeAjustarStock: puedeAjustarStock(d.columnas as Columna[], d.nombre as string),
+    }))
+    .filter((m) => m.reglas.length > 0 || m.columnas.some((c) => c.rol !== null) || m.puedeAjustarStock);
 
   return NextResponse.json({ modulos });
 }

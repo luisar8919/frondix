@@ -175,7 +175,7 @@ export default function BarraPanel({
           )}
           {!esVendedor && <BotonSubmenu texto="Resumen" items={resumenSubmenu} activo={activoResumen} />}
           {!esVendedor && <BotonSubmenu texto="Seguimiento" items={seguimientoSubmenu} activo={activoSeguimiento} />}
-          {!esVendedor && <BotonSubmenu texto="Condicionales y Enlaces" items={reglasSubmenu} activo={activoReglas} />}
+          {!esVendedor && <BotonSubmenu texto="Reglas" items={reglasSubmenu} activo={activoReglas} />}
           {esVendedor && (
             <Link href="/dashboard/calendario" className="nav-link" aria-current={activo("/dashboard/calendario") ? "page" : undefined}>
               Calendario

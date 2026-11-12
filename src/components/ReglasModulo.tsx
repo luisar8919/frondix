@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import type { Columna } from "@/lib/excel-parser";
-import { OPERADORES_NUMERO, OPERADORES_TEXTO, type Regla } from "@/lib/reglas";
+import { OPERADORES_NUMERO, OPERADORES_TEXTO, type Regla, type Operador } from "@/lib/reglas";
 import { enviarConfirmando } from "@/lib/confirmar";
 
 // Las reglas (condición -> acción) de UN módulo, como su propia tarjeta --
@@ -20,11 +20,18 @@ export default function ReglasModulo({
   nombre,
   columnas,
   reglas,
+  puedeAjustarStock,
 }: {
   datasetId: string;
   nombre: string;
   columnas: Columna[];
   reglas: Regla[];
+  // Este módulo clasifica como Ventas/Compras y su Producto está enlazado a un
+  // dataset que "parece" Stock -- habilita "Ajustar Stock automáticamente"
+  // como acción SELECCIONABLE (antes solo el sistema la creaba sola al
+  // enlazar; un enlace armado a mano desde /dashboard/enlaces nunca la
+  // generaba, así que no había forma de agregarla para ese caso).
+  puedeAjustarStock: boolean;
 }) {
   const [reglasLocal, setReglasLocal] = useState<Regla[]>(reglas);
   const [ocupado, setOcupado] = useState(false);
@@ -41,20 +48,24 @@ export default function ReglasModulo({
   // Target de "cambiar_estado": cualquier campo de texto con lista cerrada (tiene sentido
   // "cambiar a" un valor fijo, no texto libre arbitrario).
   const columnasDestino = columnas.filter((c) => c.tipo === "texto" && (c.opcionesFijas?.length ?? 0) > 0);
+  // Solo una regla "ajustar_stock" tiene sentido por módulo -- si hubiera 2 activas
+  // a la vez, un movimiento ajustaría el Stock el doble (aplicarReglasDesdeRegistro
+  // dispara TODAS las que matcheen). Se oculta la opción en las demás filas una
+  // vez que ya existe una.
+  const hayAjustarStock = reglasLocal.some((r) => r.accion.tipo === "ajustar_stock");
+
+  function condicionPorDefecto(): Regla["condicion"] {
+    const primera = columnasCondicion[0];
+    return primera ? { tipo: "campo", columnaKey: primera.key, operador: "es", valor: primera.opcionesFijas?.[0] ?? "" } : { tipo: "siempre" };
+  }
 
   function agregarRegla() {
-    const primera = columnasCondicion[0];
-    if (!primera) return;
-    setReglasLocal((rs) => [
-      ...rs,
-      {
-        id: crypto.randomUUID(),
-        activa: true,
-        origen: "manual",
-        condicion: { tipo: "campo", columnaKey: primera.key, operador: "es", valor: (primera.opcionesFijas ?? [])[0] ?? "" },
-        accion: { tipo: "excluir_de_reportes" },
-      },
-    ]);
+    if (puedeAjustarStock && !hayAjustarStock) {
+      setReglasLocal((rs) => [...rs, { id: crypto.randomUUID(), activa: true, origen: "manual", condicion: { tipo: "siempre" }, accion: { tipo: "ajustar_stock" } }]);
+      return;
+    }
+    if (columnasCondicion.length === 0) return;
+    setReglasLocal((rs) => [...rs, { id: crypto.randomUUID(), activa: true, origen: "manual", condicion: condicionPorDefecto(), accion: { tipo: "excluir_de_reportes" } }]);
   }
 
   async function guardar() {
@@ -97,6 +108,19 @@ export default function ReglasModulo({
     );
   }
 
+  type TipoAccion = "excluir_de_reportes" | "cambiar_estado" | "ajustar_stock";
+
+  function cambiarAccion(i: number, r: Regla, tipo: TipoAccion) {
+    if (tipo === "ajustar_stock") {
+      cambiarRegla(i, { condicion: { tipo: "siempre" }, accion: { tipo } });
+      return;
+    }
+    const cond = datosCondicion(r);
+    const condicion: Regla["condicion"] = cond.key ? { tipo: "campo", columnaKey: cond.key, operador: cond.operador, valor: cond.valor } : condicionPorDefecto();
+    const columnaKey = columnasDestino[0]?.key ?? (condicion.tipo === "campo" ? condicion.columnaKey : "");
+    cambiarRegla(i, { condicion, accion: tipo === "excluir_de_reportes" ? { tipo } : { tipo, columnaKey, valor: columnaDe(columnaKey)?.opcionesFijas?.[0] ?? "" } });
+  }
+
   return (
     <div className="tarjeta" style={{ marginBottom: 20 }}>
       <h3 style={{ margin: 0 }}>{nombre}</h3>
@@ -107,62 +131,58 @@ export default function ReglasModulo({
 
       {reglasLocal.map((r, i) => {
         const cond = datosCondicion(r);
+        const otraYaTieneAjustarStock = reglasLocal.some((r2, j) => j !== i && r2.accion.tipo === "ajustar_stock");
         return (
           <div key={r.id} className="fila-columna" style={{ gridTemplateColumns: "1fr auto", alignItems: "start", marginTop: 14 }}>
-            {r.accion.tipo === "ajustar_stock" ? (
-              <div>
-                <strong style={{ fontSize: 14 }}>Ajustar Stock automáticamente</strong>
-                <p className="ayuda" style={{ margin: "2px 0 0" }}>Cada venta o compra de este módulo suma o resta del Stock enlazado.</p>
-              </div>
-            ) : (
-              <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
-                <span className="suave pequeno">Campo</span>
-                <select
-                  aria-label="Campo de la condición"
-                  value={cond.key}
-                  onChange={(e) => {
-                    const key = e.target.value;
-                    const operador = operadoresDe(key)[0].valor;
-                    cambiarRegla(i, { condicion: { tipo: "campo", columnaKey: key, operador, valor: columnaDe(key)?.opcionesFijas?.[0] ?? "" } });
-                  }}
-                >
-                  {columnasCondicion.map((c) => <option key={c.key} value={c.key}>{c.label}</option>)}
-                </select>
-                <select
-                  aria-label="Operador"
-                  value={cond.operador}
-                  onChange={(e) => cambiarRegla(i, { condicion: { tipo: "campo", columnaKey: cond.key, operador: e.target.value as typeof cond.operador, valor: cond.valor } })}
-                >
-                  {operadoresDe(cond.key).map((op) => <option key={op.valor} value={op.valor}>{op.etiqueta}</option>)}
-                </select>
-                {valorInput(cond.key, cond.valor, (v) => cambiarRegla(i, { condicion: { tipo: "campo", columnaKey: cond.key, operador: cond.operador, valor: v } }), "Valor de la condición")}
-                <span className="suave pequeno">Acción</span>
-                <select
-                  aria-label="Acción"
-                  value={r.accion.tipo}
-                  onChange={(e) => {
-                    const tipo = e.target.value as "excluir_de_reportes" | "cambiar_estado";
-                    const columnaKey = columnasDestino[0]?.key ?? cond.key;
-                    cambiarRegla(i, { accion: tipo === "excluir_de_reportes" ? { tipo } : { tipo, columnaKey, valor: columnaDe(columnaKey)?.opcionesFijas?.[0] ?? "" } });
-                  }}
-                >
-                  <option value="excluir_de_reportes">Excluir de reportes</option>
-                  {columnasDestino.length > 0 && <option value="cambiar_estado">Cambiar un campo a...</option>}
-                </select>
-                {r.accion.tipo === "cambiar_estado" && (
-                  <>
-                    <select
-                      aria-label="Campo a cambiar"
-                      value={r.accion.columnaKey}
-                      onChange={(e) => cambiarRegla(i, { accion: { tipo: "cambiar_estado", columnaKey: e.target.value, valor: columnaDe(e.target.value)?.opcionesFijas?.[0] ?? "" } })}
-                    >
-                      {columnasDestino.map((c) => <option key={c.key} value={c.key}>{c.label}</option>)}
-                    </select>
-                    {valorInput(r.accion.columnaKey, r.accion.valor, (v) => cambiarRegla(i, { accion: { tipo: "cambiar_estado", columnaKey: (r.accion as { columnaKey: string }).columnaKey, valor: v } }), "Nuevo valor")}
-                  </>
-                )}
-              </div>
-            )}
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+              {r.accion.tipo !== "ajustar_stock" && (
+                <>
+                  <span className="suave pequeno">Campo</span>
+                  <select
+                    aria-label="Campo de la condición"
+                    value={cond.key}
+                    onChange={(e) => {
+                      const key = e.target.value;
+                      const operador = operadoresDe(key)[0].valor;
+                      cambiarRegla(i, { condicion: { tipo: "campo", columnaKey: key, operador, valor: columnaDe(key)?.opcionesFijas?.[0] ?? "" } });
+                    }}
+                  >
+                    {columnasCondicion.map((c) => <option key={c.key} value={c.key}>{c.label}</option>)}
+                  </select>
+                  <select
+                    aria-label="Operador"
+                    value={cond.operador}
+                    onChange={(e) => cambiarRegla(i, { condicion: { tipo: "campo", columnaKey: cond.key, operador: e.target.value as Operador, valor: cond.valor } })}
+                  >
+                    {operadoresDe(cond.key).map((op) => <option key={op.valor} value={op.valor}>{op.etiqueta}</option>)}
+                  </select>
+                  {valorInput(cond.key, cond.valor, (v) => cambiarRegla(i, { condicion: { tipo: "campo", columnaKey: cond.key, operador: cond.operador, valor: v } }), "Valor de la condición")}
+                  <span className="suave pequeno">Acción</span>
+                </>
+              )}
+              <select aria-label="Acción" value={r.accion.tipo} onChange={(e) => cambiarAccion(i, r, e.target.value as TipoAccion)}>
+                <option value="excluir_de_reportes">Excluir de reportes</option>
+                {columnasDestino.length > 0 && <option value="cambiar_estado">Cambiar un campo a...</option>}
+                {puedeAjustarStock && !otraYaTieneAjustarStock && <option value="ajustar_stock">Ajustar Stock automáticamente</option>}
+              </select>
+              {r.accion.tipo === "cambiar_estado" && (
+                <>
+                  <select
+                    aria-label="Campo a cambiar"
+                    value={r.accion.columnaKey}
+                    onChange={(e) => cambiarRegla(i, { accion: { tipo: "cambiar_estado", columnaKey: e.target.value, valor: columnaDe(e.target.value)?.opcionesFijas?.[0] ?? "" } })}
+                  >
+                    {columnasDestino.map((c) => <option key={c.key} value={c.key}>{c.label}</option>)}
+                  </select>
+                  {valorInput(r.accion.columnaKey, r.accion.valor, (v) => cambiarRegla(i, { accion: { tipo: "cambiar_estado", columnaKey: (r.accion as { columnaKey: string }).columnaKey, valor: v } }), "Nuevo valor")}
+                </>
+              )}
+              {r.accion.tipo === "ajustar_stock" && (
+                <p className="ayuda" style={{ margin: 0 }}>
+                  Toda venta resta, toda compra suma -- la cantidad exacta de cada movimiento (columna "Cantidad" de este módulo, 1 si no tiene) en el producto correspondiente del Stock enlazado.
+                </p>
+              )}
+            </div>
             <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
               <label className="pequeno" style={{ display: "flex", gap: 4, alignItems: "center", whiteSpace: "nowrap" }}>
                 <input type="checkbox" checked={r.activa} onChange={(e) => cambiarRegla(i, { activa: e.target.checked })} /> Activa
@@ -176,7 +196,7 @@ export default function ReglasModulo({
       })}
 
       <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap", marginTop: 16 }}>
-        {columnasCondicion.length > 0 && (
+        {(columnasCondicion.length > 0 || (puedeAjustarStock && !hayAjustarStock)) && (
           <button type="button" className="btn btn-secundario" onClick={agregarRegla}>
             + Agregar regla
           </button>
