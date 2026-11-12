@@ -89,7 +89,12 @@ export async function calcularModulosReporte(supabase: SupabaseClient, empresaId
     const conGastos = !!cGastos;
     if (!conTotales && !conTopProducto && !conTopCliente && !conTopProveedor && !conSumaTotal && !conFlujoCaja && !conGastos && !conCategoria) continue;
 
-    const filas = await leerFilas(supabase, d.id, {
+    // `excl` siempre se pide (barato, una columna más) y se filtra en JS, no en el
+    // SQL: un filtro `neq` de Postgres sobre un valor NULL/ausente da UNKNOWN, no
+    // true, y hubiera excluido por error TODAS las filas sin el flag en vez de
+    // solo las que de verdad lo tienen en "true" (ver aplicarReglasDesdeRegistro
+    // en lib/reglas.ts, que es quien lo escribe).
+    const filasCrudas = await leerFilas(supabase, d.id, {
       ...(cFecha && { f: cFecha.key }),
       ...(cMonto && { m: cMonto.key }),
       ...(cCosto && { co: cCosto.key }),
@@ -98,7 +103,9 @@ export async function calcularModulosReporte(supabase: SupabaseClient, empresaId
       ...(cProveedor && { pr: cProveedor.key }),
       ...(cGastos && { g: cGastos.key }),
       ...(cCategoria && { cat: cCategoria.key }),
+      excl: "_excluido_reportes",
     });
+    const filas = filasCrudas.filter((f) => f.excl !== "true");
 
     const plantillas = [
       conFlujoCaja && "flujo_caja",

@@ -26,6 +26,16 @@ assert.deepStrictEqual(p.columnas.map((c) => [c.key, c.label, c.tipo, c.rol]), [
 assert.deepStrictEqual(p.eliminadas, []);
 assert.strictEqual(p.advertencias.length, 0, "renombrar no rompe enlaces: la clave no cambia");
 
+// opcionesFijas se puede agregar/editar en un campo YA EXISTENTE sin tocar el
+// tipo (a diferencia de "tipo", que la regla de arriba prohíbe cambiar)
+p = planificarCambios(clientes, [
+  { key: "nombre", label: "Nombre", tipo: "numero", rol: null, opcionesFijas: ["Activo", "Inactivo"] },
+  { key: "dni", label: "DNI", tipo: "texto", rol: null },
+], "Clientes", "cli", otras);
+assert.strictEqual(p.columnas[0].tipo, "texto", "el tipo no cambia aunque la propuesta mande otro");
+assert.deepStrictEqual(p.columnas[0].opcionesFijas, ["Activo", "Inactivo"]);
+assert.strictEqual(p.columnas[1].opcionesFijas, null, "sin opcionesFijas en la propuesta, se limpia (no se conserva lo viejo)");
+
 // quitar un campo al que otra tabla apunta: advierte y marca el enlace a romper
 p = planificarCambios(clientes, [{ key: "dni", label: "DNI", tipo: "texto", rol: null }], "Clientes", "cli", otras);
 assert.deepStrictEqual(p.eliminadas, ["nombre"]);

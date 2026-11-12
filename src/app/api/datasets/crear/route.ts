@@ -6,6 +6,7 @@ import { tieneSuscripcionActiva } from "@/lib/suscripcion";
 import { plantillaVentas, plantillaCompras, PLANTILLAS_EXTRA } from "@/lib/plantillasModulo";
 import { tipoModulo } from "@/lib/roles";
 import { esStock } from "@/lib/stock";
+import type { Regla } from "@/lib/reglas";
 import type { Columna } from "@/lib/excel-parser";
 
 const CLAVES_PLANTILLA_EXTRA = new Set(PLANTILLAS_EXTRA.map((p) => p.clave));
@@ -22,7 +23,7 @@ const CLAVES_PLANTILLA_EXTRA = new Set(PLANTILLAS_EXTRA.map((p) => p.clave));
 // al primer módulo que "parezca" Stock.
 async function enlazarStockAutomatico(supabase: SupabaseClient, empresaId: string) {
   try {
-    const { data: todos } = await supabase.from("datasets").select("id, nombre, columnas").eq("empresa_id", empresaId);
+    const { data: todos } = await supabase.from("datasets").select("id, nombre, columnas, reglas").eq("empresa_id", empresaId);
     if (!todos) return;
     const stock = todos.find((d) => esStock(d.columnas as Columna[]));
     if (!stock) return;
@@ -37,7 +38,15 @@ async function enlazarStockAutomatico(supabase: SupabaseClient, empresaId: strin
       const idx = columnas.findIndex((c) => c.rol === "producto");
       if (idx === -1 || columnas[idx].enlace) continue;
       const nuevasColumnas = columnas.map((c, i) => (i === idx ? { ...c, enlace: { datasetId: stock.id, columnaKey: cProductoStock.key } } : c));
-      await supabase.from("datasets").update({ columnas: nuevasColumnas }).eq("id", d.id);
+      // La regla es un espejo 1:1 del enlace que se acaba de crear: así el
+      // ajuste de Stock deja de ser magia invisible y el usuario la puede ver
+      // (y apagar sin romper el enlace) desde "Editar tabla y campos".
+      const reglasActuales = (d.reglas as Regla[]) ?? [];
+      const yaTiene = reglasActuales.some((r) => r.accion.tipo === "ajustar_stock");
+      const nuevasReglas = yaTiene
+        ? reglasActuales
+        : [...reglasActuales, { id: crypto.randomUUID(), activa: true, origen: "automatica", condicion: { tipo: "siempre" }, accion: { tipo: "ajustar_stock" } } satisfies Regla];
+      await supabase.from("datasets").update({ columnas: nuevasColumnas, reglas: nuevasReglas }).eq("id", d.id);
     }
   } catch {
     // mejor esfuerzo: si falla, los módulos ya se crearon bien, no vale la
@@ -67,19 +76,25 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Falta empresaId" }, { status: 400 });
   }
 
-  const aCrear: { nombre: string; columnas: Columna[]; plantilla: string | null }[] = Array.isArray(modulos)
+  const aCrear: { nombre: string; columnas: Columna[]; plantilla: string | null; reglas: Regla[] }[] = Array.isArray(modulos)
     ? modulos
         .filter((m) => m && typeof m.nombre === "string" && m.nombre.trim() && Array.isArray(m.columnas) && m.columnas.length > 0)
         .map((m) => ({
           nombre: String(m.nombre).trim().slice(0, 120),
           columnas: m.columnas as Columna[],
           plantilla: typeof m.plantilla === "string" && CLAVES_PLANTILLA_EXTRA.has(m.plantilla) ? m.plantilla : null,
+          // Reglas sugeridas por la plantilla elegida (ver reglasSugeridas en
+          // plantillasModulo.ts) -- el cliente ya las resolvió y las manda armadas,
+          // acá solo se les asigna un id propio (nunca se confía en uno mandado
+          // desde afuera) antes de guardarlas, mismo criterio que las columnas.
+          reglas: Array.isArray(m.reglas) ? (m.reglas as Regla[]).map((r) => ({ ...r, id: crypto.randomUUID() })) : [],
         }))
     : ["compras", "ventas"].includes(tipo)
       ? [{
           nombre: (typeof nombre === "string" && nombre.trim()) || (tipo === "compras" ? "Compras" : "Ventas"),
           columnas: tipo === "compras" ? plantillaCompras() : plantillaVentas(),
           plantilla: null,
+          reglas: [],
         }]
       : [];
 
@@ -108,7 +123,7 @@ export async function POST(req: NextRequest) {
 
   const { data: datasets, error } = await supabase
     .from("datasets")
-    .insert(aCrear.map((m) => ({ empresa_id: empresaId, nombre: m.nombre, columnas: m.columnas, plantilla: m.plantilla })))
+    .insert(aCrear.map((m) => ({ empresa_id: empresaId, nombre: m.nombre, columnas: m.columnas, plantilla: m.plantilla, reglas: m.reglas })))
     .select();
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 

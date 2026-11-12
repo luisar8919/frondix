@@ -14,6 +14,13 @@ export interface Columna {
   sospechosa: boolean;
   // enlace a otra tabla: los valores de esta columna deben existir en esa otra columna
   enlace?: EnlaceColumna | null;
+  // lista cerrada de valores permitidos para un campo tipo:"texto" (ej. Estado:
+  // Pendiente/En proceso/Entregado/Cancelado) -- a propósito NO es un TipoColumna
+  // nuevo, así se puede agregar/editar en un campo YA EXISTENTE sin chocar con la
+  // regla de planificarCambios() que prohíbe cambiar el tipo de un campo existente.
+  // Nombre distinto del prop "opciones" de DynamicForm (sugerencias de autocompletado
+  // de columnas enlazadas, un concepto no relacionado) para no confundirlos.
+  opcionesFijas?: string[] | null;
 }
 
 export interface EnlaceColumna {

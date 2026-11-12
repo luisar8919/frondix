@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { crearClienteServidor } from "@/lib/supabase/server";
 import { planEliminarTabla, planificarCambios, type ColumnaPropuesta } from "@/lib/estructura";
 import type { DatasetResumen } from "@/lib/enlaces";
+import type { Regla } from "@/lib/reglas";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 // Editar la estructura de una tabla (nombre, campos) o eliminarla. Solo dueño/admin: la regla
@@ -14,7 +15,7 @@ async function cargar(ctx: Ctx) {
   const supabase = await crearClienteServidor();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { error: NextResponse.json({ error: "No autenticado" }, { status: 401 }) };
-  const { data: todas } = await supabase.from("datasets").select("id, nombre, columnas, incluye_igv, moneda");
+  const { data: todas } = await supabase.from("datasets").select("id, nombre, columnas, incluye_igv, moneda, reglas");
   const fila = (todas ?? []).find((d) => d.id === datasetId);
   if (!fila) return { error: NextResponse.json({ error: "Tabla no encontrada" }, { status: 404 }) };
   const actual = fila as DatasetResumen;
@@ -22,6 +23,7 @@ async function cargar(ctx: Ctx) {
     supabase, datasetId, actual,
     incluyeIgvActual: !!fila.incluye_igv,
     monedaActual: fila.moneda ?? "PEN",
+    reglasActual: (fila.reglas as Regla[]) ?? [],
     otras: (todas ?? []).filter((d) => d.id !== datasetId) as DatasetResumen[],
   };
 }
@@ -48,13 +50,14 @@ async function romperEnlaces(supabase: SupabaseClient, otras: DatasetResumen[], 
 export async function PUT(req: NextRequest, ctx: Ctx) {
   const c = await cargar(ctx);
   if ("error" in c) return c.error;
-  const { supabase, datasetId, actual, incluyeIgvActual, monedaActual, otras } = c;
+  const { supabase, datasetId, actual, incluyeIgvActual, monedaActual, reglasActual, otras } = c;
 
-  const { nombre, columnas, incluyeIgv, moneda, confirmar } = (await req.json().catch(() => ({}))) as {
+  const { nombre, columnas, incluyeIgv, moneda, reglas, confirmar } = (await req.json().catch(() => ({}))) as {
     nombre?: string;
     columnas?: ColumnaPropuesta[];
     incluyeIgv?: boolean;
     moneda?: string;
+    reglas?: Regla[];
     confirmar?: boolean;
   };
 
@@ -73,7 +76,7 @@ export async function PUT(req: NextRequest, ctx: Ctx) {
 
   const { data: actualizadas, error } = await supabase
     .from("datasets")
-    .update({ nombre: nombreFinal, columnas: plan.columnas, incluye_igv: incluyeIgv ?? incluyeIgvActual, moneda: moneda ?? monedaActual })
+    .update({ nombre: nombreFinal, columnas: plan.columnas, incluye_igv: incluyeIgv ?? incluyeIgvActual, moneda: moneda ?? monedaActual, reglas: reglas ?? reglasActual })
     .eq("id", datasetId)
     .select("id");
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
@@ -89,7 +92,7 @@ export async function PUT(req: NextRequest, ctx: Ctx) {
       );
     }
   }
-  return NextResponse.json({ nombre: nombreFinal, columnas: plan.columnas, incluyeIgv: incluyeIgv ?? incluyeIgvActual, moneda: moneda ?? monedaActual });
+  return NextResponse.json({ nombre: nombreFinal, columnas: plan.columnas, incluyeIgv: incluyeIgv ?? incluyeIgvActual, moneda: moneda ?? monedaActual, reglas: reglas ?? reglasActual });
 }
 
 export async function DELETE(req: NextRequest, ctx: Ctx) {

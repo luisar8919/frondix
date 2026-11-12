@@ -1,6 +1,6 @@
 // "Rol" = qué significa una columna para el negocio (no solo su tipo de dato).
 // El asistente lo necesita para saber, por ejemplo, cuál es el monto de una venta.
-export type RolColumna = "monto" | "fecha" | "cliente" | "producto" | "telefono" | "costo" | "proveedor" | "gastos" | "tipo_movimiento" | "stock" | "cantidad" | "stock_minimo" | "documento" | "direccion" | "correo" | "saldo_pendiente" | "codigo" | "categoria" | "unidad_medida" | "precio_mayorista" | "precio_minorista" | "descuento";
+export type RolColumna = "monto" | "fecha" | "cliente" | "producto" | "telefono" | "costo" | "proveedor" | "gastos" | "tipo_movimiento" | "stock" | "cantidad" | "stock_minimo" | "documento" | "direccion" | "correo" | "saldo_pendiente" | "codigo" | "categoria" | "unidad_medida" | "precio_mayorista" | "precio_minorista" | "descuento" | "estado";
 
 export const ROLES: { valor: RolColumna; etiqueta: string }[] = [
   { valor: "monto", etiqueta: "Monto (importe de la venta o movimiento)" },
@@ -16,6 +16,7 @@ export const ROLES: { valor: RolColumna; etiqueta: string }[] = [
   { valor: "direccion", etiqueta: "Dirección" },
   { valor: "correo", etiqueta: "Correo electrónico" },
   { valor: "tipo_movimiento", etiqueta: "Tipo de movimiento (si cada fila dice si es venta o compra)" },
+  { valor: "estado", etiqueta: "Estado (lista de pasos: Pendiente, En proceso, Cancelado...)" },
   { valor: "stock", etiqueta: "Stock (cuánto tienes ahora de ese producto)" },
   { valor: "stock_minimo", etiqueta: "Stock mínimo (para avisarte cuando se esté agotando)" },
   { valor: "saldo_pendiente", etiqueta: "Saldo pendiente (venta a crédito, lo que todavía te deben)" },
@@ -46,6 +47,7 @@ const REGLAS: { rol: RolColumna; patron: RegExp; tipo?: string }[] = [
   { rol: "correo", patron: /correo|email|e-mail/, tipo: "texto" },
   { rol: "fecha", patron: /fecha|date/, tipo: "fecha" },
   { rol: "tipo_movimiento", patron: /^tipo$|tipo.*(movim|transac|registro)/, tipo: "texto" },
+  { rol: "estado", patron: /^estado$|^status$/, tipo: "texto" },
   { rol: "stock_minimo", patron: /stock.?min|minimo|reorden|punto.?de.?pedido/, tipo: "numero" },
   { rol: "stock", patron: /^stock$|inventario|existencia/, tipo: "numero" },
   { rol: "unidad_medida", patron: /unidad.*medida|unid\.?\s*med/, tipo: "texto" },

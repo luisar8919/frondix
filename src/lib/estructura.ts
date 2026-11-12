@@ -9,6 +9,10 @@ export interface ColumnaPropuesta {
   label: string;
   tipo: TipoColumna; // solo cuenta en campos nuevos: cambiar el tipo de uno existente no se permite
   rol: RolColumna | null;
+  // lista cerrada de valores para un campo tipo:"texto" (ver Columna.opcionesFijas) --
+  // a diferencia de `tipo`, esto SÍ se puede editar en un campo ya existente: no cambia
+  // la forma del dato guardado (sigue siendo texto), solo agrega/saca una restricción.
+  opcionesFijas?: string[] | null;
 }
 
 export function nuevaClave(label: string, usadas: Set<string>): string {
@@ -53,10 +57,10 @@ export function planificarCambios(
     if (existente) {
       if (conservadas.has(existente.key)) return { error: "Un campo aparece repetido." };
       conservadas.add(existente.key);
-      columnas.push({ ...existente, label, rol: p.rol ?? null });
+      columnas.push({ ...existente, label, rol: p.rol ?? null, opcionesFijas: p.opcionesFijas ?? null });
     } else {
       if (!["texto", "numero", "fecha"].includes(p.tipo)) return { error: `Tipo de campo no válido en "${label}".` };
-      columnas.push({ key: nuevaClave(label, usadas), label, tipo: p.tipo, rol: p.rol ?? null, sospechosa: false });
+      columnas.push({ key: nuevaClave(label, usadas), label, tipo: p.tipo, rol: p.rol ?? null, sospechosa: false, opcionesFijas: p.opcionesFijas ?? null });
     }
   }
 

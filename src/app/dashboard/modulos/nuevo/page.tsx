@@ -10,6 +10,7 @@ import { tipoModulo } from "@/lib/roles";
 import { esStock } from "@/lib/stock";
 import { CATEGORIAS_MODULOS, PLANTILLAS_EXTRA, plantillaVentas, plantillaCompras, plantillaStock } from "@/lib/plantillasModulo";
 import type { Columna } from "@/lib/excel-parser";
+import type { Regla } from "@/lib/reglas";
 
 // Rubros donde Stock tiene sentido como recomendación de entrada -- el resto
 // (servicios, finanzas, consignación, cobro recurrente, proyectos) no vende
@@ -94,11 +95,11 @@ function NuevoModuloForm() {
 
     setCreandoLote(true);
     setError(null);
-    const modulos: { nombre: string; columnas: Columna[]; plantilla: string | null }[] = [];
+    const modulos: { nombre: string; columnas: Columna[]; plantilla: string | null; reglas?: Omit<Regla, "id">[] }[] = [];
     if (seleccionLote.ventas) modulos.push({ nombre: "Ventas", columnas: plantillaVentas(), plantilla: null });
     if (seleccionLote.compras) modulos.push({ nombre: "Compras", columnas: plantillaCompras(), plantilla: null });
     if (seleccionLote.stock) modulos.push({ nombre: "Stock", columnas: plantillaStock(), plantilla: null });
-    for (const p of curadasSeleccionadas) modulos.push({ nombre: p.nombre, columnas: p.columnas(), plantilla: p.clave });
+    for (const p of curadasSeleccionadas) modulos.push({ nombre: p.nombre, columnas: p.columnas(), plantilla: p.clave, reglas: p.reglasSugeridas?.() });
 
     try {
       const res = await fetch("/api/datasets/crear", {
@@ -154,7 +155,7 @@ function NuevoModuloForm() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           empresaId,
-          modulos: [{ nombre: nombre.trim(), columnas: elegida.columnas(), plantilla: elegida.clave }],
+          modulos: [{ nombre: nombre.trim(), columnas: elegida.columnas(), plantilla: elegida.clave, reglas: elegida.reglasSugeridas?.() }],
         }),
       });
       const body = await res.json();

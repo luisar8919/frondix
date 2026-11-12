@@ -185,6 +185,17 @@ export default function DynamicForm({
                   ))}
                   <option value={NUEVO}>+ Agregar nuevo {sustantivo}</option>
                 </select>
+              ) : !enlazada && c.opcionesFijas?.length ? (
+                // Lista cerrada de valores (ej. Estado: Pendiente/En proceso/Cancelado) --
+                // ver Columna.opcionesFijas, distinto del autocompletado de `opciones` arriba.
+                <select id={`campo-${c.key}`} value={valores[c.key] ?? ""} onChange={(e) => setValores({ ...valores, [c.key]: e.target.value })}>
+                  <option value="" disabled>
+                    Elige {c.label.toLowerCase()}...
+                  </option>
+                  {c.opcionesFijas.map((v) => (
+                    <option key={v} value={v}>{v}</option>
+                  ))}
+                </select>
               ) : (
                 <input
                   id={`campo-${c.key}`}

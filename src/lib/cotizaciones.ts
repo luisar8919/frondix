@@ -1,6 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { tipoModulo } from "./roles.ts";
-import { ajustarStockDesdeRegistro } from "./stock.ts";
+import { aplicarReglasDesdeRegistro, type Regla } from "./reglas.ts";
 import { claveValida } from "./enlaces.ts";
 import type { Columna } from "./excel-parser.ts";
 
@@ -29,7 +29,7 @@ export async function aceptarCotizacion(
   if (errorCot || !cot) return { ok: false, error: "Cotización no encontrada", status: 404 };
   if (cot.estado === "aceptada") return { ok: false, error: "Esta cotización ya fue aceptada", status: 422 };
 
-  const { data: datasets } = await supabase.from("datasets").select("id, nombre, columnas").eq("empresa_id", empresaId);
+  const { data: datasets } = await supabase.from("datasets").select("id, nombre, columnas, reglas").eq("empresa_id", empresaId);
   const deVentas = (datasets ?? []).filter((d) => tipoModulo((d.columnas as Columna[]).map((c) => c.rol), d.nombre) === "ventas");
   if (deVentas.length === 0) {
     return { ok: false, error: "Primero crea un módulo de Ventas para poder aceptar cotizaciones.", status: 422 };
@@ -60,7 +60,7 @@ export async function aceptarCotizacion(
   if (errorRecord) return { ok: false, error: errorRecord.message, status: 500 };
 
   try {
-    await ajustarStockDesdeRegistro(supabase, empresaId, columnas, datosVenta, 1, cot.created_by);
+    await aplicarReglasDesdeRegistro(supabase, empresaId, record.id, columnas, (elegido.reglas as Regla[]) ?? [], datosVenta, undefined, cot.created_by);
   } catch {
     // mejor esfuerzo, igual que en /api/records -- la venta ya quedó guardada
   }

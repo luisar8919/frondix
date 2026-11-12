@@ -1,4 +1,21 @@
 import type { Columna } from "./excel-parser.ts";
+import type { Regla } from "./reglas.ts";
+
+// Regla sugerida para las plantillas que SÍ clasifican como "ventas" (ver
+// comentario del segundo lote más abajo): excluye de Reportes cualquier fila
+// marcada con el valor de cancelación propio de esa plantilla -- sin esto, un
+// Delivery/Evento/etc. cancelado seguía sumando como ingreso real porque
+// tipoModulo() clasifica por los ROLES de columna, nunca por el valor de una
+// fila. Viene activa de entrada (mismo criterio que las columnas: la
+// plantilla ya pre-llena todo sin pedir confirmación paso a paso).
+function reglaExcluirCancelado(valorCancelado: string): Omit<Regla, "id">[] {
+  return [{
+    activa: true,
+    origen: "automatica",
+    condicion: { tipo: "estado", columnaKey: "estado", valor: valorCancelado },
+    accion: { tipo: "excluir_de_reportes" },
+  }];
+}
 
 // Columnas iniciales para crear un módulo de Compras o Ventas sin subir Excel
 // -- el mismo significado (rol) que ya detecta sugerirRoles, así que el módulo
@@ -85,7 +102,7 @@ export function plantillaActivosFijos(): Columna[] {
     { key: "categoria", label: "Categoría", tipo: "texto", rol: "categoria", sospechosa: false },
     { key: "codigo", label: "Código / etiqueta", tipo: "texto", rol: "codigo", sospechosa: false },
     { key: "valor", label: "Valor de compra", tipo: "numero", rol: "costo", sospechosa: false },
-    { key: "estado", label: "Estado", tipo: "texto", rol: null, sospechosa: false },
+    { key: "estado", label: "Estado", tipo: "texto", rol: "estado", sospechosa: false, opcionesFijas: ["Operativo", "En reparación", "De baja"] },
   ];
 }
 
@@ -95,7 +112,7 @@ export function plantillaOrdenesServicio(): Columna[] {
     { key: "cliente", label: "Cliente", tipo: "texto", rol: null, sospechosa: false },
     { key: "telefono", label: "Teléfono", tipo: "texto", rol: "telefono", sospechosa: false },
     { key: "trabajo", label: "Trabajo a realizar", tipo: "texto", rol: "producto", sospechosa: false },
-    { key: "estado", label: "Estado", tipo: "texto", rol: null, sospechosa: false },
+    { key: "estado", label: "Estado", tipo: "texto", rol: "estado", sospechosa: false, opcionesFijas: ["Pendiente", "En proceso", "Entregado", "Cancelado"] },
     { key: "monto", label: "Monto cobrado", tipo: "numero", rol: "costo", sospechosa: false },
   ];
 }
@@ -138,7 +155,7 @@ export function plantillaReservas(): Columna[] {
     { key: "cliente", label: "Cliente", tipo: "texto", rol: null, sospechosa: false },
     { key: "telefono", label: "Teléfono", tipo: "texto", rol: null, sospechosa: false },
     { key: "servicio", label: "Servicio", tipo: "texto", rol: "producto", sospechosa: false },
-    { key: "estado", label: "Estado", tipo: "texto", rol: null, sospechosa: false },
+    { key: "estado", label: "Estado", tipo: "texto", rol: "estado", sospechosa: false, opcionesFijas: ["Confirmada", "Atendida", "Cancelada", "No asistió"] },
   ];
 }
 
@@ -167,7 +184,7 @@ export function plantillaMembresias(): Columna[] {
     { key: "plan", label: "Plan", tipo: "texto", rol: "producto", sospechosa: false },
     { key: "monto_mensual", label: "Monto mensual", tipo: "numero", rol: "monto", sospechosa: false },
     { key: "fecha_vencimiento", label: "Fecha de vencimiento", tipo: "fecha", rol: null, sospechosa: false },
-    { key: "estado", label: "Estado", tipo: "texto", rol: null, sospechosa: false },
+    { key: "estado", label: "Estado", tipo: "texto", rol: "estado", sospechosa: false, opcionesFijas: ["Activa", "Vencida", "Cancelada"] },
   ];
 }
 
@@ -179,7 +196,7 @@ export function plantillaAlquileres(): Columna[] {
     { key: "propiedad", label: "Propiedad", tipo: "texto", rol: "producto", sospechosa: false },
     { key: "monto_mensual", label: "Monto mensual", tipo: "numero", rol: "monto", sospechosa: false },
     { key: "fecha_pago", label: "Próxima fecha de pago", tipo: "fecha", rol: null, sospechosa: false },
-    { key: "estado", label: "Estado", tipo: "texto", rol: null, sospechosa: false },
+    { key: "estado", label: "Estado", tipo: "texto", rol: "estado", sospechosa: false, opcionesFijas: ["Activo", "Vencido", "Cancelado"] },
   ];
 }
 
@@ -191,7 +208,7 @@ export function plantillaMatriculas(): Columna[] {
     { key: "curso", label: "Curso", tipo: "texto", rol: "producto", sospechosa: false },
     { key: "mensualidad", label: "Mensualidad", tipo: "numero", rol: "monto", sospechosa: false },
     { key: "fecha_vencimiento", label: "Fecha de vencimiento", tipo: "fecha", rol: null, sospechosa: false },
-    { key: "estado", label: "Estado", tipo: "texto", rol: null, sospechosa: false },
+    { key: "estado", label: "Estado", tipo: "texto", rol: "estado", sospechosa: false, opcionesFijas: ["Activa", "Vencida", "Cancelada"] },
   ];
 }
 
@@ -203,7 +220,7 @@ export function plantillaObras(): Columna[] {
     { key: "presupuesto", label: "Presupuesto", tipo: "numero", rol: "monto", sospechosa: false },
     { key: "avance", label: "Avance (%)", tipo: "numero", rol: null, sospechosa: false },
     { key: "fecha_fin_estimada", label: "Fecha fin estimada", tipo: "fecha", rol: null, sospechosa: false },
-    { key: "estado", label: "Estado", tipo: "texto", rol: null, sospechosa: false },
+    { key: "estado", label: "Estado", tipo: "texto", rol: "estado", sospechosa: false, opcionesFijas: ["En curso", "Pausada", "Finalizada", "Cancelada"] },
   ];
 }
 
@@ -214,7 +231,7 @@ export function plantillaEventos(): Columna[] {
     { key: "telefono", label: "Teléfono", tipo: "texto", rol: "telefono", sospechosa: false },
     { key: "tipo_evento", label: "Tipo de evento", tipo: "texto", rol: "producto", sospechosa: false },
     { key: "monto", label: "Monto", tipo: "numero", rol: "monto", sospechosa: false },
-    { key: "estado", label: "Estado", tipo: "texto", rol: null, sospechosa: false },
+    { key: "estado", label: "Estado", tipo: "texto", rol: "estado", sospechosa: false, opcionesFijas: ["Confirmado", "Realizado", "Cancelado"] },
   ];
 }
 
@@ -227,7 +244,7 @@ export function plantillaDelivery(): Columna[] {
     { key: "monto", label: "Monto", tipo: "numero", rol: "monto", sospechosa: false },
     { key: "direccion", label: "Dirección de entrega", tipo: "texto", rol: "direccion", sospechosa: false },
     { key: "repartidor", label: "Repartidor", tipo: "texto", rol: null, sospechosa: false },
-    { key: "estado", label: "Estado", tipo: "texto", rol: null, sospechosa: false },
+    { key: "estado", label: "Estado", tipo: "texto", rol: "estado", sospechosa: false, opcionesFijas: ["Pendiente", "En camino", "Entregado", "Cancelado"] },
   ];
 }
 
@@ -239,7 +256,7 @@ export function plantillaAlquilerEquipos(): Columna[] {
     { key: "equipo", label: "Equipo", tipo: "texto", rol: "producto", sospechosa: false },
     { key: "monto", label: "Monto", tipo: "numero", rol: "monto", sospechosa: false },
     { key: "fecha_devolucion", label: "Fecha de devolución", tipo: "fecha", rol: null, sospechosa: false },
-    { key: "estado", label: "Estado", tipo: "texto", rol: null, sospechosa: false },
+    { key: "estado", label: "Estado", tipo: "texto", rol: "estado", sospechosa: false, opcionesFijas: ["Prestado", "Devuelto", "Cancelado"] },
   ];
 }
 
@@ -272,22 +289,26 @@ export const CATEGORIAS_MODULOS = [
   { clave: "proyectos", titulo: "Trabajo por proyectos o eventos", descripcion: "Ej. constructoras, contratistas, organizadores de eventos: cada cliente es un proyecto con fecha y presupuesto propio." },
 ] as const;
 
+// `reglasSugeridas` se agrega explícito como `undefined` en las plantillas que
+// no clasifican como "ventas" (ver comentario arriba de las funciones): así
+// TypeScript infiere la misma forma de objeto en las 17 entradas y el resto
+// del código puede leer `p.reglasSugeridas?.()` sin importar cuál sea.
 export const PLANTILLAS_EXTRA = [
-  { clave: "gastos", nombre: "Gastos operativos", descripcion: "Alquiler, sueldos, servicios: lo que gastas aparte de lo que compras para revender.", categoria: "finanzas", columnas: plantillaGastos },
-  { clave: "cuentas_por_pagar", nombre: "Cuentas por pagar", descripcion: "Lo que tú le debes a proveedores o servicios, con fecha de vencimiento.", categoria: "finanzas", columnas: plantillaCuentasPorPagar },
-  { clave: "activos_fijos", nombre: "Activos fijos", descripcion: "Maquinaria, computadoras, vehículos del negocio (no para vender).", categoria: "finanzas", columnas: plantillaActivosFijos },
-  { clave: "importaciones", nombre: "Importaciones", descripcion: "Costo real de lo que traes del extranjero: producto, flete y aduana juntos.", categoria: "finanzas", columnas: plantillaImportaciones },
-  { clave: "ordenes_servicio", nombre: "Órdenes de servicio", descripcion: "Para talleres y reparaciones: seguir un trabajo desde que entra hasta que se entrega.", categoria: "servicios", columnas: plantillaOrdenesServicio },
-  { clave: "delivery", nombre: "Delivery / pedidos a domicilio", descripcion: "Pedidos con dirección de entrega y repartidor, hasta que se marcan entregados.", categoria: "servicios", columnas: plantillaDelivery },
-  { clave: "alquiler_equipos", nombre: "Alquiler de equipos", descripcion: "Qué prestaste, a quién y cuándo tiene que devolverlo.", categoria: "servicios", columnas: plantillaAlquilerEquipos },
-  { clave: "mermas", nombre: "Mermas / pérdidas", descripcion: "Productos vencidos, dañados o perdidos, separado de las ventas reales.", categoria: "stock_local", columnas: plantillaMermas },
-  { clave: "produccion", nombre: "Producción / insumos", descripcion: "Cuánto fabricas y qué insumos usas, para calcular el costo real por unidad.", categoria: "produccion", columnas: plantillaProduccion },
-  { clave: "consignacion", nombre: "Consignación", descripcion: "Mercadería que dejas en otro local para que te la vendan y te paguen después.", categoria: "consignacion", columnas: plantillaConsignacion },
-  { clave: "reservas", nombre: "Reservas / citas", descripcion: "Para salones, clínicas o talleres con cita previa: agenda de turnos.", categoria: "servicios", columnas: plantillaReservas },
-  { clave: "traslados", nombre: "Traslados entre almacenes", descripcion: "Mover stock entre locales o almacenes sin que parezca una venta o compra.", categoria: "stock_local", columnas: plantillaTraslados },
-  { clave: "membresias", nombre: "Membresías", descripcion: "Gimnasios, academias, clubes: cobro mensual con fecha de vencimiento.", categoria: "cobro_recurrente", columnas: plantillaMembresias },
-  { clave: "alquileres", nombre: "Alquileres", descripcion: "Propiedades o locales que alquilas, con inquilino y fecha de pago.", categoria: "cobro_recurrente", columnas: plantillaAlquileres },
-  { clave: "matriculas", nombre: "Matrículas", descripcion: "Colegios, institutos, guarderías: mensualidad por alumno.", categoria: "cobro_recurrente", columnas: plantillaMatriculas },
-  { clave: "obras", nombre: "Obras / proyectos", descripcion: "Construcción o contratistas: presupuesto y avance por proyecto.", categoria: "proyectos", columnas: plantillaObras },
-  { clave: "eventos", nombre: "Eventos", descripcion: "Fiestas, catering, eventos corporativos: un cobro por cada evento.", categoria: "proyectos", columnas: plantillaEventos },
+  { clave: "gastos", nombre: "Gastos operativos", descripcion: "Alquiler, sueldos, servicios: lo que gastas aparte de lo que compras para revender.", categoria: "finanzas", columnas: plantillaGastos, reglasSugeridas: undefined },
+  { clave: "cuentas_por_pagar", nombre: "Cuentas por pagar", descripcion: "Lo que tú le debes a proveedores o servicios, con fecha de vencimiento.", categoria: "finanzas", columnas: plantillaCuentasPorPagar, reglasSugeridas: undefined },
+  { clave: "activos_fijos", nombre: "Activos fijos", descripcion: "Maquinaria, computadoras, vehículos del negocio (no para vender).", categoria: "finanzas", columnas: plantillaActivosFijos, reglasSugeridas: undefined },
+  { clave: "importaciones", nombre: "Importaciones", descripcion: "Costo real de lo que traes del extranjero: producto, flete y aduana juntos.", categoria: "finanzas", columnas: plantillaImportaciones, reglasSugeridas: undefined },
+  { clave: "ordenes_servicio", nombre: "Órdenes de servicio", descripcion: "Para talleres y reparaciones: seguir un trabajo desde que entra hasta que se entrega.", categoria: "servicios", columnas: plantillaOrdenesServicio, reglasSugeridas: undefined },
+  { clave: "delivery", nombre: "Delivery / pedidos a domicilio", descripcion: "Pedidos con dirección de entrega y repartidor, hasta que se marcan entregados.", categoria: "servicios", columnas: plantillaDelivery, reglasSugeridas: () => reglaExcluirCancelado("Cancelado") },
+  { clave: "alquiler_equipos", nombre: "Alquiler de equipos", descripcion: "Qué prestaste, a quién y cuándo tiene que devolverlo.", categoria: "servicios", columnas: plantillaAlquilerEquipos, reglasSugeridas: () => reglaExcluirCancelado("Cancelado") },
+  { clave: "mermas", nombre: "Mermas / pérdidas", descripcion: "Productos vencidos, dañados o perdidos, separado de las ventas reales.", categoria: "stock_local", columnas: plantillaMermas, reglasSugeridas: undefined },
+  { clave: "produccion", nombre: "Producción / insumos", descripcion: "Cuánto fabricas y qué insumos usas, para calcular el costo real por unidad.", categoria: "produccion", columnas: plantillaProduccion, reglasSugeridas: undefined },
+  { clave: "consignacion", nombre: "Consignación", descripcion: "Mercadería que dejas en otro local para que te la vendan y te paguen después.", categoria: "consignacion", columnas: plantillaConsignacion, reglasSugeridas: undefined },
+  { clave: "reservas", nombre: "Reservas / citas", descripcion: "Para salones, clínicas o talleres con cita previa: agenda de turnos.", categoria: "servicios", columnas: plantillaReservas, reglasSugeridas: undefined },
+  { clave: "traslados", nombre: "Traslados entre almacenes", descripcion: "Mover stock entre locales o almacenes sin que parezca una venta o compra.", categoria: "stock_local", columnas: plantillaTraslados, reglasSugeridas: undefined },
+  { clave: "membresias", nombre: "Membresías", descripcion: "Gimnasios, academias, clubes: cobro mensual con fecha de vencimiento.", categoria: "cobro_recurrente", columnas: plantillaMembresias, reglasSugeridas: () => reglaExcluirCancelado("Cancelada") },
+  { clave: "alquileres", nombre: "Alquileres", descripcion: "Propiedades o locales que alquilas, con inquilino y fecha de pago.", categoria: "cobro_recurrente", columnas: plantillaAlquileres, reglasSugeridas: () => reglaExcluirCancelado("Cancelado") },
+  { clave: "matriculas", nombre: "Matrículas", descripcion: "Colegios, institutos, guarderías: mensualidad por alumno.", categoria: "cobro_recurrente", columnas: plantillaMatriculas, reglasSugeridas: () => reglaExcluirCancelado("Cancelada") },
+  { clave: "obras", nombre: "Obras / proyectos", descripcion: "Construcción o contratistas: presupuesto y avance por proyecto.", categoria: "proyectos", columnas: plantillaObras, reglasSugeridas: () => reglaExcluirCancelado("Cancelada") },
+  { clave: "eventos", nombre: "Eventos", descripcion: "Fiestas, catering, eventos corporativos: un cobro por cada evento.", categoria: "proyectos", columnas: plantillaEventos, reglasSugeridas: () => reglaExcluirCancelado("Cancelado") },
 ] as const;

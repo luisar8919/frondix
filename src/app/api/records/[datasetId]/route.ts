@@ -3,7 +3,8 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { crearClienteServidor } from "@/lib/supabase/server";
 import { validarEnlaces } from "@/lib/dependientes";
 import { claveValida } from "@/lib/enlaces";
-import { ajustarStockDesdeRegistro, registrarAjusteManual } from "@/lib/stock";
+import { registrarAjusteManual } from "@/lib/stock";
+import { aplicarReglasDesdeRegistro, type Regla } from "@/lib/reglas";
 import { validarCamposRegistro, tipoModulo } from "@/lib/roles";
 import { datasetBloqueado } from "@/lib/limites";
 import type { Columna } from "@/lib/excel-parser";
@@ -98,7 +99,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ data
 
   const { data: datasets, error: errorDatasets } = await supabase
     .from("datasets")
-    .select("id, nombre, columnas, incluye_igv, moneda, plantilla")
+    .select("id, nombre, columnas, incluye_igv, moneda, plantilla, reglas")
     .order("created_at", { ascending: false });
   if (errorDatasets) return respuestaError(errorDatasets);
 
@@ -119,7 +120,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ dat
   }
 
   // Si una columna está enlazada a otra tabla, el valor debe existir allí.
-  const { data: dataset, error: errorDataset } = await supabase.from("datasets").select("empresa_id, columnas, nombre, plantilla").eq("id", datasetId).single();
+  const { data: dataset, error: errorDataset } = await supabase.from("datasets").select("empresa_id, columnas, nombre, plantilla, reglas").eq("id", datasetId).single();
   if (errorDataset?.code === "42501") return respuestaError(errorDataset);
   if (!dataset) return NextResponse.json({ error: "Dataset no encontrado" }, { status: 404 });
   if (await datasetBloqueado(supabase, dataset)) {
@@ -155,11 +156,12 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ dat
 
   if (error) return respuestaError(error);
 
-  // El stock se ajusta "mejor esfuerzo": si algo falla acá, el registro ya
-  // quedó bien guardado (lo importante), no vale la pena fallar toda la
-  // petición por un ajuste de stock que el usuario puede corregir a mano.
+  // Reglas (incluye el ajuste de Stock, ver reglas.ts) "mejor esfuerzo": si
+  // algo falla acá, el registro ya quedó bien guardado (lo importante), no
+  // vale la pena fallar toda la petición por un efecto automático que el
+  // usuario puede corregir a mano.
   try {
-    await ajustarStockDesdeRegistro(supabase, dataset.empresa_id, columnas, body, 1, user?.id ?? null);
+    await aplicarReglasDesdeRegistro(supabase, dataset.empresa_id, data?.id ?? null, columnas, (dataset.reglas as Regla[]) ?? [], body, undefined, user?.id ?? null);
     // Si ESTE módulo es el propio Stock (alta manual de un producto, no vía
     // venta/compra), queda como "ajuste" en el Kardex -- ver registrarAjusteManual.
     await registrarAjusteManual(supabase, dataset.empresa_id, datasetId, columnas, null, body, user?.id ?? null);

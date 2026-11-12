@@ -9,6 +9,7 @@ import EditarTabla from "@/components/EditarTabla";
 import KardexProducto from "@/components/KardexProducto";
 import { enviarConfirmando } from "@/lib/confirmar";
 import type { Columna } from "@/lib/excel-parser";
+import type { Regla } from "@/lib/reglas";
 import { filtrarRegistros } from "@/lib/buscar";
 import { filtrarPorColumna, relacionesEntrantes, type DatasetResumen } from "@/lib/enlaces";
 import { esStock } from "@/lib/stock";
@@ -41,7 +42,7 @@ export default function DatasetPage({
   const { datasetId } = usePromise(params);
   const { filtrarCol, filtrarVal } = usePromise(searchParams);
 
-  const [dataset, setDataset] = useState<{ id: string; nombre: string; columnas: Columna[]; incluye_igv?: boolean; moneda?: string } | null>(null);
+  const [dataset, setDataset] = useState<{ id: string; nombre: string; columnas: Columna[]; incluye_igv?: boolean; moneda?: string; reglas?: Regla[] } | null>(null);
   const [otras, setOtras] = useState<DatasetResumen[]>([]);
   const [registros, setRegistros] = useState<Registro[]>([]);
   const [total, setTotal] = useState(0);
@@ -380,6 +381,7 @@ export default function DatasetPage({
             columnas={dataset.columnas}
             incluyeIgv={!!dataset.incluye_igv}
             moneda={dataset.moneda ?? "PEN"}
+            reglas={dataset.reglas ?? []}
             onGuardado={cargar}
           />
           <EnlacesTabla datasetId={datasetId} columnas={dataset.columnas} otras={otras} onGuardado={cargar} />

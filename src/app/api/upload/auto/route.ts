@@ -16,6 +16,7 @@ import {
   type PrecioCompra,
 } from "@/lib/divisor";
 import { clasificarVentaCompraConIA } from "@/lib/sugerencia-ia";
+import type { Regla } from "@/lib/reglas";
 
 // El asistente de importación ya mostró los grupos (vía /api/upload/grupos) y el
 // usuario eligió cuáles quedarse, con nombre y roles ya confirmados/editados. Aquí se
@@ -152,12 +153,19 @@ async function crearModuloStockSiPedido(
   }
 
   for (const d of datasetsAEnlazar) {
-    const { data: ds } = await supabase.from("datasets").select("columnas").eq("id", d.datasetId).single();
+    const { data: ds } = await supabase.from("datasets").select("columnas, reglas").eq("id", d.datasetId).single();
     if (ds) {
       const cols = (ds.columnas as Columna[]).map((c) =>
         c.key === d.columnaKey ? { ...c, enlace: { datasetId: datasetStock.id, columnaKey: "producto" } } : c
       );
-      await supabase.from("datasets").update({ columnas: cols }).eq("id", d.datasetId);
+      // Mismo criterio que enlazarStockAutomatico (datasets/crear/route.ts):
+      // la regla es un espejo 1:1 del enlace recién creado, para que el ajuste
+      // de Stock se vea y se pueda apagar desde "Editar tabla y campos".
+      const reglasActuales = (ds.reglas as Regla[]) ?? [];
+      const nuevasReglas = reglasActuales.some((r) => r.accion.tipo === "ajustar_stock")
+        ? reglasActuales
+        : [...reglasActuales, { id: crypto.randomUUID(), activa: true, origen: "automatica", condicion: { tipo: "siempre" }, accion: { tipo: "ajustar_stock" } } satisfies Regla];
+      await supabase.from("datasets").update({ columnas: cols, reglas: nuevasReglas }).eq("id", d.datasetId);
     }
   }
 

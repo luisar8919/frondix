@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { crearClienteServidor } from "@/lib/supabase/server";
 import { advertenciasDeRegistro, validarEnlaces } from "@/lib/dependientes";
-import { revertirStockDesdeRegistro, registrarAjusteManual } from "@/lib/stock";
+import { registrarAjusteManual } from "@/lib/stock";
+import { aplicarReglasDesdeRegistro, type Regla } from "@/lib/reglas";
 import { validarCamposRegistro, tipoModulo } from "@/lib/roles";
 import { datasetBloqueado } from "@/lib/limites";
 import type { Columna } from "@/lib/excel-parser";
@@ -52,15 +53,17 @@ export async function PATCH(req: NextRequest, ctx: Ctx) {
   const { data, confirmar, sustento, motivo } = await req.json().catch(() => ({}));
   let columnas: Columna[] | null = null;
   let empresaId: string | null = null;
+  let reglas: Regla[] = [];
   if (data !== undefined) {
     if (typeof data !== "object" || data === null || Array.isArray(data)) {
       return NextResponse.json({ error: "Body inválido" }, { status: 400 });
     }
 
-    const { data: dataset } = await supabase.from("datasets").select("empresa_id, columnas, nombre").eq("id", datasetId).single();
+    const { data: dataset } = await supabase.from("datasets").select("empresa_id, columnas, nombre, reglas").eq("id", datasetId).single();
     if (!dataset) return NextResponse.json({ error: "Tabla no encontrada" }, { status: 404 });
     columnas = dataset.columnas as Columna[];
     empresaId = dataset.empresa_id;
+    reglas = (dataset.reglas as Regla[]) ?? [];
 
     const faltaCampo = validarCamposRegistro(columnas, data, dataset.nombre);
     if (faltaCampo) return NextResponse.json({ error: faltaCampo }, { status: 422 });
@@ -88,11 +91,12 @@ export async function PATCH(req: NextRequest, ctx: Ctx) {
     .single();
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-  // Stock "mejor esfuerzo": si el producto o la cantidad cambiaron, deshace el
-  // efecto de los datos viejos y aplica el de los nuevos -- ver revertirStockDesdeRegistro.
+  // Reglas (incluye el ajuste de Stock, ver reglas.ts) "mejor esfuerzo": si el
+  // producto o la cantidad cambiaron, deshace el efecto de los datos viejos y
+  // aplica el de los nuevos.
   if (data !== undefined && columnas && empresaId) {
     try {
-      await revertirStockDesdeRegistro(supabase, empresaId, columnas, registro.data as Record<string, unknown>, data, userId);
+      await aplicarReglasDesdeRegistro(supabase, empresaId, recordId, columnas, reglas, data, registro.data as Record<string, unknown>, userId);
       // Si ESTE módulo es el propio Stock (corrección a mano de una cantidad,
       // no vía venta/compra), queda como "ajuste" en el Kardex, con motivo si se mandó.
       await registrarAjusteManual(supabase, empresaId, datasetId, columnas, registro.data as Record<string, unknown>, data, userId, typeof motivo === "string" ? motivo.trim().slice(0, 300) || null : null);
@@ -115,7 +119,7 @@ export async function DELETE(req: NextRequest, ctx: Ctx) {
     if (advertencias.length) return NextResponse.json({ advertencias }, { status: 409 });
   }
 
-  const { data: dataset } = await supabase.from("datasets").select("empresa_id, columnas").eq("id", datasetId).single();
+  const { data: dataset } = await supabase.from("datasets").select("empresa_id, columnas, reglas").eq("id", datasetId).single();
 
   const { data: borrados, error } = await supabase.from("records").delete().eq("id", recordId).select("id");
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
@@ -125,7 +129,7 @@ export async function DELETE(req: NextRequest, ctx: Ctx) {
 
   if (dataset) {
     try {
-      await revertirStockDesdeRegistro(supabase, dataset.empresa_id, dataset.columnas as Columna[], registro.data as Record<string, unknown>, undefined, userId);
+      await aplicarReglasDesdeRegistro(supabase, dataset.empresa_id, null, dataset.columnas as Columna[], (dataset.reglas as Regla[]) ?? [], undefined, registro.data as Record<string, unknown>, userId);
     } catch {
       // silencioso a propósito, ver comentario de PATCH
     }
