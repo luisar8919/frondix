@@ -21,12 +21,25 @@ interface AjustarStockInfo {
   cantidadLabel: string | null;
 }
 
+interface CandidatoSumarCampo {
+  columnaEnlaceKey: string;
+  columnaEnlaceLabel: string;
+  columnaObjetivoKey: string;
+  columnaObjetivoLabel: string;
+  datasetObjetivoNombre: string;
+}
+
+type TipoAccion = "excluir_de_reportes" | "cambiar_estado" | "ajustar_stock" | "enviar_whatsapp" | "agregar_seguimiento" | "notificacion_push" | "sumar_campo_enlazado";
+
 export default function ReglasModulo({
   datasetId,
   nombre,
   columnas,
   reglas,
   ajustarStockInfo,
+  hayTelefono,
+  hayCliente,
+  candidatosSumarCampo,
 }: {
   datasetId: string;
   nombre: string;
@@ -40,6 +53,13 @@ export default function ReglasModulo({
   // real (tipo, a qué Stock, con qué columna) se usa para mostrarla armada
   // con su propia estructura "Si... entonces...", no solo un título.
   ajustarStockInfo: AjustarStockInfo | null;
+  // "Enviar WhatsApp" necesita un campo rol "telefono" en ESTE módulo (a quién
+  // escribirle); "Agregar a Seguimiento" necesita un campo rol "cliente".
+  hayTelefono: boolean;
+  hayCliente: boolean;
+  // "Sumar un campo enlazado": un campo numérico candidato por cada columna de
+  // este módulo que tenga un enlace -- ver /api/reglas (candidatosSumarCampo).
+  candidatosSumarCampo: CandidatoSumarCampo[];
 }) {
   const puedeAjustarStock = !!ajustarStockInfo;
   const [reglasLocal, setReglasLocal] = useState<Regla[]>(reglas);
@@ -62,6 +82,9 @@ export default function ReglasModulo({
   // dispara TODAS las que matcheen). Se oculta la opción en las demás filas una
   // vez que ya existe una.
   const hayAjustarStock = reglasLocal.some((r) => r.accion.tipo === "ajustar_stock");
+
+  const claveCandidato = (c: CandidatoSumarCampo) => `${c.columnaEnlaceKey}::${c.columnaObjetivoKey}`;
+  const candidatoDe = (clave: string) => candidatosSumarCampo.find((c) => claveCandidato(c) === clave);
 
   function condicionPorDefecto(): Regla["condicion"] {
     const primera = columnasCondicion[0];
@@ -117,17 +140,32 @@ export default function ReglasModulo({
     );
   }
 
-  type TipoAccion = "excluir_de_reportes" | "cambiar_estado" | "ajustar_stock";
-
   function cambiarAccion(i: number, r: Regla, tipo: TipoAccion) {
     if (tipo === "ajustar_stock") {
       cambiarRegla(i, { condicion: { tipo: "siempre" }, accion: { tipo } });
       return;
     }
+    if (tipo === "sumar_campo_enlazado") {
+      const primero = candidatosSumarCampo[0];
+      cambiarRegla(i, { condicion: { tipo: "siempre" }, accion: primero ? { tipo, columnaEnlaceKey: primero.columnaEnlaceKey, columnaObjetivoKey: primero.columnaObjetivoKey, delta: 1 } : { tipo, columnaEnlaceKey: "", columnaObjetivoKey: "", delta: 1 } });
+      return;
+    }
     const cond = datosCondicion(r);
     const condicion: Regla["condicion"] = cond.key ? { tipo: "campo", columnaKey: cond.key, operador: cond.operador, valor: cond.valor } : condicionPorDefecto();
+    if (tipo === "excluir_de_reportes" || tipo === "agregar_seguimiento") {
+      cambiarRegla(i, { condicion, accion: { tipo } });
+      return;
+    }
+    if (tipo === "enviar_whatsapp") {
+      cambiarRegla(i, { condicion, accion: { tipo, mensaje: "" } });
+      return;
+    }
+    if (tipo === "notificacion_push") {
+      cambiarRegla(i, { condicion, accion: { tipo, titulo: "", mensaje: "" } });
+      return;
+    }
     const columnaKey = columnasDestino[0]?.key ?? (condicion.tipo === "campo" ? condicion.columnaKey : "");
-    cambiarRegla(i, { condicion, accion: tipo === "excluir_de_reportes" ? { tipo } : { tipo, columnaKey, valor: columnaDe(columnaKey)?.opcionesFijas?.[0] ?? "" } });
+    cambiarRegla(i, { condicion, accion: { tipo, columnaKey, valor: columnaDe(columnaKey)?.opcionesFijas?.[0] ?? "" } });
   }
 
   return (
@@ -173,7 +211,12 @@ export default function ReglasModulo({
                 <option value="excluir_de_reportes">Excluir de reportes</option>
                 {columnasDestino.length > 0 && <option value="cambiar_estado">Cambiar un campo a...</option>}
                 {puedeAjustarStock && !otraYaTieneAjustarStock && <option value="ajustar_stock">Ajustar Stock automáticamente</option>}
+                {hayTelefono && <option value="enviar_whatsapp">Enviar WhatsApp</option>}
+                {hayCliente && <option value="agregar_seguimiento">Agregar a Seguimiento</option>}
+                <option value="notificacion_push">Notificación push</option>
+                {candidatosSumarCampo.length > 0 && <option value="sumar_campo_enlazado">Sumar un campo enlazado</option>}
               </select>
+
               {r.accion.tipo === "cambiar_estado" && (
                 <>
                   <select
@@ -186,6 +229,70 @@ export default function ReglasModulo({
                   {valorInput(r.accion.columnaKey, r.accion.valor, (v) => cambiarRegla(i, { accion: { tipo: "cambiar_estado", columnaKey: (r.accion as { columnaKey: string }).columnaKey, valor: v } }), "Nuevo valor")}
                 </>
               )}
+
+              {r.accion.tipo === "enviar_whatsapp" && (
+                <input
+                  aria-label="Mensaje de WhatsApp"
+                  placeholder="Mensaje a enviar (texto fijo, sin {nombre} ni variables)"
+                  value={r.accion.mensaje}
+                  onChange={(e) => cambiarRegla(i, { accion: { tipo: "enviar_whatsapp", mensaje: e.target.value } })}
+                  style={{ minWidth: 260, flex: 1 }}
+                />
+              )}
+
+              {r.accion.tipo === "notificacion_push" && (
+                <>
+                  <input
+                    aria-label="Título de la notificación"
+                    placeholder="Título"
+                    value={r.accion.titulo}
+                    onChange={(e) => cambiarRegla(i, { accion: { tipo: "notificacion_push", titulo: e.target.value, mensaje: (r.accion as { mensaje: string }).mensaje } })}
+                    style={{ width: 160 }}
+                  />
+                  <input
+                    aria-label="Mensaje de la notificación"
+                    placeholder="Mensaje"
+                    value={r.accion.mensaje}
+                    onChange={(e) => cambiarRegla(i, { accion: { tipo: "notificacion_push", titulo: (r.accion as { titulo: string }).titulo, mensaje: e.target.value } })}
+                    style={{ minWidth: 200, flex: 1 }}
+                  />
+                </>
+              )}
+
+              {r.accion.tipo === "agregar_seguimiento" && (
+                <p className="ayuda" style={{ margin: 0 }}>
+                  Activa el seguimiento del cliente de este registro -- si deja de comprar, el aviso automático de
+                  Seguimiento se encarga del resto.
+                </p>
+              )}
+
+              {r.accion.tipo === "sumar_campo_enlazado" && (
+                <>
+                  <select
+                    aria-label="Campo a sumar"
+                    value={claveCandidato({ columnaEnlaceKey: r.accion.columnaEnlaceKey, columnaObjetivoKey: r.accion.columnaObjetivoKey } as CandidatoSumarCampo)}
+                    onChange={(e) => {
+                      const c = candidatoDe(e.target.value);
+                      if (c) cambiarRegla(i, { accion: { tipo: "sumar_campo_enlazado", columnaEnlaceKey: c.columnaEnlaceKey, columnaObjetivoKey: c.columnaObjetivoKey, delta: r.accion.tipo === "sumar_campo_enlazado" ? r.accion.delta : 1 } });
+                    }}
+                  >
+                    {candidatosSumarCampo.map((c) => (
+                      <option key={claveCandidato(c)} value={claveCandidato(c)}>
+                        {c.datasetObjetivoNombre} &gt; {c.columnaObjetivoLabel} (por {c.columnaEnlaceLabel})
+                      </option>
+                    ))}
+                  </select>
+                  <span className="suave pequeno">sumar</span>
+                  <input
+                    aria-label="Cuánto sumar"
+                    type="number"
+                    value={r.accion.delta}
+                    onChange={(e) => cambiarRegla(i, { accion: { tipo: "sumar_campo_enlazado", columnaEnlaceKey: (r.accion as { columnaEnlaceKey: string }).columnaEnlaceKey, columnaObjetivoKey: (r.accion as { columnaObjetivoKey: string }).columnaObjetivoKey, delta: Number(e.target.value) || 0 } })}
+                    style={{ width: 70 }}
+                  />
+                </>
+              )}
+
               {r.accion.tipo === "ajustar_stock" && ajustarStockInfo && (
                 <>
                   <span className="suave pequeno">Si</span>

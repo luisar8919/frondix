@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { tipoModulo } from "./roles.ts";
-import { aplicarReglasDesdeRegistro, type Regla } from "./reglas.ts";
+import { aplicarReglasDesdeRegistro } from "./reglasAplicar.ts";
+import type { Regla } from "./reglas.ts";
 import { claveValida } from "./enlaces.ts";
 import type { Columna } from "./excel-parser.ts";
 
@@ -60,7 +61,7 @@ export async function aceptarCotizacion(
   if (errorRecord) return { ok: false, error: errorRecord.message, status: 500 };
 
   try {
-    await aplicarReglasDesdeRegistro(supabase, empresaId, record.id, columnas, (elegido.reglas as Regla[]) ?? [], datosVenta, undefined, cot.created_by);
+    await aplicarReglasDesdeRegistro(supabase, empresaId, elegido.id, record.id, columnas, (elegido.reglas as Regla[]) ?? [], datosVenta, undefined, cot.created_by);
   } catch {
     // mejor esfuerzo, igual que en /api/records -- la venta ya quedó guardada
   }

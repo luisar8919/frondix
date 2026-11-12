@@ -12,12 +12,23 @@ interface AjustarStockInfo {
   cantidadLabel: string | null;
 }
 
+interface CandidatoSumarCampo {
+  columnaEnlaceKey: string;
+  columnaEnlaceLabel: string;
+  columnaObjetivoKey: string;
+  columnaObjetivoLabel: string;
+  datasetObjetivoNombre: string;
+}
+
 interface ModuloConReglas {
   datasetId: string;
   nombre: string;
   columnas: Columna[];
   reglas: Regla[];
   ajustarStockInfo: AjustarStockInfo | null;
+  hayTelefono: boolean;
+  hayCliente: boolean;
+  candidatosSumarCampo: CandidatoSumarCampo[];
 }
 
 // Un solo lugar para ver y armar TODAS las reglas de la empresa, módulo por
@@ -73,6 +84,9 @@ export default function ReglasPage() {
           columnas={m.columnas}
           reglas={m.reglas}
           ajustarStockInfo={m.ajustarStockInfo}
+          hayTelefono={m.hayTelefono}
+          hayCliente={m.hayCliente}
+          candidatosSumarCampo={m.candidatosSumarCampo}
         />
       ))}
     </>

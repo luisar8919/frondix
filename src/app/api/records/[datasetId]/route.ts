@@ -4,7 +4,8 @@ import { crearClienteServidor } from "@/lib/supabase/server";
 import { validarEnlaces } from "@/lib/dependientes";
 import { claveValida } from "@/lib/enlaces";
 import { registrarAjusteManual } from "@/lib/stock";
-import { aplicarReglasDesdeRegistro, type Regla } from "@/lib/reglas";
+import { aplicarReglasDesdeRegistro } from "@/lib/reglasAplicar";
+import type { Regla } from "@/lib/reglas";
 import { validarCamposRegistro, tipoModulo } from "@/lib/roles";
 import { datasetBloqueado } from "@/lib/limites";
 import type { Columna } from "@/lib/excel-parser";
@@ -161,7 +162,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ dat
   // vale la pena fallar toda la petición por un efecto automático que el
   // usuario puede corregir a mano.
   try {
-    await aplicarReglasDesdeRegistro(supabase, dataset.empresa_id, data?.id ?? null, columnas, (dataset.reglas as Regla[]) ?? [], body, undefined, user?.id ?? null);
+    await aplicarReglasDesdeRegistro(supabase, dataset.empresa_id, datasetId, data?.id ?? null, columnas, (dataset.reglas as Regla[]) ?? [], body, undefined, user?.id ?? null);
     // Si ESTE módulo es el propio Stock (alta manual de un producto, no vía
     // venta/compra), queda como "ajuste" en el Kardex -- ver registrarAjusteManual.
     await registrarAjusteManual(supabase, dataset.empresa_id, datasetId, columnas, null, body, user?.id ?? null);

@@ -49,6 +49,30 @@ export async function GET() {
     return { tipoModulo: tipo as "ventas" | "compras", stockNombre: stockDs.nombre, cantidadLabel: cCantidad?.label ?? null };
   }
 
+  // Candidatos para "Sumar un campo enlazado" (generaliza ajustar_stock a
+  // cualquier campo numérico de cualquier módulo enlazado, ej. sumar 1 a
+  // "Visitas" en Clientes por cada venta): por cada columna de ESTE módulo
+  // que tenga un enlace, los campos numéricos del dataset al que apunta.
+  function candidatosSumarCampo(columnas: Columna[]) {
+    const candidatos: { columnaEnlaceKey: string; columnaEnlaceLabel: string; columnaObjetivoKey: string; columnaObjetivoLabel: string; datasetObjetivoNombre: string }[] = [];
+    for (const c of columnas) {
+      if (!c.enlace || !claveValida(c.enlace.columnaKey)) continue;
+      const destino = todos.find((d) => d.id === c.enlace!.datasetId);
+      if (!destino) continue;
+      for (const objetivo of destino.columnas) {
+        if (objetivo.tipo !== "numero") continue;
+        candidatos.push({
+          columnaEnlaceKey: c.key,
+          columnaEnlaceLabel: c.label,
+          columnaObjetivoKey: objetivo.key,
+          columnaObjetivoLabel: objetivo.label,
+          datasetObjetivoNombre: destino.nombre,
+        });
+      }
+    }
+    return candidatos;
+  }
+
   const modulos = (datasets ?? [])
     .map((d) => ({
       datasetId: d.id as string,
@@ -56,6 +80,9 @@ export async function GET() {
       columnas: d.columnas as Columna[],
       reglas: (d.reglas as Regla[]) ?? [],
       ajustarStockInfo: infoAjustarStock(d.columnas as Columna[], d.nombre as string),
+      hayTelefono: (d.columnas as Columna[]).some((c) => c.rol === "telefono"),
+      hayCliente: (d.columnas as Columna[]).some((c) => c.rol === "cliente"),
+      candidatosSumarCampo: candidatosSumarCampo(d.columnas as Columna[]),
     }))
     .filter((m) => m.reglas.length > 0 || m.columnas.some((c) => c.rol !== null) || m.ajustarStockInfo);
 

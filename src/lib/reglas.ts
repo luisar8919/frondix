@@ -1,7 +1,3 @@
-import type { SupabaseClient } from "@supabase/supabase-js";
-import type { Columna } from "./excel-parser.ts";
-import { ajustarStockDesdeRegistro, revertirStockDesdeRegistro } from "./stock.ts";
-
 // "Reglas" = condición -> acción por módulo (modelo mental: Gambit System de
 // FFXII -- elegís el "detonante" (cualquier campo ya mapeado del módulo, no
 // solo Estado) y el umbral que lo activa -- pero evaluando TODAS las reglas
@@ -10,6 +6,14 @@ import { ajustarStockDesdeRegistro, revertirStockDesdeRegistro } from "./stock.t
 // stock) deben poder dispararse juntos, no competir entre sí. Vocabulario
 // cerrado a propósito: nunca texto libre/código, solo lo que el usuario arma
 // desde dropdowns en ReglasModulo.
+//
+// SOLO tipos y constantes acá -- sin ninguna lógica de ejecución ni imports de
+// Node/servidor (Firebase, WhatsApp, admin de Supabase). ReglasModulo.tsx (un
+// componente cliente) importa este archivo para los tipos/constantes del
+// formulario; si la lógica de aplicarReglasDesdeRegistro viviera en el mismo
+// archivo, Next.js intenta empaquetar sus imports de servidor (firebase-admin,
+// que usa fs/net/tls) para el navegador y el build se rompe. Esa lógica vive
+// en reglasAplicar.ts (servidor, nunca importado desde un componente cliente).
 //
 // "campo" es el tipo normal (cualquier columna del módulo, con el operador
 // que corresponda a su tipo -- igual/distinto para texto, también
@@ -39,7 +43,28 @@ export type Condicion =
 export type Accion =
   | { tipo: "excluir_de_reportes" }
   | { tipo: "cambiar_estado"; columnaKey: string; valor: string }
-  | { tipo: "ajustar_stock" }; // reusa stock.ts tal cual -- ver comentario en aplicarReglasDesdeRegistro
+  | { tipo: "ajustar_stock" } // reusa stock.ts tal cual -- ver comentario en reglasAplicar.ts
+  // Manda el mensaje tal cual (sin plantillas {nombre}/etc -- eso es de
+  // Seguimiento) al campo con rol "telefono" de ESTE registro. Mejor esfuerzo:
+  // la API de WhatsApp solo entrega texto libre si el cliente te escribió en
+  // las últimas 24h (ver enviarTexto en whatsapp.ts); fuera de esa ventana
+  // simplemente no se manda, sin romper el resto de la regla.
+  | { tipo: "enviar_whatsapp"; mensaje: string }
+  // Activa el seguimiento (misma tabla y mecanismo que el checkbox manual de
+  // /dashboard/seguimiento) para el cliente del campo rol "cliente" de este
+  // registro -- el cron ya existente (api/cron/seguimiento-push) se encarga
+  // de avisar si se queda callado, no hace falta nada más acá.
+  | { tipo: "agregar_seguimiento" }
+  // Push a todos los miembros de la empresa (Firebase, misma función que ya
+  // usa el cron de seguimiento).
+  | { tipo: "notificacion_push"; titulo: string; mensaje: string }
+  // Generaliza ajustar_stock a CUALQUIER campo numérico de CUALQUIER módulo
+  // enlazado (no solo Stock) -- ej. sumar 1 a "Visitas" en Clientes por cada
+  // venta. Mismo patrón de "buscar fila por el valor enlazado, sumar o crear"
+  // que ajustarStock() en stock.ts, pero sin Kardex (eso es específico de
+  // Stock). `columnaEnlaceKey` es una columna de ESTE módulo con `.enlace`;
+  // `columnaObjetivoKey` es el campo numérico a sumar en el dataset enlazado.
+  | { tipo: "sumar_campo_enlazado"; columnaEnlaceKey: string; columnaObjetivoKey: string; delta: number };
 
 export interface Regla {
   id: string;
@@ -51,7 +76,7 @@ export interface Regla {
   accion: Accion;
 }
 
-function condicionCumple(condicion: Condicion, datos: Record<string, unknown>): boolean {
+export function condicionCumple(condicion: Condicion, datos: Record<string, unknown>): boolean {
   if (condicion.tipo === "siempre") return true;
   if (condicion.tipo === "estado") return String(datos[condicion.columnaKey] ?? "").trim() === condicion.valor;
 
@@ -69,69 +94,4 @@ function condicionCumple(condicion: Condicion, datos: Record<string, unknown>): 
   if (condicion.operador === "mayor_igual") return num >= umbral;
   if (condicion.operador === "menor") return num < umbral;
   return num <= umbral; // menor_igual
-}
-
-// Único punto de entrada que llaman las rutas de /api/records al crear, editar
-// o borrar un registro -- reemplaza las llamadas directas a
-// ajustarStockDesdeRegistro/revertirStockDesdeRegistro que antes vivían ahí.
-// El ajuste de Stock NO se reimplementa acá como una acción genérica
-// interpretada: esta función solo DESPACHA a las funciones ya existentes y
-// probadas de stock.ts (esa matemática -- qué dataset de Stock, qué columna
-// de cantidad, el Kardex -- sigue siendo de ahí, sin tocar). Lo único
-// realmente nuevo/genérico son "excluir_de_reportes" y "cambiar_estado".
-//
-// `datosNuevos`/`datosViejos` siguen el mismo significado que ya tenían en
-// stock.ts: solo `datosNuevos` = alta; ambos = edición; solo `datosViejos` =
-// eliminación. Las reglas basadas en condición (no "siempre") solo tienen
-// sentido si hay una fila viva después del cambio, así que se saltean en una
-// eliminación -- no hay nada que excluir de reportes de un registro que ya
-// no existe.
-//
-// "Mejor esfuerzo" como el resto de este archivo hermano (stock.ts): quien
-// llama debe envolver esto en try/catch, un fallo acá nunca debe tumbar el
-// guardado del registro, que ya es lo importante y ya quedó bien guardado.
-export async function aplicarReglasDesdeRegistro(
-  supabase: SupabaseClient,
-  empresaId: string,
-  recordId: string | null,
-  columnas: Columna[],
-  reglas: Regla[],
-  datosNuevos: Record<string, unknown> | undefined,
-  datosViejos: Record<string, unknown> | undefined,
-  userId: string | null = null
-): Promise<void> {
-  let datosFinal: Record<string, unknown> | undefined;
-  let huboMutacion = false;
-
-  for (const regla of reglas) {
-    if (!regla.activa) continue;
-
-    if (regla.accion.tipo === "ajustar_stock") {
-      if (datosNuevos && !datosViejos) {
-        await ajustarStockDesdeRegistro(supabase, empresaId, columnas, datosNuevos, 1, userId);
-      } else if (datosViejos) {
-        await revertirStockDesdeRegistro(supabase, empresaId, columnas, datosViejos, datosNuevos, userId);
-      }
-      continue;
-    }
-
-    // excluir_de_reportes / cambiar_estado: necesitan una fila viva con la que
-    // evaluar la condición y a la que aplicarle el efecto -- no aplica a un
-    // registro que se acaba de eliminar (datosNuevos viene undefined ahí).
-    if (!datosNuevos) continue;
-    if (!condicionCumple(regla.condicion, datosNuevos)) continue;
-
-    if (!datosFinal) datosFinal = { ...datosNuevos };
-    if (regla.accion.tipo === "excluir_de_reportes") {
-      datosFinal._excluido_reportes = true;
-      huboMutacion = true;
-    } else if (regla.accion.tipo === "cambiar_estado") {
-      datosFinal[regla.accion.columnaKey] = regla.accion.valor;
-      huboMutacion = true;
-    }
-  }
-
-  if (huboMutacion && recordId && datosFinal) {
-    await supabase.from("records").update({ data: datosFinal }).eq("id", recordId);
-  }
 }

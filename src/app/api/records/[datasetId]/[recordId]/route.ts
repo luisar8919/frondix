@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { crearClienteServidor } from "@/lib/supabase/server";
 import { advertenciasDeRegistro, validarEnlaces } from "@/lib/dependientes";
 import { registrarAjusteManual } from "@/lib/stock";
-import { aplicarReglasDesdeRegistro, type Regla } from "@/lib/reglas";
+import { aplicarReglasDesdeRegistro } from "@/lib/reglasAplicar";
+import type { Regla } from "@/lib/reglas";
 import { validarCamposRegistro, tipoModulo } from "@/lib/roles";
 import { datasetBloqueado } from "@/lib/limites";
 import type { Columna } from "@/lib/excel-parser";
@@ -96,7 +97,7 @@ export async function PATCH(req: NextRequest, ctx: Ctx) {
   // aplica el de los nuevos.
   if (data !== undefined && columnas && empresaId) {
     try {
-      await aplicarReglasDesdeRegistro(supabase, empresaId, recordId, columnas, reglas, data, registro.data as Record<string, unknown>, userId);
+      await aplicarReglasDesdeRegistro(supabase, empresaId, datasetId, recordId, columnas, reglas, data, registro.data as Record<string, unknown>, userId);
       // Si ESTE módulo es el propio Stock (corrección a mano de una cantidad,
       // no vía venta/compra), queda como "ajuste" en el Kardex, con motivo si se mandó.
       await registrarAjusteManual(supabase, empresaId, datasetId, columnas, registro.data as Record<string, unknown>, data, userId, typeof motivo === "string" ? motivo.trim().slice(0, 300) || null : null);
@@ -129,7 +130,7 @@ export async function DELETE(req: NextRequest, ctx: Ctx) {
 
   if (dataset) {
     try {
-      await aplicarReglasDesdeRegistro(supabase, dataset.empresa_id, null, dataset.columnas as Columna[], (dataset.reglas as Regla[]) ?? [], undefined, registro.data as Record<string, unknown>, userId);
+      await aplicarReglasDesdeRegistro(supabase, dataset.empresa_id, datasetId, null, dataset.columnas as Columna[], (dataset.reglas as Regla[]) ?? [], undefined, registro.data as Record<string, unknown>, userId);
     } catch {
       // silencioso a propósito, ver comentario de PATCH
     }
