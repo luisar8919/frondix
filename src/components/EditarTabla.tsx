@@ -55,7 +55,7 @@ export default function EditarTabla({
   const [mensaje, setMensaje] = useState<{ tipo: "ok" | "error"; texto: string } | null>(null);
 
   const cambiar = (i: number, parche: Partial<Fila>) => setFilas((f) => f.map((x, j) => (j === i ? { ...x, ...parche } : x)));
-  const hayCampoEstado = filas.some((f) => f.rol === "estado");
+  const hayCampoMapeado = filas.some((f) => f.rol !== "");
 
   async function guardar() {
     setOcupado(true);
@@ -164,9 +164,9 @@ export default function EditarTabla({
           + Agregar campo
         </button>
 
-        {hayCampoEstado && (
+        {hayCampoMapeado && (
           <p className="ayuda" style={{ marginTop: 14 }}>
-            Este módulo tiene un campo "Estado" -- armá sus reglas (ej. "Cancelado" no cuenta como ingreso) en{" "}
+            Armá reglas sobre los campos de este módulo (ej. "Cancelado" no cuenta como ingreso) en{" "}
             <Link href="/dashboard/reglas">Reglas</Link>.
           </p>
         )}

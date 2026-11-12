@@ -12,7 +12,7 @@ function reglaExcluirCancelado(valorCancelado: string): Omit<Regla, "id">[] {
   return [{
     activa: true,
     origen: "automatica",
-    condicion: { tipo: "estado", columnaKey: "estado", valor: valorCancelado },
+    condicion: { tipo: "campo", columnaKey: "estado", operador: "es", valor: valorCancelado },
     accion: { tipo: "excluir_de_reportes" },
   }];
 }

@@ -3,12 +3,38 @@ import type { Columna } from "./excel-parser.ts";
 import { ajustarStockDesdeRegistro, revertirStockDesdeRegistro } from "./stock.ts";
 
 // "Reglas" = condición -> acción por módulo (modelo mental: Gambit System de
-// FFXII, pero evaluando TODAS las reglas activas que matcheen, en orden -- no
-// solo la primera -- porque varios efectos de un mismo evento (ej. "Cancelado"
-// -> excluir de reportes Y "siempre" -> ajustar stock) deben poder dispararse
-// juntos, no competir entre sí. Vocabulario cerrado a propósito: nunca texto
-// libre/código, solo lo que el usuario arma desde dropdowns en EditarTabla.
-export type Condicion = { tipo: "siempre" } | { tipo: "estado"; columnaKey: string; valor: string };
+// FFXII -- elegís el "detonante" (cualquier campo ya mapeado del módulo, no
+// solo Estado) y el umbral que lo activa -- pero evaluando TODAS las reglas
+// activas que matcheen, en orden, no solo la primera: varios efectos de un
+// mismo evento (ej. "Cancelado" -> excluir de reportes Y "siempre" -> ajustar
+// stock) deben poder dispararse juntos, no competir entre sí. Vocabulario
+// cerrado a propósito: nunca texto libre/código, solo lo que el usuario arma
+// desde dropdowns en ReglasModulo.
+//
+// "campo" es el tipo normal (cualquier columna del módulo, con el operador
+// que corresponda a su tipo -- igual/distinto para texto, también
+// mayor/menor para número). "estado" queda como alias legado SOLO para leer
+// reglas guardadas antes de esta generalización (equivale a "campo" con
+// operador "es") -- nunca se vuelve a escribir desde la UI.
+export type Operador = "es" | "no_es" | "mayor" | "mayor_igual" | "menor" | "menor_igual";
+
+export const OPERADORES_TEXTO: { valor: Operador; etiqueta: string }[] = [
+  { valor: "es", etiqueta: "es igual a" },
+  { valor: "no_es", etiqueta: "es distinto de" },
+];
+export const OPERADORES_NUMERO: { valor: Operador; etiqueta: string }[] = [
+  { valor: "es", etiqueta: "es igual a" },
+  { valor: "no_es", etiqueta: "es distinto de" },
+  { valor: "mayor", etiqueta: "es mayor que" },
+  { valor: "mayor_igual", etiqueta: "es mayor o igual que" },
+  { valor: "menor", etiqueta: "es menor que" },
+  { valor: "menor_igual", etiqueta: "es menor o igual que" },
+];
+
+export type Condicion =
+  | { tipo: "siempre" }
+  | { tipo: "campo"; columnaKey: string; operador: Operador; valor: string }
+  | { tipo: "estado"; columnaKey: string; valor: string }; // legado, ver comentario arriba
 
 export type Accion =
   | { tipo: "excluir_de_reportes" }
@@ -19,7 +45,7 @@ export interface Regla {
   id: string;
   activa: boolean;
   // "automatica" = la creó el sistema (enlace de stock, sugerencia de plantilla) -- informativo
-  // para la UI (ver EditarTabla), no cambia en nada cómo se evalúa.
+  // para la UI (ver ReglasModulo), no cambia en nada cómo se evalúa.
   origen: "automatica" | "manual";
   condicion: Condicion;
   accion: Accion;
@@ -27,7 +53,22 @@ export interface Regla {
 
 function condicionCumple(condicion: Condicion, datos: Record<string, unknown>): boolean {
   if (condicion.tipo === "siempre") return true;
-  return String(datos[condicion.columnaKey] ?? "").trim() === condicion.valor;
+  if (condicion.tipo === "estado") return String(datos[condicion.columnaKey] ?? "").trim() === condicion.valor;
+
+  const crudo = datos[condicion.columnaKey];
+  if (condicion.operador === "es") return String(crudo ?? "").trim() === condicion.valor;
+  if (condicion.operador === "no_es") return String(crudo ?? "").trim() !== condicion.valor;
+
+  // Resto de operadores son numéricos (mayor/menor): si cualquiera de los 2
+  // lados no es un número real, la condición simplemente no matchea -- nunca
+  // un error, un campo de texto con un operador numérico solo no dispara.
+  const num = Number(crudo);
+  const umbral = Number(condicion.valor);
+  if (!Number.isFinite(num) || !Number.isFinite(umbral)) return false;
+  if (condicion.operador === "mayor") return num > umbral;
+  if (condicion.operador === "mayor_igual") return num >= umbral;
+  if (condicion.operador === "menor") return num < umbral;
+  return num <= umbral; // menor_igual
 }
 
 // Único punto de entrada que llaman las rutas de /api/records al crear, editar

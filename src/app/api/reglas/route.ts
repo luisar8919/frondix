@@ -6,10 +6,11 @@ import type { Columna } from "@/lib/excel-parser";
 import type { Regla } from "@/lib/reglas";
 
 // Todos los módulos de la empresa que tienen algo que mostrar en la pantalla
-// de Reglas: una columna con significado "Estado" (para armar condiciones
-// nuevas) o ya tienen al menos una regla guardada (ej. "ajustar_stock", que
-// no depende de ninguna columna Estado). El resto de módulos no aparece acá
-// -- mismo criterio de "ocultar si no aplica" que ya usa EditarTabla.
+// de Reglas: al menos UN campo ya mapeado (cualquier rol, no solo "Estado" --
+// Monto, Cantidad, Stock mínimo, el que sea sirve de condición ahora) para
+// armar condiciones nuevas, o ya tienen al menos una regla guardada (ej.
+// "ajustar_stock", que no depende de ningún campo mapeado). El resto de
+// módulos (sin ningún significado marcado) no aparece acá.
 export async function GET() {
   const supabase = await crearClienteServidor();
   const sesion = await empresaDelUsuarioServidor(supabase);
@@ -27,7 +28,7 @@ export async function GET() {
 
   const modulos = (datasets ?? [])
     .map((d) => ({ datasetId: d.id as string, nombre: d.nombre as string, columnas: d.columnas as Columna[], reglas: (d.reglas as Regla[]) ?? [] }))
-    .filter((m) => m.reglas.length > 0 || m.columnas.some((c) => c.rol === "estado"));
+    .filter((m) => m.reglas.length > 0 || m.columnas.some((c) => c.rol !== null));
 
   return NextResponse.json({ modulos });
 }
