@@ -26,6 +26,11 @@ const seguimientoSubmenu = [
   { href: "/dashboard/calendario", texto: "Calendario" },
 ];
 
+const reglasSubmenu = [
+  { href: "/dashboard/reglas", texto: "Condicionales" },
+  { href: "/dashboard/enlaces", texto: "Enlaces" },
+];
+
 const itemsMenu = [
   { href: "/dashboard/cuenta", texto: "Mis datos" },
   { href: "/dashboard/empresa", texto: "Mi empresa" },
@@ -132,12 +137,13 @@ export default function BarraPanel({
   }, []);
 
   // "Inicio" también queda marcada dentro de un módulo concreto (/dashboard/<id>).
-  const fijas = [...enlaces.map((e) => e.href), ...modulosSubmenu.map((e) => e.href), ...resumenSubmenu.map((e) => e.href), ...seguimientoSubmenu.map((e) => e.href), "/dashboard/reglas"];
+  const fijas = [...enlaces.map((e) => e.href), ...modulosSubmenu.map((e) => e.href), ...resumenSubmenu.map((e) => e.href), ...seguimientoSubmenu.map((e) => e.href), ...reglasSubmenu.map((e) => e.href)];
   const activo = (href: string) =>
     href === "/dashboard" ? ruta === "/dashboard" || !fijas.some((f) => f !== "/dashboard" && ruta.startsWith(f)) : ruta === href;
   const activoModulos = modulosSubmenu.some((s) => s.href === ruta) || /^\/dashboard\/[0-9a-f-]{36}$/.test(ruta);
   const activoResumen = resumenSubmenu.some((s) => s.href === ruta);
   const activoSeguimiento = seguimientoSubmenu.some((s) => s.href === ruta);
+  const activoReglas = reglasSubmenu.some((s) => s.href === ruta);
 
   async function salir() {
     await crearClienteBrowser().auth.signOut();
@@ -169,11 +175,7 @@ export default function BarraPanel({
           )}
           {!esVendedor && <BotonSubmenu texto="Resumen" items={resumenSubmenu} activo={activoResumen} />}
           {!esVendedor && <BotonSubmenu texto="Seguimiento" items={seguimientoSubmenu} activo={activoSeguimiento} />}
-          {!esVendedor && (
-            <Link href="/dashboard/reglas" className="nav-link" aria-current={ruta === "/dashboard/reglas" ? "page" : undefined}>
-              Reglas
-            </Link>
-          )}
+          {!esVendedor && <BotonSubmenu texto="Condicionales y Enlaces" items={reglasSubmenu} activo={activoReglas} />}
           {esVendedor && (
             <Link href="/dashboard/calendario" className="nav-link" aria-current={activo("/dashboard/calendario") ? "page" : undefined}>
               Calendario

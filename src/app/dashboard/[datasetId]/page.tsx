@@ -4,7 +4,6 @@ import { useEffect, useState, use as usePromise } from "react";
 import Link from "next/link";
 import DynamicTable from "@/components/DynamicTable";
 import DynamicForm from "@/components/DynamicForm";
-import EnlacesTabla from "@/components/EnlacesTabla";
 import EditarTabla from "@/components/EditarTabla";
 import KardexProducto from "@/components/KardexProducto";
 import { enviarConfirmando } from "@/lib/confirmar";
@@ -383,7 +382,10 @@ export default function DatasetPage({
             moneda={dataset.moneda ?? "PEN"}
             onGuardado={cargar}
           />
-          <EnlacesTabla datasetId={datasetId} columnas={dataset.columnas} otras={otras} onGuardado={cargar} />
+          <p className="ayuda" style={{ marginTop: 4 }}>
+            Enlazá columnas de este módulo con otros (Cliente con Clientes, Producto con Stock...) desde{" "}
+            <Link href="/dashboard/enlaces">Enlaces</Link>.
+          </p>
 
           {esStock(dataset.columnas) && (() => {
             const cProducto = dataset.columnas.find((c) => c.rol === "producto")!;
