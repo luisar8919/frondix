@@ -381,7 +381,6 @@ export default function DatasetPage({
             columnas={dataset.columnas}
             incluyeIgv={!!dataset.incluye_igv}
             moneda={dataset.moneda ?? "PEN"}
-            reglas={dataset.reglas ?? []}
             onGuardado={cargar}
           />
           <EnlacesTabla datasetId={datasetId} columnas={dataset.columnas} otras={otras} onGuardado={cargar} />

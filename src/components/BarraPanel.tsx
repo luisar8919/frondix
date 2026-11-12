@@ -132,7 +132,7 @@ export default function BarraPanel({
   }, []);
 
   // "Inicio" también queda marcada dentro de un módulo concreto (/dashboard/<id>).
-  const fijas = [...enlaces.map((e) => e.href), ...modulosSubmenu.map((e) => e.href), ...resumenSubmenu.map((e) => e.href), ...seguimientoSubmenu.map((e) => e.href)];
+  const fijas = [...enlaces.map((e) => e.href), ...modulosSubmenu.map((e) => e.href), ...resumenSubmenu.map((e) => e.href), ...seguimientoSubmenu.map((e) => e.href), "/dashboard/reglas"];
   const activo = (href: string) =>
     href === "/dashboard" ? ruta === "/dashboard" || !fijas.some((f) => f !== "/dashboard" && ruta.startsWith(f)) : ruta === href;
   const activoModulos = modulosSubmenu.some((s) => s.href === ruta) || /^\/dashboard\/[0-9a-f-]{36}$/.test(ruta);
@@ -169,6 +169,11 @@ export default function BarraPanel({
           )}
           {!esVendedor && <BotonSubmenu texto="Resumen" items={resumenSubmenu} activo={activoResumen} />}
           {!esVendedor && <BotonSubmenu texto="Seguimiento" items={seguimientoSubmenu} activo={activoSeguimiento} />}
+          {!esVendedor && (
+            <Link href="/dashboard/reglas" className="nav-link" aria-current={ruta === "/dashboard/reglas" ? "page" : undefined}>
+              Reglas
+            </Link>
+          )}
           {esVendedor && (
             <Link href="/dashboard/calendario" className="nav-link" aria-current={activo("/dashboard/calendario") ? "page" : undefined}>
               Calendario
