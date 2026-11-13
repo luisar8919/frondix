@@ -76,7 +76,10 @@ export default function ReglasModulo({
   // Cualquier campo con significado mapeado puede ser el detonante -- ya no
   // solo los de rol "estado". Los que tienen opcionesFijas muestran un
   // desplegable de valores; el resto, texto o número libre según su tipo.
-  const columnasCondicion = columnas.filter((c) => c.rol !== null);
+  // Excepción: la "Cantidad" de un módulo de Stock nace con rol null a
+  // propósito (plantillaStock(), para no confundirse con otras plantillas
+  // que combinan Producto+Cantidad) -- se deja entrar igual por su key fija.
+  const columnasCondicion = columnas.filter((c) => c.rol !== null || c.key === "cantidad");
   const columnaDe = (key: string) => columnas.find((c) => c.key === key);
   const operadoresDe = (key: string) => (columnaDe(key)?.tipo === "numero" ? OPERADORES_NUMERO : OPERADORES_TEXTO);
   // Target de "cambiar_estado" ("registrar nuevo valor"): cualquier campo de
