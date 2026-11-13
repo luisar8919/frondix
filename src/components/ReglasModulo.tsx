@@ -65,6 +65,11 @@ export default function ReglasModulo({
   const [reglasLocal, setReglasLocal] = useState<Regla[]>(reglas);
   const [ocupado, setOcupado] = useState(false);
   const [mensaje, setMensaje] = useState<{ tipo: "ok" | "error"; texto: string } | null>(null);
+  // Qué reglas están desplegadas en modo edición (vs. la línea compacta de
+  // lectura). Una regla recién agregada arranca editando -- el resto del
+  // módulo queda colapsado, mismo criterio que el <details> de la tarjeta.
+  const [editando, setEditando] = useState<Record<string, boolean>>({});
+  const toggleEditar = (id: string) => setEditando((e) => ({ ...e, [id]: !e[id] }));
 
   const cambiarRegla = (i: number, parche: Partial<Regla>) => setReglasLocal((rs) => rs.map((r, j) => (j === i ? ({ ...r, ...parche } as Regla) : r)));
 
@@ -92,12 +97,53 @@ export default function ReglasModulo({
   }
 
   function agregarRegla() {
+    const id = crypto.randomUUID();
+    setEditando((e) => ({ ...e, [id]: true }));
     if (puedeAjustarStock && !hayAjustarStock) {
-      setReglasLocal((rs) => [...rs, { id: crypto.randomUUID(), activa: true, origen: "manual", condicion: { tipo: "siempre" }, accion: { tipo: "ajustar_stock" } }]);
+      setReglasLocal((rs) => [...rs, { id, activa: true, origen: "manual", condicion: { tipo: "siempre" }, accion: { tipo: "ajustar_stock" } }]);
       return;
     }
     if (columnasCondicion.length === 0) return;
-    setReglasLocal((rs) => [...rs, { id: crypto.randomUUID(), activa: true, origen: "manual", condicion: condicionPorDefecto(), accion: { tipo: "excluir_de_reportes" } }]);
+    setReglasLocal((rs) => [...rs, { id, activa: true, origen: "manual", condicion: condicionPorDefecto(), accion: { tipo: "excluir_de_reportes" } }]);
+  }
+
+  // Icono + texto de una sola línea para la fila compacta (modo lectura) --
+  // mismo vocabulario que ya se usa al construir/editar la regla, solo
+  // resumido a lo legible: "Si <condición> -> <acción>".
+  const ICONO_ACCION: Record<TipoAccion, string> = {
+    excluir_de_reportes: "🚫",
+    cambiar_estado: "🔄",
+    ajustar_stock: "📦",
+    enviar_whatsapp: "💬",
+    agregar_seguimiento: "👀",
+    notificacion_push: "🔔",
+    sumar_campo_enlazado: "➕",
+  };
+  const OPERADOR_SIMBOLO: Record<Operador, string> = { es: "es", no_es: "no es", mayor: ">", mayor_igual: "≥", menor: "<", menor_igual: "≤" };
+
+  function textoCondicion(r: Regla): string {
+    if (r.accion.tipo === "ajustar_stock" && ajustarStockInfo) {
+      return `Si registra ${ajustarStockInfo.tipoModulo === "ventas" ? "una venta" : "una compra"}`;
+    }
+    const c = datosCondicion(r);
+    if (!c.key) return "Siempre";
+    return `Si ${columnaDe(c.key)?.label ?? c.key} ${OPERADOR_SIMBOLO[c.operador]} "${c.valor}"`;
+  }
+
+  function textoAccion(r: Regla): string {
+    const a = r.accion;
+    if (a.tipo === "excluir_de_reportes") return "Excluir de reportes";
+    if (a.tipo === "agregar_seguimiento") return "Agregar a Seguimiento";
+    if (a.tipo === "cambiar_estado") return `Cambiar ${columnaDe(a.columnaKey)?.label ?? a.columnaKey} a "${a.valor}"`;
+    if (a.tipo === "ajustar_stock") {
+      if (!ajustarStockInfo) return "Ajustar Stock automáticamente";
+      const cant = ajustarStockInfo.cantidadLabel ? `"${ajustarStockInfo.cantidadLabel}"` : "1";
+      return `${ajustarStockInfo.tipoModulo === "ventas" ? "Restar" : "Sumar"} ${cant} de Cantidad en "${ajustarStockInfo.stockNombre}"`;
+    }
+    if (a.tipo === "enviar_whatsapp") return `Enviar WhatsApp${a.mensaje ? `: "${a.mensaje.slice(0, 40)}${a.mensaje.length > 40 ? "..." : ""}"` : ""}`;
+    if (a.tipo === "notificacion_push") return `Notificar${a.titulo ? `: "${a.titulo}"` : ""}`;
+    const c = candidatoDe(claveCandidato({ columnaEnlaceKey: a.columnaEnlaceKey, columnaObjetivoKey: a.columnaObjetivoKey } as CandidatoSumarCampo));
+    return `Sumar ${a.delta} a ${c?.columnaObjetivoLabel ?? a.columnaObjetivoKey}${c ? ` en ${c.datasetObjetivoNombre}` : ""}`;
   }
 
   async function guardar() {
@@ -168,9 +214,15 @@ export default function ReglasModulo({
     cambiarRegla(i, { condicion, accion: { tipo, columnaKey, valor: columnaDe(columnaKey)?.opcionesFijas?.[0] ?? "" } });
   }
 
+  const iconosPresentes = [...new Set(reglasLocal.map((r) => ICONO_ACCION[r.accion.tipo as TipoAccion]))];
+
   return (
-    <div className="tarjeta" style={{ marginBottom: 20 }}>
-      <h3 style={{ margin: 0 }}>{nombre}</h3>
+    <details className="tarjeta" style={{ marginBottom: 20 }}>
+      <summary style={{ cursor: "pointer", display: "flex", gap: 10, alignItems: "baseline", flexWrap: "wrap" }}>
+        <h3 style={{ margin: 0, display: "inline" }}>{nombre}</h3>
+        <span className="suave pequeno">{reglasLocal.length} regla{reglasLocal.length === 1 ? "" : "s"}</span>
+        {iconosPresentes.length > 0 && <span>{iconosPresentes.join(" ")}</span>}
+      </summary>
 
       {reglasLocal.length === 0 && (
         <p className="suave pequeno" style={{ marginTop: 10 }}>Este módulo todavía no tiene ninguna regla.</p>
@@ -179,8 +231,33 @@ export default function ReglasModulo({
       {reglasLocal.map((r, i) => {
         const cond = datosCondicion(r);
         const otraYaTieneAjustarStock = reglasLocal.some((r2, j) => j !== i && r2.accion.tipo === "ajustar_stock");
+
+        if (!editando[r.id]) {
+          return (
+            <div key={r.id} style={{ display: "flex", gap: 8, alignItems: "center", padding: "8px 0", borderTop: "1px solid var(--borde, #e5e5e5)" }}>
+              <button
+                type="button"
+                aria-label={r.activa ? "Desactivar regla" : "Activar regla"}
+                onClick={() => cambiarRegla(i, { activa: !r.activa })}
+                style={{ background: "none", border: "none", cursor: "pointer", fontSize: 15, padding: 0, lineHeight: 1 }}
+              >
+                {r.activa ? "🟢" : "⚪"}
+              </button>
+              <span className="pequeno" style={{ flex: 1, opacity: r.activa ? 1 : 0.5 }}>
+                {ICONO_ACCION[r.accion.tipo as TipoAccion]} {textoCondicion(r)} → {textoAccion(r)}
+              </span>
+              <button type="button" aria-label="Editar regla" onClick={() => toggleEditar(r.id)} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 14, padding: 0 }}>
+                ✏️
+              </button>
+              <button type="button" aria-label="Quitar regla" onClick={() => setReglasLocal((rs) => rs.filter((_, j) => j !== i))} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 14, padding: 0 }}>
+                🗑️
+              </button>
+            </div>
+          );
+        }
+
         return (
-          <div key={r.id} className="fila-columna" style={{ gridTemplateColumns: "1fr auto", alignItems: "start", marginTop: 14 }}>
+          <div key={r.id} className="fila-columna" style={{ gridTemplateColumns: "1fr auto", alignItems: "start", marginTop: 14, paddingTop: 14, borderTop: "1px solid var(--borde, #e5e5e5)" }}>
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
               {r.accion.tipo !== "ajustar_stock" && (
                 <>
@@ -316,11 +393,8 @@ export default function ReglasModulo({
               )}
             </div>
             <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-              <label className="pequeno" style={{ display: "flex", gap: 4, alignItems: "center", whiteSpace: "nowrap" }}>
-                <input type="checkbox" checked={r.activa} onChange={(e) => cambiarRegla(i, { activa: e.target.checked })} /> Activa
-              </label>
-              <button type="button" className="btn btn-fantasma" onClick={() => setReglasLocal((rs) => rs.filter((_, j) => j !== i))}>
-                Quitar
+              <button type="button" className="btn btn-primario" onClick={() => toggleEditar(r.id)}>
+                ✓ Listo
               </button>
             </div>
           </div>
@@ -338,6 +412,6 @@ export default function ReglasModulo({
         </button>
         {mensaje && <span className={`alerta ${mensaje.tipo === "ok" ? "alerta-ok" : "alerta-error"}`} role="status" style={{ margin: 0 }}>{mensaje.texto}</span>}
       </div>
-    </div>
+    </details>
   );
 }
