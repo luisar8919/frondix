@@ -35,9 +35,23 @@ export const OPERADORES_NUMERO: { valor: Operador; etiqueta: string }[] = [
   { valor: "menor_igual", etiqueta: "es menor o igual que" },
 ];
 
+// Detonante: cuándo se evalúa la regla. Legado (undefined) = las 3, mismo
+// comportamiento que antes de que existiera este campo -- nunca se vuelve a
+// guardar undefined desde la UI, siempre un array explícito.
+export type Evento = "creacion" | "modificacion" | "eliminacion";
+export const EVENTOS: { valor: Evento; etiqueta: string }[] = [
+  { valor: "creacion", etiqueta: "Creación" },
+  { valor: "modificacion", etiqueta: "Modificación" },
+  { valor: "eliminacion", etiqueta: "Eliminación" },
+];
+
 export type Condicion =
   | { tipo: "siempre" }
-  | { tipo: "campo"; columnaKey: string; operador: Operador; valor: string }
+  // `compararColumnaKey`, si está presente, ignora `valor` (literal) y compara
+  // contra el valor de ESE OTRO campo del mismo registro en su lugar -- ej.
+  // "Cantidad > Stock mínimo". `valor` sigue siendo obligatorio en el tipo
+  // (vacío si no se usa) para no bifurcar la unión en 2 formas de "campo".
+  | { tipo: "campo"; columnaKey: string; operador: Operador; valor: string; compararColumnaKey?: string }
   | { tipo: "estado"; columnaKey: string; valor: string }; // legado, ver comentario arriba
 
 export type Accion =
@@ -64,7 +78,12 @@ export type Accion =
   // que ajustarStock() en stock.ts, pero sin Kardex (eso es específico de
   // Stock). `columnaEnlaceKey` es una columna de ESTE módulo con `.enlace`;
   // `columnaObjetivoKey` es el campo numérico a sumar en el dataset enlazado.
-  | { tipo: "sumar_campo_enlazado"; columnaEnlaceKey: string; columnaObjetivoKey: string; delta: number };
+  | { tipo: "sumar_campo_enlazado"; columnaEnlaceKey: string; columnaObjetivoKey: string; delta: number }
+  // Borra directamente el registro que acaba de disparar la regla -- ej. "si
+  // Cantidad <= 0 -> eliminar este registro". Solo tiene efecto en creación/
+  // modificación (ver reglasAplicar.ts): en un registro que ya se está
+  // eliminando no hay nada que borrar de nuevo.
+  | { tipo: "eliminar_registro" };
 
 export interface Regla {
   id: string;
@@ -72,6 +91,8 @@ export interface Regla {
   // "automatica" = la creó el sistema (enlace de stock, sugerencia de plantilla) -- informativo
   // para la UI (ver ReglasModulo), no cambia en nada cómo se evalúa.
   origen: "automatica" | "manual";
+  // undefined = legado, equivale a las 3 (ver Evento arriba).
+  evento?: Evento[];
   condicion: Condicion;
   accion: Accion;
 }
@@ -81,14 +102,15 @@ export function condicionCumple(condicion: Condicion, datos: Record<string, unkn
   if (condicion.tipo === "estado") return String(datos[condicion.columnaKey] ?? "").trim() === condicion.valor;
 
   const crudo = datos[condicion.columnaKey];
-  if (condicion.operador === "es") return String(crudo ?? "").trim() === condicion.valor;
-  if (condicion.operador === "no_es") return String(crudo ?? "").trim() !== condicion.valor;
+  const comparado = condicion.compararColumnaKey ? datos[condicion.compararColumnaKey] : condicion.valor;
+  if (condicion.operador === "es") return String(crudo ?? "").trim() === String(comparado ?? "").trim();
+  if (condicion.operador === "no_es") return String(crudo ?? "").trim() !== String(comparado ?? "").trim();
 
   // Resto de operadores son numéricos (mayor/menor): si cualquiera de los 2
   // lados no es un número real, la condición simplemente no matchea -- nunca
   // un error, un campo de texto con un operador numérico solo no dispara.
   const num = Number(crudo);
-  const umbral = Number(condicion.valor);
+  const umbral = Number(comparado);
   if (!Number.isFinite(num) || !Number.isFinite(umbral)) return false;
   if (condicion.operador === "mayor") return num > umbral;
   if (condicion.operador === "mayor_igual") return num >= umbral;

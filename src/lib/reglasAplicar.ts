@@ -6,7 +6,7 @@ import { normalizarTexto, normalizarTelefonoPE } from "./seguimiento.ts";
 import { enviarTexto } from "./whatsapp.ts";
 import { enviarPush } from "./push.ts";
 import { crearClienteAdmin } from "./supabase/admin.ts";
-import { condicionCumple, type Accion, type Regla } from "./reglas.ts";
+import { condicionCumple, type Accion, type Evento, type Regla } from "./reglas.ts";
 
 // Lógica de EJECUCIÓN de reglas (servidor, nunca desde un componente cliente
 // -- ver el comentario en reglas.ts sobre por qué esto está separado: acá se
@@ -64,10 +64,12 @@ async function dispatchSumarCampoEnlazado(
 //
 // `datosNuevos`/`datosViejos` siguen el mismo significado que ya tenían en
 // stock.ts: solo `datosNuevos` = alta; ambos = edición; solo `datosViejos` =
-// eliminación. Las reglas basadas en condición (no "siempre") solo tienen
-// sentido si hay una fila viva después del cambio, así que se saltean en una
-// eliminación -- no hay nada que excluir de reportes, avisar por WhatsApp o
-// activar seguimiento de un registro que ya no existe.
+// eliminación -- de ahí se deriva `evento`, contra el que se filtra
+// `regla.evento` (el "Detonante" de la UI). Mutar el registro (excluir de
+// reportes, cambiar un campo, eliminarlo) no tiene sentido en una
+// eliminación -- no hay fila viva que tocar -- así que esas 2 primeras se
+// saltean solas (necesitan `recordId` + `datosNuevos`); los efectos externos
+// (WhatsApp, seguimiento, push) sí pueden evaluarse contra los datos viejos.
 //
 // "Mejor esfuerzo" como el resto de este archivo hermano (stock.ts): quien
 // llama debe envolver esto en try/catch, un fallo acá nunca debe tumbar el
@@ -88,9 +90,14 @@ export async function aplicarReglasDesdeRegistro(
 ): Promise<void> {
   let datosFinal: Record<string, unknown> | undefined;
   let huboMutacion = false;
+  // Mismo criterio que ya usaba stock.ts para distinguir alta/edición/baja a
+  // partir de qué lado viene presente -- ver comentario de `evento` en
+  // reglas.ts. `regla.evento` filtra sobre este mismo valor.
+  const evento: Evento = datosNuevos && !datosViejos ? "creacion" : datosViejos && datosNuevos ? "modificacion" : "eliminacion";
 
   for (const regla of reglas) {
     if (!regla.activa) continue;
+    if (regla.evento && !regla.evento.includes(evento)) continue;
 
     if (regla.accion.tipo === "ajustar_stock") {
       if (datosNuevos && !datosViejos) {
@@ -115,24 +122,35 @@ export async function aplicarReglasDesdeRegistro(
       continue;
     }
 
-    // El resto (excluir_de_reportes, cambiar_estado, enviar_whatsapp,
-    // agregar_seguimiento, notificacion_push) necesita una fila viva con la
-    // que evaluar la condición -- no aplica a un registro recién eliminado.
-    if (!datosNuevos) continue;
-    if (!condicionCumple(regla.condicion, datosNuevos)) continue;
+    // El resto necesita una fila sobre la que evaluar la condición: los datos
+    // nuevos si existen (creación/modificación), o los viejos si el evento es
+    // una eliminación (ya no hay fila nueva, pero sí tiene sentido evaluar
+    // "qué tenía" para un aviso -- ej. "al eliminar una Reserva, notificar").
+    const datosEval = datosNuevos ?? datosViejos;
+    if (!datosEval) continue;
+    if (!condicionCumple(regla.condicion, datosEval)) continue;
 
-    if (regla.accion.tipo === "excluir_de_reportes") {
-      if (!datosFinal) datosFinal = { ...datosNuevos };
-      datosFinal._excluido_reportes = true;
-      huboMutacion = true;
+    if (regla.accion.tipo === "eliminar_registro") {
+      // Solo tiene sentido en creación/modificación -- ver comentario del tipo en reglas.ts.
+      if (recordId && evento !== "eliminacion") {
+        try { await supabase.from("records").delete().eq("id", recordId); } catch { /* mejor esfuerzo */ }
+      }
+    } else if (regla.accion.tipo === "excluir_de_reportes") {
+      if (recordId && datosNuevos) {
+        if (!datosFinal) datosFinal = { ...datosNuevos };
+        datosFinal._excluido_reportes = true;
+        huboMutacion = true;
+      }
     } else if (regla.accion.tipo === "cambiar_estado") {
-      if (!datosFinal) datosFinal = { ...datosNuevos };
-      datosFinal[regla.accion.columnaKey] = regla.accion.valor;
-      huboMutacion = true;
+      if (recordId && datosNuevos) {
+        if (!datosFinal) datosFinal = { ...datosNuevos };
+        datosFinal[regla.accion.columnaKey] = regla.accion.valor;
+        huboMutacion = true;
+      }
     } else if (regla.accion.tipo === "enviar_whatsapp") {
       try {
         const cTelefono = columnas.find((c) => c.rol === "telefono");
-        const telefono = cTelefono ? normalizarTelefonoPE(datosNuevos[cTelefono.key]) : null;
+        const telefono = cTelefono ? normalizarTelefonoPE(datosEval[cTelefono.key]) : null;
         if (telefono) await enviarTexto(telefono, regla.accion.mensaje);
       } catch {
         // ver comentario de arriba -- ej. fuera de la ventana de 24h de WhatsApp
@@ -140,10 +158,10 @@ export async function aplicarReglasDesdeRegistro(
     } else if (regla.accion.tipo === "agregar_seguimiento") {
       try {
         const cCliente = columnas.find((c) => c.rol === "cliente");
-        const nombre = cCliente ? String(datosNuevos[cCliente.key] ?? "").trim() : "";
+        const nombre = cCliente ? String(datosEval[cCliente.key] ?? "").trim() : "";
         if (nombre && datasetId) {
           const cFecha = columnas.find((c) => c.rol === "fecha" && c.tipo === "fecha");
-          const fecha = cFecha ? String(datosNuevos[cFecha.key] ?? "").slice(0, 10) || null : null;
+          const fecha = cFecha ? String(datosEval[cFecha.key] ?? "").slice(0, 10) || null : null;
           await supabase.from("seguimiento_clientes").upsert(
             { empresa_id: empresaId, dataset_id: datasetId, cliente_clave: normalizarTexto(nombre), cliente_nombre: nombre, activo: true, ultima_fecha_cliente: fecha },
             { onConflict: "dataset_id,cliente_clave" }

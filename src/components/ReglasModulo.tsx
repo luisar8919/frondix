@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import type { Columna } from "@/lib/excel-parser";
-import { OPERADORES_NUMERO, OPERADORES_TEXTO, type Regla, type Operador } from "@/lib/reglas";
+import { OPERADORES_NUMERO, OPERADORES_TEXTO, EVENTOS, type Regla, type Operador, type Evento } from "@/lib/reglas";
 import { enviarConfirmando } from "@/lib/confirmar";
 
 // Las reglas (condición -> acción) de UN módulo, como su propia tarjeta --
@@ -29,7 +29,7 @@ interface CandidatoSumarCampo {
   datasetObjetivoNombre: string;
 }
 
-type TipoAccion = "excluir_de_reportes" | "cambiar_estado" | "ajustar_stock" | "enviar_whatsapp" | "agregar_seguimiento" | "notificacion_push" | "sumar_campo_enlazado";
+type TipoAccion = "excluir_de_reportes" | "cambiar_estado" | "ajustar_stock" | "enviar_whatsapp" | "agregar_seguimiento" | "notificacion_push" | "sumar_campo_enlazado" | "eliminar_registro";
 
 export default function ReglasModulo({
   datasetId,
@@ -79,9 +79,10 @@ export default function ReglasModulo({
   const columnasCondicion = columnas.filter((c) => c.rol !== null);
   const columnaDe = (key: string) => columnas.find((c) => c.key === key);
   const operadoresDe = (key: string) => (columnaDe(key)?.tipo === "numero" ? OPERADORES_NUMERO : OPERADORES_TEXTO);
-  // Target de "cambiar_estado": cualquier campo de texto con lista cerrada (tiene sentido
-  // "cambiar a" un valor fijo, no texto libre arbitrario).
-  const columnasDestino = columnas.filter((c) => c.tipo === "texto" && (c.opcionesFijas?.length ?? 0) > 0);
+  // Target de "cambiar_estado" ("registrar nuevo valor"): cualquier campo de
+  // texto o número -- valorInput() ya elige select (si tiene opcionesFijas) o
+  // input libre según corresponda.
+  const columnasDestino = columnas.filter((c) => c.tipo === "texto" || c.tipo === "numero");
   // Solo una regla "ajustar_stock" tiene sentido por módulo -- si hubiera 2 activas
   // a la vez, un movimiento ajustaría el Stock el doble (aplicarReglasDesdeRegistro
   // dispara TODAS las que matcheen). Se oculta la opción en las demás filas una
@@ -118,8 +119,17 @@ export default function ReglasModulo({
     agregar_seguimiento: "👀",
     notificacion_push: "🔔",
     sumar_campo_enlazado: "➕",
+    eliminar_registro: "🗑️",
   };
   const OPERADOR_SIMBOLO: Record<Operador, string> = { es: "es", no_es: "no es", mayor: ">", mayor_igual: "≥", menor: "<", menor_igual: "≤" };
+
+  // Detonante en texto -- solo se muestra si NO son los 3 (si es undefined o
+  // están los 3, el detonante es "siempre que se guarde", el caso de siempre
+  // hasta ahora, y mostrarlo sería ruido).
+  function textoEvento(r: Regla): string {
+    if (!r.evento || r.evento.length === 3) return "";
+    return `[Al ${r.evento.map((e) => EVENTOS.find((x) => x.valor === e)?.etiqueta.toLowerCase()).join("/")}] `;
+  }
 
   function textoCondicion(r: Regla): string {
     if (r.accion.tipo === "ajustar_stock" && ajustarStockInfo) {
@@ -127,11 +137,14 @@ export default function ReglasModulo({
     }
     const c = datosCondicion(r);
     if (!c.key) return "Siempre";
-    return `Si ${columnaDe(c.key)?.label ?? c.key} ${OPERADOR_SIMBOLO[c.operador]} "${c.valor}"`;
+    const comparar = r.condicion.tipo === "campo" ? r.condicion.compararColumnaKey : undefined;
+    const ladoDerecho = comparar ? `campo "${columnaDe(comparar)?.label ?? comparar}"` : `"${c.valor}"`;
+    return `Si ${columnaDe(c.key)?.label ?? c.key} ${OPERADOR_SIMBOLO[c.operador]} ${ladoDerecho}`;
   }
 
   function textoAccion(r: Regla): string {
     const a = r.accion;
+    if (a.tipo === "eliminar_registro") return "Eliminar este registro";
     if (a.tipo === "excluir_de_reportes") return "Excluir de reportes";
     if (a.tipo === "agregar_seguimiento") return "Agregar a Seguimiento";
     if (a.tipo === "cambiar_estado") return `Cambiar ${columnaDe(a.columnaKey)?.label ?? a.columnaKey} a "${a.valor}"`;
@@ -198,7 +211,7 @@ export default function ReglasModulo({
     }
     const cond = datosCondicion(r);
     const condicion: Regla["condicion"] = cond.key ? { tipo: "campo", columnaKey: cond.key, operador: cond.operador, valor: cond.valor } : condicionPorDefecto();
-    if (tipo === "excluir_de_reportes" || tipo === "agregar_seguimiento") {
+    if (tipo === "excluir_de_reportes" || tipo === "agregar_seguimiento" || tipo === "eliminar_registro") {
       cambiarRegla(i, { condicion, accion: { tipo } });
       return;
     }
@@ -244,7 +257,7 @@ export default function ReglasModulo({
                 {r.activa ? "🟢" : "⚪"}
               </button>
               <span className="pequeno" style={{ flex: 1, opacity: r.activa ? 1 : 0.5 }}>
-                {ICONO_ACCION[r.accion.tipo as TipoAccion]} {textoCondicion(r)} → {textoAccion(r)}
+                {textoEvento(r)}{ICONO_ACCION[r.accion.tipo as TipoAccion]} {textoCondicion(r)} → {textoAccion(r)}
               </span>
               <button type="button" aria-label="Editar regla" onClick={() => toggleEditar(r.id)} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 14, padding: 0 }}>
                 ✏️
@@ -258,6 +271,24 @@ export default function ReglasModulo({
 
         return (
           <div key={r.id} className="fila-columna" style={{ gridTemplateColumns: "1fr auto", alignItems: "start", marginTop: 14, paddingTop: 14, borderTop: "1px solid var(--borde, #e5e5e5)" }}>
+            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+              <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
+                <span className="suave pequeno">Cuándo</span>
+                {EVENTOS.map((ev) => (
+                  <label key={ev.valor} className="pequeno" style={{ display: "flex", gap: 4, alignItems: "center", whiteSpace: "nowrap" }}>
+                    <input
+                      type="checkbox"
+                      checked={!r.evento || r.evento.includes(ev.valor)}
+                      onChange={(e) => {
+                        const actuales = r.evento ?? EVENTOS.map((x) => x.valor);
+                        const nuevos = e.target.checked ? [...actuales, ev.valor] : actuales.filter((x) => x !== ev.valor);
+                        cambiarRegla(i, { evento: (nuevos.length ? nuevos : actuales) as Evento[] });
+                      }}
+                    />{" "}
+                    {ev.etiqueta}
+                  </label>
+                ))}
+              </div>
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
               {r.accion.tipo !== "ajustar_stock" && (
                 <>
@@ -280,7 +311,32 @@ export default function ReglasModulo({
                   >
                     {operadoresDe(cond.key).map((op) => <option key={op.valor} value={op.valor}>{op.etiqueta}</option>)}
                   </select>
-                  {valorInput(cond.key, cond.valor, (v) => cambiarRegla(i, { condicion: { tipo: "campo", columnaKey: cond.key, operador: cond.operador, valor: v } }), "Valor de la condición")}
+                  <select
+                    aria-label="Comparar contra"
+                    value={r.condicion.tipo === "campo" && r.condicion.compararColumnaKey ? "campo" : "valor"}
+                    onChange={(e) => {
+                      if (e.target.value === "campo") {
+                        const otra = columnasCondicion.find((c) => c.key !== cond.key) ?? columnasCondicion[0];
+                        cambiarRegla(i, { condicion: { tipo: "campo", columnaKey: cond.key, operador: cond.operador, valor: "", compararColumnaKey: otra?.key } });
+                      } else {
+                        cambiarRegla(i, { condicion: { tipo: "campo", columnaKey: cond.key, operador: cond.operador, valor: columnaDe(cond.key)?.opcionesFijas?.[0] ?? "" } });
+                      }
+                    }}
+                  >
+                    <option value="valor">un valor</option>
+                    <option value="campo">otro campo</option>
+                  </select>
+                  {r.condicion.tipo === "campo" && r.condicion.compararColumnaKey ? (
+                    <select
+                      aria-label="Campo a comparar"
+                      value={r.condicion.compararColumnaKey}
+                      onChange={(e) => cambiarRegla(i, { condicion: { tipo: "campo", columnaKey: cond.key, operador: cond.operador, valor: "", compararColumnaKey: e.target.value } })}
+                    >
+                      {columnasCondicion.map((c) => <option key={c.key} value={c.key}>{c.label}</option>)}
+                    </select>
+                  ) : (
+                    valorInput(cond.key, cond.valor, (v) => cambiarRegla(i, { condicion: { tipo: "campo", columnaKey: cond.key, operador: cond.operador, valor: v } }), "Valor de la condición")
+                  )}
                   <span className="suave pequeno">Acción</span>
                 </>
               )}
@@ -292,6 +348,7 @@ export default function ReglasModulo({
                 {hayCliente && <option value="agregar_seguimiento">Agregar a Seguimiento</option>}
                 <option value="notificacion_push">Notificación push</option>
                 {candidatosSumarCampo.length > 0 && <option value="sumar_campo_enlazado">Sumar un campo enlazado</option>}
+                <option value="eliminar_registro">Eliminar este registro</option>
               </select>
 
               {r.accion.tipo === "cambiar_estado" && (
@@ -391,6 +448,7 @@ export default function ReglasModulo({
                   </p>
                 </>
               )}
+            </div>
             </div>
             <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
               <button type="button" className="btn btn-primario" onClick={() => toggleEditar(r.id)}>
