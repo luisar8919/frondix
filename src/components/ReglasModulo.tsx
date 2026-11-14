@@ -301,9 +301,17 @@ export default function ReglasModulo({
                 ))}
               </div>
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
-              {r.accion.tipo !== "ajustar_stock" && (
+              <span className="suave pequeno">Campo</span>
+              {r.accion.tipo === "ajustar_stock" && ajustarStockInfo ? (
                 <>
-                  <span className="suave pequeno">Campo</span>
+                  <select disabled aria-label="Campo de la condición (fijo)"><option>Este módulo registra</option></select>
+                  <select disabled aria-label="Operador (fijo)"><option>es</option></select>
+                  <select disabled aria-label="Valor (fijo)">
+                    <option>{ajustarStockInfo.tipoModulo === "ventas" ? "una Venta" : "una Compra"}</option>
+                  </select>
+                </>
+              ) : (
+                <>
                   <select
                     aria-label="Campo de la condición"
                     value={cond.key}
@@ -348,9 +356,9 @@ export default function ReglasModulo({
                   ) : (
                     valorInput(cond.key, cond.valor, (v) => cambiarRegla(i, { condicion: { tipo: "campo", columnaKey: cond.key, operador: cond.operador, valor: v } }), "Valor de la condición")
                   )}
-                  <span className="suave pequeno">Acción</span>
                 </>
               )}
+              <span className="suave pequeno">Acción</span>
               <select aria-label="Acción" value={r.accion.tipo} onChange={(e) => cambiarAccion(i, r, e.target.value as TipoAccion)}>
                 <option value="excluir_de_reportes">Excluir de reportes</option>
                 {columnasDestino.length > 0 && <option value="cambiar_estado">Cambiar un campo a...</option>}
@@ -470,13 +478,6 @@ export default function ReglasModulo({
 
               {r.accion.tipo === "ajustar_stock" && ajustarStockInfo && (
                 <>
-                  <span className="suave pequeno">Si</span>
-                  <select disabled aria-label="Campo de la condición (fijo)"><option>Este módulo registra</option></select>
-                  <select disabled aria-label="Operador (fijo)"><option>es</option></select>
-                  <select disabled aria-label="Valor (fijo)">
-                    <option>{ajustarStockInfo.tipoModulo === "ventas" ? "una Venta" : "una Compra"}</option>
-                  </select>
-                  <span className="suave pequeno">entonces</span>
                   <select disabled aria-label="Acción (fija)">
                     <option>{ajustarStockInfo.tipoModulo === "ventas" ? "Restar de" : "Sumar a"}</option>
                   </select>
