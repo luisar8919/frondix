@@ -163,6 +163,7 @@ export default function ReglasModulo({
     const c = candidatoDe(claveCandidato({ columnaEnlaceKey: a.columnaEnlaceKey, columnaObjetivoKey: a.columnaObjetivoKey } as CandidatoSumarCampo));
     const campo = `${c?.columnaObjetivoLabel ?? a.columnaObjetivoKey}${c ? ` en ${c.datasetObjetivoNombre}` : ""}`;
     if (a.modo === "fijar") return `Fijar ${campo} a "${a.valor ?? ""}"`;
+    if (a.deltaColumnaKey) return `${a.delta < 0 ? "Restar" : "Sumar"} "${columnaDe(a.deltaColumnaKey)?.label ?? a.deltaColumnaKey}" a ${campo}`;
     return `Sumar ${a.delta} a ${campo}`;
   }
 
@@ -451,7 +452,42 @@ export default function ReglasModulo({
                         <option value="fijar">fijar un valor</option>
                       </select>
                     )}
-                    {modo === "sumar" ? (
+                    {modo === "sumar" && (
+                      <select
+                        aria-label="Cantidad fija o de un campo"
+                        value={a.deltaColumnaKey ? "campo" : "fijo"}
+                        onChange={(e) => {
+                          if (e.target.value === "campo") {
+                            const primeraNumerica = columnas.find((c) => c.tipo === "numero");
+                            cambiarRegla(i, { accion: { ...a, deltaColumnaKey: primeraNumerica?.key } });
+                          } else {
+                            cambiarRegla(i, { accion: { ...a, deltaColumnaKey: undefined } });
+                          }
+                        }}
+                      >
+                        <option value="fijo">cantidad fija</option>
+                        <option value="campo">cantidad de un campo de este módulo</option>
+                      </select>
+                    )}
+                    {modo === "sumar" && a.deltaColumnaKey ? (
+                      <>
+                        <select
+                          aria-label="Sumar o restar"
+                          value={a.delta < 0 ? "restar" : "sumar"}
+                          onChange={(e) => cambiarRegla(i, { accion: { ...a, delta: e.target.value === "restar" ? -1 : 1 } })}
+                        >
+                          <option value="sumar">sumar</option>
+                          <option value="restar">restar</option>
+                        </select>
+                        <select
+                          aria-label="Campo con la cantidad"
+                          value={a.deltaColumnaKey}
+                          onChange={(e) => cambiarRegla(i, { accion: { ...a, deltaColumnaKey: e.target.value } })}
+                        >
+                          {columnas.filter((c) => c.tipo === "numero").map((c) => <option key={c.key} value={c.key}>{c.label}</option>)}
+                        </select>
+                      </>
+                    ) : modo === "sumar" ? (
                       <input
                         aria-label="Cuánto sumar (negativo para restar)"
                         type="number"

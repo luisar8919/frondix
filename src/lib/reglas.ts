@@ -84,8 +84,13 @@ export type Accion =
   // posible si es texto) usa `valor` como literal -- "fijar" es idempotente
   // (sin deshacer/rehacer como "sumar" en una edición, ver reglasAplicar.ts).
   // `modo` ausente = legado, equivale a "sumar" (reglas guardadas antes de
-  // esta generalización).
-  | { tipo: "sumar_campo_enlazado"; columnaEnlaceKey: string; columnaObjetivoKey: string; delta: number; modo?: "sumar" | "fijar"; valor?: string }
+  // esta generalización). `deltaColumnaKey`, si está presente, ignora la
+  // MAGNITUD de `delta` y usa en su lugar el valor de ESE campo numérico de
+  // ESTE registro (ej. la "Cantidad" real de la venta, no un -1 fijo) -- el
+  // SIGNO de `delta` se conserva como dirección (sumar vs. restar). Mismo
+  // patrón que ajustarStockDesdeRegistro en stock.ts (columna rol "cantidad",
+  // con piso de 1 si no es un número válido o es <= 0).
+  | { tipo: "sumar_campo_enlazado"; columnaEnlaceKey: string; columnaObjetivoKey: string; delta: number; deltaColumnaKey?: string; modo?: "sumar" | "fijar"; valor?: string }
   // Borra directamente el registro que acaba de disparar la regla -- ej. "si
   // Cantidad <= 0 -> eliminar este registro". Solo tiene efecto en creación/
   // modificación (ver reglasAplicar.ts): en un registro que ya se está

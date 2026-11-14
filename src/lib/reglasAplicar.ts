@@ -40,6 +40,19 @@ async function sumarCampoEnlazado(
   }
 }
 
+// Magnitud real a sumar: `delta` tal cual si no hay `deltaColumnaKey`, o el
+// valor de ESE campo de este registro (ej. la Cantidad real de la venta) si
+// lo hay -- mismo piso de 1 que ajustarStockDesdeRegistro en stock.ts si el
+// campo no trae un número válido/positivo, para nunca sumar 0 por un dato
+// sucio. El SIGNO de `delta` decide la dirección en ambos casos.
+function magnitudSumarCampoEnlazado(accion: Extract<Accion, { tipo: "sumar_campo_enlazado" }>, datos: Record<string, unknown>): number {
+  const direccion = accion.delta < 0 ? -1 : 1;
+  if (!accion.deltaColumnaKey) return accion.delta;
+  const cruda = Number(datos[accion.deltaColumnaKey]);
+  const magnitud = Number.isFinite(cruda) && cruda > 0 ? cruda : 1;
+  return direccion * magnitud;
+}
+
 async function dispatchSumarCampoEnlazado(
   supabase: SupabaseClient,
   columnas: Columna[],
@@ -51,7 +64,7 @@ async function dispatchSumarCampoEnlazado(
   if (!cEnlace?.enlace) return;
   const valor = datos[cEnlace.key]?.toString().trim();
   if (!valor) return;
-  await sumarCampoEnlazado(supabase, cEnlace.enlace.datasetId, cEnlace.enlace.columnaKey, valor, accion.columnaObjetivoKey, signo * accion.delta);
+  await sumarCampoEnlazado(supabase, cEnlace.enlace.datasetId, cEnlace.enlace.columnaKey, valor, accion.columnaObjetivoKey, signo * magnitudSumarCampoEnlazado(accion, datos));
 }
 
 // Fija (en vez de sumar) el campo objetivo del registro enlazado -- lo crea
