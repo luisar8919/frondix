@@ -82,13 +82,18 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ data
   const q = req.nextUrl.searchParams;
   const desde = Math.max(0, parseInt(q.get("desde") ?? "0", 10) || 0);
   const limite = Math.min(MAX_PAGINA, Math.max(1, parseInt(q.get("limite") ?? String(MAX_PAGINA), 10) || MAX_PAGINA));
+  // ?papelera=1 pide los registros en la papelera (eliminado_en no nulo) en vez
+  // de los vivos -- misma paginación, un solo endpoint, ver /dashboard/[datasetId]/papelera.
+  const papelera = q.get("papelera") === "1";
 
   // "id" desempata registros creados en el mismo instante (una importación los crea juntos);
   // sin eso, una página podría repetir o saltarse filas.
-  const { data: records, count, error } = await supabase
+  let consulta = supabase
     .from("records")
-    .select("id, data, sustento, created_at, updated_at, updated_by", { count: "exact" })
-    .eq("dataset_id", datasetId)
+    .select("id, data, sustento, created_at, updated_at, updated_by, eliminado_en", { count: "exact" })
+    .eq("dataset_id", datasetId);
+  consulta = papelera ? consulta.not("eliminado_en", "is", null) : consulta.is("eliminado_en", null);
+  const { data: records, count, error } = await consulta
     .order("created_at", { ascending: false })
     .order("id")
     .range(desde, desde + limite - 1);

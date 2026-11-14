@@ -320,6 +320,7 @@ export default function DatasetPage({
         </div>
         {!esVendedor && (
           <div className="acciones">
+            <Link href={`/dashboard/${datasetId}/papelera`} className="btn btn-fantasma">Papelera</Link>
             <a href={`/api/export/${datasetId}`} className="btn btn-secundario">Descargar Excel</a>
             {(tipo === "ventas" || tipo === "compras") && (
               <a

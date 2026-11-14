@@ -109,12 +109,15 @@ export async function PATCH(req: NextRequest, ctx: Ctx) {
   return NextResponse.json({ record: actualizado });
 }
 
+// Por defecto NO borra de verdad: marca `eliminado_en` (papelera, ver
+// migracion-33). `definitivo: true` (solo lo manda la pantalla de Papelera,
+// sobre un registro que YA está ahí) hace el borrado real sin vuelta atrás.
 export async function DELETE(req: NextRequest, ctx: Ctx) {
   const c = await cargar(ctx);
   if ("error" in c) return c.error;
   const { supabase, datasetId, recordId, registro, userId } = c;
 
-  const { confirmar } = await req.json().catch(() => ({}));
+  const { confirmar, definitivo } = await req.json().catch(() => ({}));
   if (!confirmar) {
     const advertencias = await advertenciasDeRegistro(supabase, datasetId, recordId, registro.data, null);
     if (advertencias.length) return NextResponse.json({ advertencias }, { status: 409 });
@@ -122,12 +125,26 @@ export async function DELETE(req: NextRequest, ctx: Ctx) {
 
   const { data: dataset } = await supabase.from("datasets").select("empresa_id, columnas, reglas").eq("id", datasetId).single();
 
-  const { data: borrados, error } = await supabase.from("records").delete().eq("id", recordId).select("id");
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  if (!borrados?.length) {
-    return NextResponse.json({ error: "No se pudo eliminar (falta ejecutar la migración 04 en Supabase)." }, { status: 403 });
+  if (definitivo) {
+    const { data: borrados, error } = await supabase.from("records").delete().eq("id", recordId).select("id");
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    if (!borrados?.length) return NextResponse.json({ error: "No se pudo eliminar" }, { status: 403 });
+    return NextResponse.json({ ok: true });
   }
 
+  const { data: movidos, error } = await supabase
+    .from("records")
+    .update({ eliminado_en: new Date().toISOString() })
+    .eq("id", recordId)
+    .select("id");
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (!movidos?.length) {
+    return NextResponse.json({ error: "No se pudo eliminar (falta ejecutar la migración 33 en Supabase)." }, { status: 403 });
+  }
+
+  // Reglas de "eliminación" (incluido revertir el ajuste de Stock) se
+  // disparan al momento real de sacarlo de circulación -- restaurar (POST de
+  // este mismo archivo) las vuelve a disparar como si fuera un alta nueva.
   if (dataset) {
     try {
       await aplicarReglasDesdeRegistro(supabase, dataset.empresa_id, datasetId, null, dataset.columnas as Columna[], (dataset.reglas as Regla[]) ?? [], undefined, registro.data as Record<string, unknown>, userId);
@@ -137,4 +154,33 @@ export async function DELETE(req: NextRequest, ctx: Ctx) {
   }
 
   return NextResponse.json({ ok: true });
+}
+
+// Restaura un registro de la papelera (eliminado_en -> null) y vuelve a
+// disparar las reglas como un alta nueva (incluido el ajuste de Stock) --
+// mismo criterio documentado arriba en DELETE.
+export async function POST(req: NextRequest, ctx: Ctx) {
+  const c = await cargar(ctx);
+  if ("error" in c) return c.error;
+  const { supabase, datasetId, recordId, registro, userId } = c;
+
+  const { data: dataset } = await supabase.from("datasets").select("empresa_id, columnas, reglas").eq("id", datasetId).single();
+
+  const { data: restaurado, error } = await supabase
+    .from("records")
+    .update({ eliminado_en: null })
+    .eq("id", recordId)
+    .select("id, data, sustento, created_at, updated_at, updated_by")
+    .single();
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+  if (dataset) {
+    try {
+      await aplicarReglasDesdeRegistro(supabase, dataset.empresa_id, datasetId, recordId, dataset.columnas as Columna[], (dataset.reglas as Regla[]) ?? [], registro.data as Record<string, unknown>, undefined, userId);
+    } catch {
+      // silencioso a propósito, ver comentario de PATCH
+    }
+  }
+
+  return NextResponse.json({ record: restaurado });
 }
