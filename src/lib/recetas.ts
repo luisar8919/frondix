@@ -1,6 +1,7 @@
 import type { Columna } from "./excel-parser.ts";
 import type { Regla } from "./reglas.ts";
 import { tipoModulo } from "./roles.ts";
+import { esStock } from "./stock.ts";
 
 // "Recetas" = reglas pre-armadas para quien no quiere ver Campo/Operador/
 // Acción: un ícono, una frase en español llano y A LO SUMO un valor a
@@ -37,7 +38,6 @@ export interface Receta {
 }
 
 const col = (columnas: Columna[], rol: string) => columnas.find((c) => c.rol === rol);
-const esModuloStock = (columnas: Columna[]) => columnas.some((c) => c.key === "cantidad");
 const valorCondicionCampo = (r: Regla) => (r.condicion.tipo === "campo" ? r.condicion.valor : r.condicion.tipo === "estado" ? r.condicion.valor : "");
 
 export const RECETAS: Receta[] = [
@@ -73,9 +73,12 @@ export const RECETAS: Receta[] = [
         accion: { tipo: "notificacion_push", titulo: "Registro grande", mensaje: `Se registró un monto mayor a ${valor}` },
       };
     },
+    // Por ESTRUCTURA (condición Monto > algo + push), no por el título exacto
+    // -- reconoce también una regla armada a mano con un mensaje propio
+    // ("Venta grande", "Compra grande"...), no solo la creada por esta receta.
     coincideCon: (r, columnas) => {
       const cMonto = col(columnas, "monto");
-      return !!cMonto && r.accion.tipo === "notificacion_push" && r.accion.titulo === "Registro grande" && r.condicion.tipo === "campo" && r.condicion.columnaKey === cMonto.key;
+      return !!cMonto && r.accion.tipo === "notificacion_push" && r.condicion.tipo === "campo" && r.condicion.columnaKey === cMonto.key && r.condicion.operador === "mayor" && !r.condicion.compararColumnaKey;
     },
     extraerValor: valorCondicionCampo,
   },
@@ -92,7 +95,9 @@ export const RECETAS: Receta[] = [
       condicion: { tipo: "siempre" },
       accion: { tipo: "notificacion_push", titulo: "Registro eliminado", mensaje: "Se eliminó un registro" },
     }),
-    coincideCon: (r) => r.accion.tipo === "notificacion_push" && r.accion.titulo === "Registro eliminado" && !!r.evento && r.evento.length === 1 && r.evento[0] === "eliminacion",
+    // Igual criterio: por estructura (push + evento SOLO eliminación), no por
+    // el título -- "Venta eliminada" cuenta igual que "Registro eliminado".
+    coincideCon: (r) => r.accion.tipo === "notificacion_push" && r.condicion.tipo === "siempre" && !!r.evento && r.evento.length === 1 && r.evento[0] === "eliminacion",
     extraerValor: () => "",
   },
   {
@@ -161,7 +166,7 @@ export const RECETAS: Receta[] = [
     tipoValor: "ninguno",
     valorPorDefecto: "",
     descripcion: () => "Avisa cuando la Cantidad de un producto llega a su Stock mínimo.",
-    aplicaA: (columnas) => esModuloStock(columnas) && !!col(columnas, "stock_minimo"),
+    aplicaA: (columnas) => esStock(columnas) && !!col(columnas, "stock_minimo"),
     construir: (columnas) => {
       const cMin = col(columnas, "stock_minimo");
       if (!cMin) return null;
@@ -184,7 +189,7 @@ export const RECETAS: Receta[] = [
     tipoValor: "ninguno",
     valorPorDefecto: "",
     descripcion: () => "Elimina el producto del Stock si su Cantidad queda por debajo de 0 (dato inconsistente).",
-    aplicaA: (columnas) => esModuloStock(columnas),
+    aplicaA: (columnas) => esStock(columnas),
     construir: () => ({
       activa: true, origen: "manual", evento: ["modificacion"],
       condicion: { tipo: "campo", columnaKey: "cantidad", operador: "menor", valor: "0" },
