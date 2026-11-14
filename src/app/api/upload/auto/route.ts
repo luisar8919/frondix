@@ -17,6 +17,7 @@ import {
 } from "@/lib/divisor";
 import { clasificarVentaCompraConIA } from "@/lib/sugerencia-ia";
 import type { Regla } from "@/lib/reglas";
+import { recetaPorClave } from "@/lib/recetas";
 
 // El asistente de importación ya mostró los grupos (vía /api/upload/grupos) y el
 // usuario eligió cuáles quedarse, con nombre y roles ya confirmados/editados. Aquí se
@@ -162,9 +163,10 @@ async function crearModuloStockSiPedido(
       // la regla es un espejo 1:1 del enlace recién creado, para que el ajuste
       // de Stock se vea y se pueda apagar desde "Editar tabla y campos".
       const reglasActuales = (ds.reglas as Regla[]) ?? [];
-      const nuevasReglas = reglasActuales.some((r) => r.accion.tipo === "ajustar_stock")
+      const construida = recetaPorClave("ajustar_stock").construir(cols, "");
+      const nuevasReglas = reglasActuales.some((r) => r.accion.tipo === "ajustar_stock") || !construida
         ? reglasActuales
-        : [...reglasActuales, { id: crypto.randomUUID(), activa: true, origen: "automatica", condicion: { tipo: "siempre" }, accion: { tipo: "ajustar_stock" } } satisfies Regla];
+        : [...reglasActuales, { ...construida, id: crypto.randomUUID() } satisfies Regla];
       await supabase.from("datasets").update({ columnas: cols, reglas: nuevasReglas }).eq("id", d.datasetId);
     }
   }

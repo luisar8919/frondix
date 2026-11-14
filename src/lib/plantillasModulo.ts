@@ -1,5 +1,6 @@
 import type { Columna } from "./excel-parser.ts";
 import type { Regla } from "./reglas.ts";
+import { recetaPorClave } from "./recetas.ts";
 
 // Regla sugerida para las plantillas que SÍ clasifican como "ventas" (ver
 // comentario del segundo lote más abajo): excluye de Reportes cualquier fila
@@ -8,13 +9,14 @@ import type { Regla } from "./reglas.ts";
 // tipoModulo() clasifica por los ROLES de columna, nunca por el valor de una
 // fila. Viene activa de entrada (mismo criterio que las columnas: la
 // plantilla ya pre-llena todo sin pedir confirmación paso a paso).
+//
+// Delega en la receta "excluir_cancelados" (recetas.ts) -- esta función solo
+// arma el array mínimo de columnas que esa receta necesita (una "estado"),
+// para no tener que reescribir el objeto `{condicion, accion}` acá también.
 function reglaExcluirCancelado(valorCancelado: string): Omit<Regla, "id">[] {
-  return [{
-    activa: true,
-    origen: "automatica",
-    condicion: { tipo: "campo", columnaKey: "estado", operador: "es", valor: valorCancelado },
-    accion: { tipo: "excluir_de_reportes" },
-  }];
+  const columnaEstado: Columna = { key: "estado", label: "Estado", tipo: "texto", rol: "estado", sospechosa: false };
+  const construida = recetaPorClave("excluir_cancelados").construir([columnaEstado], valorCancelado);
+  return construida ? [{ ...construida, activa: true, origen: "automatica" }] : [];
 }
 
 // Columnas iniciales para crear un módulo de Compras o Ventas sin subir Excel
