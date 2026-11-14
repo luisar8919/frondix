@@ -21,11 +21,14 @@ const sustantivoEnlace: Record<string, string> = {
   categoria: "categoría",
 };
 
+type PreciosProducto = { general?: number; mayorista?: number; minorista?: number };
+
 export default function DynamicForm({
   columnas,
   nombreModulo,
   opciones,
   etiquetasEnlace,
+  precios,
   onSubmit,
   inicial,
   textoBoton = "Agregar registro",
@@ -39,6 +42,12 @@ export default function DynamicForm({
   opciones?: Record<string, string[]>;
   // a qué tabla > columna apunta cada columna enlazada (texto de ayuda)
   etiquetasEnlace?: Record<string, string>;
+  // precio(s) de cada valor de una columna "producto" enlazada a un Stock
+  // (ver /api/records/[datasetId]/valores) -- autocompleta el campo Monto al
+  // elegir un producto existente, con selector de lista si Stock define más
+  // de un precio (general/mayorista/minorista). Nunca pisa un Monto que el
+  // usuario ya haya escrito a mano.
+  precios?: Record<string, Record<string, PreciosProducto>>;
   // devuelve un mensaje de error si el servidor rechazó el registro, o null si se guardó
   onSubmit: (data: Record<string, unknown>) => Promise<string | null>;
   // al editar: datos actuales del registro; el formulario no se vacía al guardar
@@ -106,12 +115,31 @@ export default function DynamicForm({
     }
   }
 
+  const [listaPrecio, setListaPrecio] = useState<"general" | "mayorista" | "minorista">("general");
+  const cMonto = columnas.find((c) => c.rol === "monto");
+
+  // Solo completa Monto si está vacío -- nunca pisa un valor que el usuario
+  // ya haya escrito (ej. una venta con descuento puntual).
+  function autollenarPrecio(c: Columna, valor: string) {
+    if (c.rol !== "producto" || !cMonto || valores[cMonto.key]) return;
+    const p = precios?.[c.key]?.[valor];
+    const elegido = p?.[listaPrecio] ?? p?.general ?? p?.mayorista ?? p?.minorista;
+    if (typeof elegido === "number") setValores((v) => ({ ...v, [cMonto.key]: String(elegido) }));
+  }
+
+  // Un producto tiene "varias listas" si CUALQUIER valor conocido trae más de
+  // un precio cargado -- si todos solo tienen uno, no hace falta el selector.
+  function hayVariasListas(key: string): boolean {
+    return Object.values(precios?.[key] ?? {}).some((p) => [p.general, p.mayorista, p.minorista].filter((x) => x !== undefined).length > 1);
+  }
+
   function cambiarEnlace(c: Columna, valor: string) {
     if (valor === NUEVO) {
       setModoNuevo({ ...modoNuevo, [c.key]: true });
       setValores({ ...valores, [c.key]: "" });
     } else {
       setValores({ ...valores, [c.key]: valor });
+      autollenarPrecio(c, valor);
     }
   }
 
@@ -208,8 +236,31 @@ export default function DynamicForm({
                   placeholder={enModoNuevo ? `Nombre del ${sustantivo} nuevo` : undefined}
                   autoFocus={enModoNuevo}
                   value={valores[c.key] ?? ""}
-                  onChange={(e) => setValores({ ...valores, [c.key]: e.target.value })}
+                  onChange={(e) => {
+                    setValores({ ...valores, [c.key]: e.target.value });
+                    if (enlazada) autollenarPrecio(c, e.target.value);
+                  }}
                 />
+              )}
+              {c.rol === "producto" && hayVariasListas(c.key) && (
+                <select
+                  aria-label="Lista de precios"
+                  value={listaPrecio}
+                  onChange={(e) => {
+                    const nueva = e.target.value as "general" | "mayorista" | "minorista";
+                    setListaPrecio(nueva);
+                    if (cMonto && valores[c.key]) {
+                      const p = precios?.[c.key]?.[valores[c.key]];
+                      const elegido = p?.[nueva] ?? p?.general;
+                      if (typeof elegido === "number") setValores((v) => ({ ...v, [cMonto.key]: String(elegido) }));
+                    }
+                  }}
+                  style={{ marginTop: 4 }}
+                >
+                  <option value="general">Precio general</option>
+                  <option value="mayorista">Precio mayorista</option>
+                  <option value="minorista">Precio minorista</option>
+                </select>
               )}
               {c.rol === "producto" && tipo === "compras" && Capacitor.isNativePlatform() && (!enlazada || enModoNuevo) && (
                 <button

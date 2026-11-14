@@ -47,6 +47,7 @@ export default function DatasetPage({
   const [total, setTotal] = useState(0);
   const [cargando, setCargando] = useState(true);
   const [opciones, setOpciones] = useState<Record<string, string[]>>({});
+  const [precios, setPrecios] = useState<Record<string, Record<string, { general?: number; mayorista?: number; minorista?: number }>>>({});
   const [error, setError] = useState(false);
   const [bloqueado, setBloqueado] = useState(false);
   const [empresaId, setEmpresaId] = useState<string | null>(null);
@@ -115,17 +116,21 @@ export default function DatasetPage({
     setCargando(false);
   }
 
-  // Lista de valores permitidos para cada columna enlazada (alimenta el autocompletado).
+  // Lista de valores permitidos para cada columna enlazada (alimenta el autocompletado)
+  // y, si el dataset enlazado trae precios (típicamente un Stock), los precios por
+  // valor -- ver DynamicForm (autocompleta Monto al elegir un producto existente).
   async function cargarOpciones(columnas: Columna[]) {
     const entradas = await Promise.all(
       columnas
         .filter((c) => c.enlace)
         .map(async (c) => {
           const res = await fetch(`/api/records/${c.enlace!.datasetId}/valores?columna=${c.enlace!.columnaKey}`);
-          return [c.key, res.ok ? ((await res.json()).valores as string[]) : []] as const;
+          const body = res.ok ? await res.json() : { valores: [], precios: {} };
+          return [c.key, body.valores as string[], body.precios as Record<string, { general?: number; mayorista?: number; minorista?: number }>] as const;
         })
     );
-    setOpciones(Object.fromEntries(entradas));
+    setOpciones(Object.fromEntries(entradas.map(([k, valores]) => [k, valores])));
+    setPrecios(Object.fromEntries(entradas.filter(([, , precios]) => Object.keys(precios ?? {}).length > 0).map(([k, , precios]) => [k, precios])));
   }
 
   useEffect(() => {
@@ -350,6 +355,7 @@ export default function DatasetPage({
             nombreModulo={dataset.nombre}
             opciones={opciones}
             etiquetasEnlace={etiquetasEnlace}
+            precios={precios}
             onSubmit={agregarRegistro}
           />
         </div>
@@ -364,6 +370,7 @@ export default function DatasetPage({
             nombreModulo={dataset.nombre}
             opciones={opciones}
             etiquetasEnlace={etiquetasEnlace}
+            precios={precios}
             inicial={editando.data}
             textoBoton="Guardar cambios"
             onSubmit={guardarEdicion}
