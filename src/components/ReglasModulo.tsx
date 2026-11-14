@@ -27,6 +27,8 @@ interface CandidatoSumarCampo {
   columnaObjetivoKey: string;
   columnaObjetivoLabel: string;
   datasetObjetivoNombre: string;
+  tipoObjetivo: "numero" | "texto";
+  opcionesObjetivo: string[] | null;
 }
 
 type TipoAccion = "excluir_de_reportes" | "cambiar_estado" | "ajustar_stock" | "enviar_whatsapp" | "agregar_seguimiento" | "notificacion_push" | "sumar_campo_enlazado" | "eliminar_registro";
@@ -159,7 +161,9 @@ export default function ReglasModulo({
     if (a.tipo === "enviar_whatsapp") return `Enviar WhatsApp${a.mensaje ? `: "${a.mensaje.slice(0, 40)}${a.mensaje.length > 40 ? "..." : ""}"` : ""}`;
     if (a.tipo === "notificacion_push") return `Notificar${a.titulo ? `: "${a.titulo}"` : ""}`;
     const c = candidatoDe(claveCandidato({ columnaEnlaceKey: a.columnaEnlaceKey, columnaObjetivoKey: a.columnaObjetivoKey } as CandidatoSumarCampo));
-    return `Sumar ${a.delta} a ${c?.columnaObjetivoLabel ?? a.columnaObjetivoKey}${c ? ` en ${c.datasetObjetivoNombre}` : ""}`;
+    const campo = `${c?.columnaObjetivoLabel ?? a.columnaObjetivoKey}${c ? ` en ${c.datasetObjetivoNombre}` : ""}`;
+    if (a.modo === "fijar") return `Fijar ${campo} a "${a.valor ?? ""}"`;
+    return `Sumar ${a.delta} a ${campo}`;
   }
 
   async function guardar() {
@@ -209,7 +213,11 @@ export default function ReglasModulo({
     }
     if (tipo === "sumar_campo_enlazado") {
       const primero = candidatosSumarCampo[0];
-      cambiarRegla(i, { condicion: { tipo: "siempre" }, accion: primero ? { tipo, columnaEnlaceKey: primero.columnaEnlaceKey, columnaObjetivoKey: primero.columnaObjetivoKey, delta: 1 } : { tipo, columnaEnlaceKey: "", columnaObjetivoKey: "", delta: 1 } });
+      const modo = primero?.tipoObjetivo === "texto" ? "fijar" : "sumar";
+      cambiarRegla(i, {
+        condicion: { tipo: "siempre" },
+        accion: primero ? { tipo, columnaEnlaceKey: primero.columnaEnlaceKey, columnaObjetivoKey: primero.columnaObjetivoKey, delta: 1, modo, valor: primero.opcionesObjetivo?.[0] ?? "" } : { tipo, columnaEnlaceKey: "", columnaObjetivoKey: "", delta: 1 },
+      });
       return;
     }
     const cond = datosCondicion(r);
@@ -403,32 +411,62 @@ export default function ReglasModulo({
                 </p>
               )}
 
-              {r.accion.tipo === "sumar_campo_enlazado" && (
-                <>
-                  <select
-                    aria-label="Campo a sumar"
-                    value={claveCandidato({ columnaEnlaceKey: r.accion.columnaEnlaceKey, columnaObjetivoKey: r.accion.columnaObjetivoKey } as CandidatoSumarCampo)}
-                    onChange={(e) => {
-                      const c = candidatoDe(e.target.value);
-                      if (c) cambiarRegla(i, { accion: { tipo: "sumar_campo_enlazado", columnaEnlaceKey: c.columnaEnlaceKey, columnaObjetivoKey: c.columnaObjetivoKey, delta: r.accion.tipo === "sumar_campo_enlazado" ? r.accion.delta : 1 } });
-                    }}
-                  >
-                    {candidatosSumarCampo.map((c) => (
-                      <option key={claveCandidato(c)} value={claveCandidato(c)}>
-                        {c.datasetObjetivoNombre} &gt; {c.columnaObjetivoLabel} (por {c.columnaEnlaceLabel})
-                      </option>
-                    ))}
-                  </select>
-                  <span className="suave pequeno">sumar</span>
-                  <input
-                    aria-label="Cuánto sumar"
-                    type="number"
-                    value={r.accion.delta}
-                    onChange={(e) => cambiarRegla(i, { accion: { tipo: "sumar_campo_enlazado", columnaEnlaceKey: (r.accion as { columnaEnlaceKey: string }).columnaEnlaceKey, columnaObjetivoKey: (r.accion as { columnaObjetivoKey: string }).columnaObjetivoKey, delta: Number(e.target.value) || 0 } })}
-                    style={{ width: 70 }}
-                  />
-                </>
-              )}
+              {r.accion.tipo === "sumar_campo_enlazado" && (() => {
+                const a = r.accion;
+                const candidatoActual = candidatoDe(claveCandidato({ columnaEnlaceKey: a.columnaEnlaceKey, columnaObjetivoKey: a.columnaObjetivoKey } as CandidatoSumarCampo));
+                const modo = a.modo ?? "sumar";
+                return (
+                  <>
+                    <select
+                      aria-label="Campo a modificar (de otro módulo enlazado)"
+                      value={claveCandidato({ columnaEnlaceKey: a.columnaEnlaceKey, columnaObjetivoKey: a.columnaObjetivoKey } as CandidatoSumarCampo)}
+                      onChange={(e) => {
+                        const c = candidatoDe(e.target.value);
+                        if (!c) return;
+                        const nuevoModo = c.tipoObjetivo === "texto" ? "fijar" : "sumar";
+                        cambiarRegla(i, { accion: { tipo: "sumar_campo_enlazado", columnaEnlaceKey: c.columnaEnlaceKey, columnaObjetivoKey: c.columnaObjetivoKey, delta: a.delta, modo: nuevoModo, valor: c.opcionesObjetivo?.[0] ?? "" } });
+                      }}
+                    >
+                      {candidatosSumarCampo.map((c) => (
+                        <option key={claveCandidato(c)} value={claveCandidato(c)}>
+                          {c.datasetObjetivoNombre} &gt; {c.columnaObjetivoLabel} (por {c.columnaEnlaceLabel})
+                        </option>
+                      ))}
+                    </select>
+                    {candidatoActual?.tipoObjetivo === "numero" && (
+                      <select
+                        aria-label="Sumar o fijar"
+                        value={modo}
+                        onChange={(e) => cambiarRegla(i, { accion: { ...a, modo: e.target.value as "sumar" | "fijar" } })}
+                      >
+                        <option value="sumar">sumar/restar</option>
+                        <option value="fijar">fijar un valor</option>
+                      </select>
+                    )}
+                    {modo === "sumar" ? (
+                      <input
+                        aria-label="Cuánto sumar (negativo para restar)"
+                        type="number"
+                        value={a.delta}
+                        onChange={(e) => cambiarRegla(i, { accion: { ...a, delta: Number(e.target.value) || 0 } })}
+                        style={{ width: 70 }}
+                      />
+                    ) : candidatoActual?.opcionesObjetivo?.length ? (
+                      <select aria-label="Nuevo valor" value={a.valor ?? ""} onChange={(e) => cambiarRegla(i, { accion: { ...a, valor: e.target.value } })}>
+                        {candidatoActual.opcionesObjetivo.map((v) => <option key={v} value={v}>{v}</option>)}
+                      </select>
+                    ) : (
+                      <input
+                        aria-label="Nuevo valor"
+                        type={candidatoActual?.tipoObjetivo === "numero" ? "number" : "text"}
+                        value={a.valor ?? ""}
+                        onChange={(e) => cambiarRegla(i, { accion: { ...a, valor: e.target.value } })}
+                        style={{ width: candidatoActual?.tipoObjetivo === "numero" ? 100 : 140 }}
+                      />
+                    )}
+                  </>
+                );
+              })()}
 
               {r.accion.tipo === "ajustar_stock" && ajustarStockInfo && (
                 <>

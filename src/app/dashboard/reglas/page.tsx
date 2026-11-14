@@ -18,6 +18,8 @@ interface CandidatoSumarCampo {
   columnaObjetivoKey: string;
   columnaObjetivoLabel: string;
   datasetObjetivoNombre: string;
+  tipoObjetivo: "numero" | "texto";
+  opcionesObjetivo: string[] | null;
 }
 
 interface ModuloConReglas {

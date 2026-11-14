@@ -54,6 +54,45 @@ async function dispatchSumarCampoEnlazado(
   await sumarCampoEnlazado(supabase, cEnlace.enlace.datasetId, cEnlace.enlace.columnaKey, valor, accion.columnaObjetivoKey, signo * accion.delta);
 }
 
+// Fija (en vez de sumar) el campo objetivo del registro enlazado -- lo crea
+// con ese valor si todavía no existe. Idempotente, sin signo/revertir: a
+// diferencia de "sumar", no tiene sentido deshacer un valor fijo en una
+// edición, solo volver a fijarlo con los datos nuevos (ver el llamador).
+async function fijarCampoEnlazado(
+  supabase: SupabaseClient,
+  datasetObjetivoId: string,
+  claveMatch: string,
+  valorMatch: string,
+  columnaObjetivoKey: string,
+  valor: string
+): Promise<void> {
+  if (!claveValida(claveMatch) || !claveValida(columnaObjetivoKey) || !valorMatch) return;
+  const { data: fila } = await supabase
+    .from("records")
+    .select("id, data")
+    .eq("dataset_id", datasetObjetivoId)
+    .eq(`data->>${claveMatch}`, valorMatch)
+    .maybeSingle();
+  if (fila) {
+    await supabase.from("records").update({ data: { ...(fila.data as object), [columnaObjetivoKey]: valor } }).eq("id", fila.id);
+  } else {
+    await supabase.from("records").insert({ dataset_id: datasetObjetivoId, data: { [claveMatch]: valorMatch, [columnaObjetivoKey]: valor } });
+  }
+}
+
+async function dispatchFijarCampoEnlazado(
+  supabase: SupabaseClient,
+  columnas: Columna[],
+  accion: Extract<Accion, { tipo: "sumar_campo_enlazado" }>,
+  datos: Record<string, unknown>
+): Promise<void> {
+  const cEnlace = columnas.find((c) => c.key === accion.columnaEnlaceKey && c.enlace && claveValida(c.enlace.columnaKey));
+  if (!cEnlace?.enlace) return;
+  const valorMatch = datos[cEnlace.key]?.toString().trim();
+  if (!valorMatch) return;
+  await fijarCampoEnlazado(supabase, cEnlace.enlace.datasetId, cEnlace.enlace.columnaKey, valorMatch, accion.columnaObjetivoKey, accion.valor ?? "");
+}
+
 // Único punto de entrada que llaman las rutas de /api/records al crear, editar
 // o borrar un registro -- reemplaza las llamadas directas a
 // ajustarStockDesdeRegistro/revertirStockDesdeRegistro que antes vivían ahí.
@@ -110,7 +149,11 @@ export async function aplicarReglasDesdeRegistro(
 
     if (regla.accion.tipo === "sumar_campo_enlazado") {
       try {
-        if (datosNuevos && !datosViejos) {
+        if (regla.accion.modo === "fijar") {
+          // Idempotente: solo tiene sentido en creación/modificación, con los
+          // datos nuevos -- no hay "deshacer" un valor fijo al eliminar.
+          if (datosNuevos) await dispatchFijarCampoEnlazado(supabase, columnas, regla.accion, datosNuevos);
+        } else if (datosNuevos && !datosViejos) {
           await dispatchSumarCampoEnlazado(supabase, columnas, regla.accion, datosNuevos, 1);
         } else if (datosViejos) {
           await dispatchSumarCampoEnlazado(supabase, columnas, regla.accion, datosViejos, -1);

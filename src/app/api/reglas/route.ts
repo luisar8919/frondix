@@ -49,24 +49,31 @@ export async function GET() {
     return { tipoModulo: tipo as "ventas" | "compras", stockNombre: stockDs.nombre, cantidadLabel: cCantidad?.label ?? null };
   }
 
-  // Candidatos para "Sumar un campo enlazado" (generaliza ajustar_stock a
-  // cualquier campo numérico de cualquier módulo enlazado, ej. sumar 1 a
-  // "Visitas" en Clientes por cada venta): por cada columna de ESTE módulo
-  // que tenga un enlace, los campos numéricos del dataset al que apunta.
+  // Candidatos para "Sumar/fijar un campo enlazado" (generaliza ajustar_stock
+  // a cualquier campo de cualquier módulo enlazado, ej. sumar 1 a "Visitas"
+  // en Clientes por cada venta, o fijar "Último estado" en el Pedido
+  // enlazado): por cada columna de ESTE módulo que tenga un enlace, los
+  // campos de texto o número del dataset al que apunta -- "sumar" solo tiene
+  // sentido si el objetivo es numérico (la UI lo restringe con tipoObjetivo).
   function candidatosSumarCampo(columnas: Columna[]) {
-    const candidatos: { columnaEnlaceKey: string; columnaEnlaceLabel: string; columnaObjetivoKey: string; columnaObjetivoLabel: string; datasetObjetivoNombre: string }[] = [];
+    const candidatos: {
+      columnaEnlaceKey: string; columnaEnlaceLabel: string; columnaObjetivoKey: string; columnaObjetivoLabel: string;
+      datasetObjetivoNombre: string; tipoObjetivo: "numero" | "texto"; opcionesObjetivo: string[] | null;
+    }[] = [];
     for (const c of columnas) {
       if (!c.enlace || !claveValida(c.enlace.columnaKey)) continue;
       const destino = todos.find((d) => d.id === c.enlace!.datasetId);
       if (!destino) continue;
       for (const objetivo of destino.columnas) {
-        if (objetivo.tipo !== "numero") continue;
+        if (objetivo.tipo !== "numero" && objetivo.tipo !== "texto") continue;
         candidatos.push({
           columnaEnlaceKey: c.key,
           columnaEnlaceLabel: c.label,
           columnaObjetivoKey: objetivo.key,
           columnaObjetivoLabel: objetivo.label,
           datasetObjetivoNombre: destino.nombre,
+          tipoObjetivo: objetivo.tipo,
+          opcionesObjetivo: objetivo.opcionesFijas ?? null,
         });
       }
     }

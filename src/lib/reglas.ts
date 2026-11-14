@@ -72,13 +72,20 @@ export type Accion =
   // Push a todos los miembros de la empresa (Firebase, misma función que ya
   // usa el cron de seguimiento).
   | { tipo: "notificacion_push"; titulo: string; mensaje: string }
-  // Generaliza ajustar_stock a CUALQUIER campo numérico de CUALQUIER módulo
-  // enlazado (no solo Stock) -- ej. sumar 1 a "Visitas" en Clientes por cada
-  // venta. Mismo patrón de "buscar fila por el valor enlazado, sumar o crear"
-  // que ajustarStock() en stock.ts, pero sin Kardex (eso es específico de
-  // Stock). `columnaEnlaceKey` es una columna de ESTE módulo con `.enlace`;
-  // `columnaObjetivoKey` es el campo numérico a sumar en el dataset enlazado.
-  | { tipo: "sumar_campo_enlazado"; columnaEnlaceKey: string; columnaObjetivoKey: string; delta: number }
+  // Generaliza ajustar_stock a CUALQUIER campo de CUALQUIER módulo enlazado
+  // (no solo Stock) -- ej. sumar 1 a "Visitas" en Clientes por cada venta, o
+  // fijar "Último estado" a "Entregado" en el Pedido enlazado. Mismo patrón
+  // de "buscar fila por el valor enlazado, sumar/fijar o crear" que
+  // ajustarStock() en stock.ts, pero sin Kardex (eso es específico de Stock).
+  // `columnaEnlaceKey` es una columna de ESTE módulo con `.enlace`;
+  // `columnaObjetivoKey` es el campo a modificar en el dataset enlazado.
+  // `modo: "sumar"` usa `delta` (numérico, negativo = restar, el único modo
+  // posible si el campo objetivo es numérico); `modo: "fijar"` (el único
+  // posible si es texto) usa `valor` como literal -- "fijar" es idempotente
+  // (sin deshacer/rehacer como "sumar" en una edición, ver reglasAplicar.ts).
+  // `modo` ausente = legado, equivale a "sumar" (reglas guardadas antes de
+  // esta generalización).
+  | { tipo: "sumar_campo_enlazado"; columnaEnlaceKey: string; columnaObjetivoKey: string; delta: number; modo?: "sumar" | "fijar"; valor?: string }
   // Borra directamente el registro que acaba de disparar la regla -- ej. "si
   // Cantidad <= 0 -> eliminar este registro". Solo tiene efecto en creación/
   // modificación (ver reglasAplicar.ts): en un registro que ya se está
