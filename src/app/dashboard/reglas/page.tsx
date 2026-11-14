@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import ReglasModulo from "@/components/ReglasModulo";
-import RecetasModulo from "@/components/RecetasModulo";
 import type { Columna } from "@/lib/excel-parser";
 import type { Regla } from "@/lib/reglas";
 
@@ -57,10 +56,10 @@ export default function ReglasPage() {
     <>
       <div className="panel-cabecera">
         <div>
-          <h1>Reglas</h1>
+          <h1>Condicionales</h1>
           <p className="suave">
             Qué debe pasar solo cuando algo cambia en un módulo -- ej. que un pedido "Cancelado" no cuente como ingreso,
-            o que una venta ajuste tu Stock automáticamente.
+            o que una venta ajuste tu Stock automáticamente. Para lo más simple y directo, mejor entrá a "Recetas".
           </p>
         </div>
       </div>
@@ -79,36 +78,19 @@ export default function ReglasPage() {
         </div>
       )}
 
-      {modulos?.map((m) => {
-        // `version` fuerza un remount de ambos componentes del módulo cuando
-        // una receta guarda -- si no, ReglasModulo (que copia `reglas` a su
-        // propio estado SOLO al montar) quedaría mostrando reglas viejas
-        // hasta un refresh manual.
-        const version = m.reglas.map((r) => r.id).join(",");
-        return (
-          <div key={m.datasetId}>
-            <RecetasModulo
-              key={`recetas-${m.datasetId}-${version}`}
-              datasetId={m.datasetId}
-              nombre={m.nombre}
-              columnas={m.columnas}
-              reglas={m.reglas}
-              onGuardado={(reglas) => setModulos((ms) => ms?.map((x) => (x.datasetId === m.datasetId ? { ...x, reglas } : x)) ?? ms)}
-            />
-            <ReglasModulo
-              key={`avanzado-${m.datasetId}-${version}`}
-              datasetId={m.datasetId}
-              nombre={`${m.nombre} (modo avanzado)`}
-              columnas={m.columnas}
-              reglas={m.reglas}
-              ajustarStockInfo={m.ajustarStockInfo}
-              hayTelefono={m.hayTelefono}
-              hayCliente={m.hayCliente}
-              candidatosSumarCampo={m.candidatosSumarCampo}
-            />
-          </div>
-        );
-      })}
+      {modulos?.map((m) => (
+        <ReglasModulo
+          key={m.datasetId}
+          datasetId={m.datasetId}
+          nombre={m.nombre}
+          columnas={m.columnas}
+          reglas={m.reglas}
+          ajustarStockInfo={m.ajustarStockInfo}
+          hayTelefono={m.hayTelefono}
+          hayCliente={m.hayCliente}
+          candidatosSumarCampo={m.candidatosSumarCampo}
+        />
+      ))}
     </>
   );
 }

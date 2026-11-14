@@ -26,12 +26,9 @@ export default function RecetasModulo({
   reglas: Regla[];
   onGuardado: (reglas: Regla[]) => void;
 }) {
-  const aplicables = RECETAS.filter((rc) => rc.aplicaA(columnas, nombre));
   const [borradores, setBorradores] = useState<Record<string, string>>({});
   const [ocupada, setOcupada] = useState<string | null>(null);
   const [mensaje, setMensaje] = useState<{ tipo: "ok" | "error"; texto: string } | null>(null);
-
-  if (aplicables.length === 0) return null;
 
   async function aplicar(rc: Receta, activar: boolean) {
     setOcupada(rc.clave);
@@ -49,11 +46,14 @@ export default function RecetasModulo({
   return (
     <div className="tarjeta" style={{ marginBottom: 20 }}>
       <h3 style={{ margin: "0 0 4px" }}>{nombre}</h3>
-      <p className="suave pequeno" style={{ marginTop: 0 }}>Recetas listas para activar, sin configurar nada técnico.</p>
+      <p className="suave pequeno" style={{ marginTop: 0 }}>
+        Todas las recetas disponibles -- las que este módulo todavía no puede usar aparecen apagadas, con lo que les falta.
+      </p>
 
       <div style={{ display: "grid", gap: 14, gridTemplateColumns: "repeat(auto-fill, minmax(270px, 1fr))", marginTop: 14 }}>
-        {aplicables.map((rc) => {
-          const existente = reglas.find((r) => rc.coincideCon(r, columnas));
+        {RECETAS.map((rc) => {
+          const aplica = rc.aplicaA(columnas, nombre);
+          const existente = aplica ? reglas.find((r) => rc.coincideCon(r, columnas)) : undefined;
           const activa = !!existente?.activa;
           const valorActual = borradores[rc.clave] ?? (existente ? rc.extraerValor(existente) : rc.valorPorDefecto);
           const opciones = rc.opcionesValor?.(columnas) ?? null;
@@ -67,6 +67,7 @@ export default function RecetasModulo({
                 background: activa ? "var(--verde-50)" : "var(--papel)",
                 borderRadius: 10,
                 padding: 16,
+                opacity: aplica ? 1 : 0.55,
               }}
             >
               <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
@@ -77,45 +78,51 @@ export default function RecetasModulo({
 
               <p className="suave pequeno" style={{ margin: "8px 0 10px" }}>{rc.descripcion(valorActual || rc.valorPorDefecto)}</p>
 
-              {rc.tipoValor !== "ninguno" && (
-                opciones?.length ? (
-                  <select
-                    aria-label={rc.titulo}
-                    value={valorActual}
-                    onChange={(e) => setBorradores((b) => ({ ...b, [rc.clave]: e.target.value }))}
-                    style={{ width: "100%", marginBottom: 10 }}
-                  >
-                    {opciones.map((o) => <option key={o} value={o}>{o}</option>)}
-                  </select>
-                ) : (
-                  <input
-                    aria-label={rc.titulo}
-                    type={rc.tipoValor === "numero" ? "number" : "text"}
-                    value={valorActual}
-                    onChange={(e) => setBorradores((b) => ({ ...b, [rc.clave]: e.target.value }))}
-                    style={{ width: "100%", marginBottom: 10 }}
-                  />
-                )
-              )}
+              {!aplica ? (
+                <p className="suave pequeno" style={{ fontStyle: "italic", margin: "0 0 10px" }}>No disponible: {rc.requisito}</p>
+              ) : (
+                <>
+                  {rc.tipoValor !== "ninguno" && (
+                    opciones?.length ? (
+                      <select
+                        aria-label={rc.titulo}
+                        value={valorActual}
+                        onChange={(e) => setBorradores((b) => ({ ...b, [rc.clave]: e.target.value }))}
+                        style={{ width: "100%", marginBottom: 10 }}
+                      >
+                        {opciones.map((o) => <option key={o} value={o}>{o}</option>)}
+                      </select>
+                    ) : (
+                      <input
+                        aria-label={rc.titulo}
+                        type={rc.tipoValor === "numero" ? "number" : "text"}
+                        value={valorActual}
+                        onChange={(e) => setBorradores((b) => ({ ...b, [rc.clave]: e.target.value }))}
+                        style={{ width: "100%", marginBottom: 10 }}
+                      />
+                    )
+                  )}
 
-              <div style={{ display: "flex", gap: 8 }}>
-                {activa ? (
-                  <>
-                    {rc.tipoValor !== "ninguno" && (
-                      <button type="button" className="btn btn-secundario" disabled={trabajando} onClick={() => aplicar(rc, true)}>
-                        Actualizar
+                  <div style={{ display: "flex", gap: 8 }}>
+                    {activa ? (
+                      <>
+                        {rc.tipoValor !== "ninguno" && (
+                          <button type="button" className="btn btn-secundario" disabled={trabajando} onClick={() => aplicar(rc, true)}>
+                            Actualizar
+                          </button>
+                        )}
+                        <button type="button" className="btn btn-fantasma" disabled={trabajando} onClick={() => aplicar(rc, false)}>
+                          Desactivar
+                        </button>
+                      </>
+                    ) : (
+                      <button type="button" className="btn btn-primario" disabled={trabajando} onClick={() => aplicar(rc, true)}>
+                        {trabajando ? "Activando..." : "Activar"}
                       </button>
                     )}
-                    <button type="button" className="btn btn-fantasma" disabled={trabajando} onClick={() => aplicar(rc, false)}>
-                      Desactivar
-                    </button>
-                  </>
-                ) : (
-                  <button type="button" className="btn btn-primario" disabled={trabajando} onClick={() => aplicar(rc, true)}>
-                    {trabajando ? "Activando..." : "Activar"}
-                  </button>
-                )}
-              </div>
+                  </div>
+                </>
+              )}
             </div>
           );
         })}

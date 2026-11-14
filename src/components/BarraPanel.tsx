@@ -27,6 +27,7 @@ const seguimientoSubmenu = [
 ];
 
 const reglasSubmenu = [
+  { href: "/dashboard/recetas", texto: "Recetas" },
   { href: "/dashboard/reglas", texto: "Condicionales" },
   { href: "/dashboard/enlaces", texto: "Enlaces" },
 ];

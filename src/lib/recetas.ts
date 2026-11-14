@@ -29,6 +29,10 @@ export interface Receta {
   valorPorDefecto: string;
   descripcion: (valor: string) => string;
   aplicaA: (columnas: Columna[], nombre: string) => boolean;
+  // Qué le falta al módulo para poder usarla -- se muestra en la tarjeta
+  // deshabilitada cuando `aplicaA` da false (ver comentario de la galería
+  // completa en RecetasModulo.tsx).
+  requisito: string;
   // Lista cerrada de valores para el campo (ej. los opcionesFijas reales de
   // Estado) -- si existe, la UI muestra un <select> en vez de un input libre.
   opcionesValor?: (columnas: Columna[]) => string[] | null;
@@ -48,6 +52,7 @@ export const RECETAS: Receta[] = [
     tipoValor: "ninguno",
     valorPorDefecto: "",
     descripcion: () => "Cada venta o compra descuenta o suma la Cantidad real en el Stock enlazado.",
+    requisito: "Este módulo debe ser de Ventas o Compras, con un Producto enlazado a un módulo de Stock.",
     aplicaA: (columnas, nombre) => {
       const tipo = tipoModulo(columnas.map((c) => c.rol), nombre);
       return (tipo === "ventas" || tipo === "compras") && !!col(columnas, "producto")?.enlace;
@@ -63,6 +68,7 @@ export const RECETAS: Receta[] = [
     tipoValor: "numero",
     valorPorDefecto: "500",
     descripcion: (v) => `Te avisamos cuando el Monto de un registro supere ${v}.`,
+    requisito: "Necesita un campo con significado \"Monto\".",
     aplicaA: (columnas) => !!col(columnas, "monto"),
     construir: (columnas, valor) => {
       const cMonto = col(columnas, "monto");
@@ -89,6 +95,7 @@ export const RECETAS: Receta[] = [
     tipoValor: "ninguno",
     valorPorDefecto: "",
     descripcion: () => "Te avisamos apenas se borra cualquier fila de este módulo.",
+    requisito: "",
     aplicaA: () => true,
     construir: () => ({
       activa: true, origen: "manual", evento: ["eliminacion"],
@@ -107,6 +114,7 @@ export const RECETAS: Receta[] = [
     tipoValor: "texto",
     valorPorDefecto: "Cancelado",
     descripcion: (v) => `Si el Estado queda en "${v}", no se suma como ingreso en Reportes.`,
+    requisito: "Necesita un campo \"Estado\" con una lista cerrada de valores (ej. Pendiente/Cancelado).",
     aplicaA: (columnas) => (col(columnas, "estado")?.opcionesFijas?.length ?? 0) > 0,
     opcionesValor: (columnas) => col(columnas, "estado")?.opcionesFijas ?? null,
     construir: (columnas, valor) => {
@@ -131,6 +139,7 @@ export const RECETAS: Receta[] = [
     tipoValor: "texto",
     valorPorDefecto: "Cliente mostrador",
     descripcion: (v) => `Si no se escribe un Cliente, se completa solo con "${v}".`,
+    requisito: "Necesita un campo con significado \"Cliente\" de texto libre (sin lista cerrada).",
     aplicaA: (columnas) => !!col(columnas, "cliente") && !col(columnas, "cliente")?.opcionesFijas?.length,
     construir: (columnas, valor) => {
       const cCliente = col(columnas, "cliente");
@@ -154,6 +163,7 @@ export const RECETAS: Receta[] = [
     tipoValor: "ninguno",
     valorPorDefecto: "",
     descripcion: () => "Cada registro nuevo activa el seguimiento de ese cliente (avisa si deja de comprar).",
+    requisito: "Necesita un campo con significado \"Cliente\".",
     aplicaA: (columnas) => !!col(columnas, "cliente"),
     construir: () => ({ activa: true, origen: "manual", evento: ["creacion"], condicion: { tipo: "siempre" }, accion: { tipo: "agregar_seguimiento" } }),
     coincideCon: (r) => r.accion.tipo === "agregar_seguimiento" && r.condicion.tipo === "siempre",
@@ -166,6 +176,7 @@ export const RECETAS: Receta[] = [
     tipoValor: "ninguno",
     valorPorDefecto: "",
     descripcion: () => "Avisa cuando la Cantidad de un producto llega a su Stock mínimo.",
+    requisito: "Este módulo debe ser de Stock, con un campo \"Stock mínimo\".",
     aplicaA: (columnas) => esStock(columnas) && !!col(columnas, "stock_minimo"),
     construir: (columnas) => {
       const cMin = col(columnas, "stock_minimo");
@@ -189,6 +200,7 @@ export const RECETAS: Receta[] = [
     tipoValor: "ninguno",
     valorPorDefecto: "",
     descripcion: () => "Elimina el producto del Stock si su Cantidad queda por debajo de 0 (dato inconsistente).",
+    requisito: "Este módulo debe ser de Stock.",
     aplicaA: (columnas) => esStock(columnas),
     construir: () => ({
       activa: true, origen: "manual", evento: ["modificacion"],
