@@ -86,7 +86,7 @@ export async function ajustarStock(
   claveProducto: string,
   producto: string,
   delta: number,
-  registro: { empresaId: string; tipo: TipoMovimientoStock; userId: string | null }
+  registro: { empresaId: string; tipo: TipoMovimientoStock; userId: string | null; motivo?: string | null }
 ): Promise<void> {
   if (!claveValida(claveProducto) || !producto || delta === 0) return;
 
@@ -107,7 +107,31 @@ export async function ajustarStock(
     await supabase.from("records").insert({ dataset_id: stockDatasetId, data: { [claveProducto]: producto, cantidad: delta } });
   }
 
-  await registrarMovimiento(supabase, registro.empresaId, stockDatasetId, producto, registro.tipo, delta, saldo, registro.userId);
+  await registrarMovimiento(supabase, registro.empresaId, stockDatasetId, producto, registro.tipo, delta, saldo, registro.userId, registro.motivo);
+}
+
+// Mueve `cantidad` unidades de un producto entre 2 módulos de Stock -- cada
+// módulo de Stock YA es, en los hechos, un almacén propio (ver stockCombinado
+// en datosReportes.ts); esto solo formaliza el "traslado" que antes había que
+// armar a mano con 2 ajustes sueltos sin relación entre sí. Resta del origen,
+// suma al destino, y deja en el Kardex de AMBOS un "ajuste" con el motivo
+// explícito (de/hacia qué almacén), en vez de generar una venta o compra falsa.
+export async function transferirStock(
+  supabase: SupabaseClient,
+  empresaId: string,
+  origen: { datasetId: string; claveProducto: string; nombre: string },
+  destino: { datasetId: string; claveProducto: string; nombre: string },
+  producto: string,
+  cantidad: number,
+  userId: string | null
+): Promise<void> {
+  if (!(cantidad > 0) || !producto.trim()) return;
+  await ajustarStock(supabase, origen.datasetId, origen.claveProducto, producto, -cantidad, {
+    empresaId, tipo: "ajuste", userId, motivo: `Traslado a "${destino.nombre}"`,
+  });
+  await ajustarStock(supabase, destino.datasetId, destino.claveProducto, producto, cantidad, {
+    empresaId, tipo: "ajuste", userId, motivo: `Traslado desde "${origen.nombre}"`,
+  });
 }
 
 // Si `columnas` (de un dataset recién escrito) clasifica como ventas o
