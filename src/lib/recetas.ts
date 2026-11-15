@@ -58,7 +58,19 @@ export const RECETAS: Receta[] = [
       return (tipo === "ventas" || tipo === "compras") && !!col(columnas, "producto")?.enlace;
     },
     construir: () => ({ activa: true, origen: "automatica", condicion: { tipo: "siempre" }, accion: { tipo: "ajustar_stock" } }),
-    coincideCon: (r) => r.accion.tipo === "ajustar_stock",
+    // Reconoce también la versión homologada a mano (sumar_campo_enlazado con
+    // la Cantidad real en vez de la acción fija "ajustar_stock", ver la
+    // migración de la cuenta de prueba) -- misma función, forma distinta.
+    // Sin esto, "Activar" crearía una SEGUNDA regla de ajuste y el Stock se
+    // descontaría doble en cada venta.
+    coincideCon: (r, columnas) => {
+      if (r.accion.tipo === "ajustar_stock") return true;
+      if (r.accion.tipo !== "sumar_campo_enlazado") return false;
+      const a = r.accion;
+      if (a.modo === "fijar") return false;
+      const cEnlace = columnas.find((c) => c.key === a.columnaEnlaceKey);
+      return a.columnaObjetivoKey === "cantidad" && cEnlace?.rol === "producto" && !!cEnlace.enlace;
+    },
     extraerValor: () => "",
   },
   {
