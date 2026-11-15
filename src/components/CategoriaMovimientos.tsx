@@ -13,6 +13,7 @@ import type { Columna } from "@/lib/excel-parser";
 
 interface TotalMes { mes: string; total: number; registros: number }
 interface RankingItem { clave: string; total: number; veces: number }
+interface RankingMargen { clave: string; ventas: number; costos: number; margen: number; veces: number }
 interface FlujoCaja { ventas: number; costos: number; igv: number; gananciaBruta: number; gananciaNeta: number }
 interface ModuloReporte {
   datasetId: string;
@@ -24,6 +25,7 @@ interface ModuloReporte {
   sumaTotal: number | null;
   sumaGastos: number | null;
   flujoCaja: FlujoCaja | null;
+  topMargenProducto: RankingMargen[] | null;
 }
 
 const nombreMes = (clave: string) => {
@@ -264,6 +266,27 @@ export default function CategoriaMovimientos({ tipo }: { tipo: TipoModulo }) {
                     const max = Math.max(1, ...r.topProducto!.map((x) => x.total || x.veces));
                     return r.topProducto!.map((p) => (
                       <Barra key={p.clave} valor={p.total || p.veces} maximo={max} etiqueta={p.clave.length > 12 ? p.clave.slice(0, 11) + "…" : p.clave} texto={p.total > 0 ? soles(p.total) : `${p.veces}x`} />
+                    ));
+                  })()}
+                </div>
+              </div>
+            )}
+
+            {tipo === "ventas" && r?.topMargenProducto && r.topMargenProducto.length > 0 && (
+              <div className="tarjeta" style={{ marginTop: 14, padding: 14 }}>
+                <strong>Top productos por margen</strong>
+                <p className="suave pequeno" style={{ margin: "2px 0 0" }}>Lo que más vende no siempre es lo que más deja -- esto ordena por ganancia (venta - costo), no por monto vendido.</p>
+                <div style={{ marginTop: 10 }}>
+                  {(() => {
+                    const max = Math.max(1, ...r.topMargenProducto!.map((x) => Math.abs(x.margen)));
+                    return r.topMargenProducto!.slice(0, 5).map((p) => (
+                      <Barra
+                        key={p.clave}
+                        valor={Math.max(0, p.margen)}
+                        maximo={max}
+                        etiqueta={p.clave.length > 12 ? p.clave.slice(0, 11) + "…" : p.clave}
+                        texto={soles(p.margen)}
+                      />
                     ));
                   })()}
                 </div>

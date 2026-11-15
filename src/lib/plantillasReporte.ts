@@ -21,6 +21,8 @@ export const PLANTILLAS_REPORTE: PlantillaReporte[] = [
   { id: "top_proveedores", nombre: "Proveedores por monto", descripcion: "A quién le compras más.", rolesNecesarios: ["proveedor"] },
   { id: "total_simple", nombre: "Total sumado", descripcion: "Suma general, para módulos de caja sin fecha.", rolesNecesarios: ["monto"] },
   { id: "gastos_adicionales", nombre: "Gastos adicionales", descripcion: "Suma de envío, comisión u otro gasto aparte del monto.", rolesNecesarios: ["gastos"] },
+  { id: "por_categoria", nombre: "Por categoría", descripcion: "Composición del monto por categoría.", rolesNecesarios: ["categoria", "monto"] },
+  { id: "margen_productos", nombre: "Margen por producto", descripcion: "Qué productos dejan más ganancia, no solo cuáles venden más.", rolesNecesarios: ["producto", "monto", "costo"] },
 ];
 
 // Qué plantillas quedan armadas con los roles que ya se marcaron en estas columnas.

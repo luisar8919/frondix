@@ -12,6 +12,7 @@ import { marcarLogroCliente } from "@/lib/marcarLogro";
 
 interface TotalMes { mes: string; total: number; registros: number }
 interface RankingItem { clave: string; total: number; veces: number }
+interface RankingMargen { clave: string; ventas: number; costos: number; margen: number; veces: number }
 interface FlujoCaja { ventas: number; costos: number; igv: number; gananciaBruta: number; gananciaNeta: number }
 interface ProgresoMeta { id: string; producto: string; objetivo: number; vendidos: number; faltan: number; porcentaje: number; alcanzada: boolean }
 interface BloqueHighlight { titulo: string; texto: string }
@@ -28,6 +29,7 @@ interface Modulo {
   sumaGastos: number | null;
   flujoCaja: FlujoCaja | null;
   metas: ProgresoMeta[] | null;
+  topMargenProducto: RankingMargen[] | null;
 }
 
 const nombrePlantilla = Object.fromEntries(PLANTILLAS_REPORTE.map((p) => [p.id, p.nombre]));
@@ -350,6 +352,21 @@ export default function ResumenReportes() {
                   </button>
                 </div>
                 {errorMeta[m.datasetId] && <p className="alerta alerta-error pequeno" role="alert" style={{ marginTop: 8 }}>{errorMeta[m.datasetId]}</p>}
+                </div>
+              </div>
+            )}
+
+            {!duplicadoEnCategoria && m.topMargenProducto && m.topMargenProducto.length > 0 && (
+              <div className="tarjeta" style={{ marginTop: 14, padding: 14 }}>
+                <strong>Top productos por margen</strong>
+                <p className="suave pequeno" style={{ margin: "2px 0 0" }}>Ordenado por ganancia (venta - costo), no por monto vendido.</p>
+                <div style={{ marginTop: 10 }}>
+                  {(() => {
+                    const max = Math.max(1, ...m.topMargenProducto.map((x) => Math.abs(x.margen)));
+                    return m.topMargenProducto.slice(0, 5).map((p) => (
+                      <Barra key={p.clave} valor={Math.max(0, p.margen)} maximo={max} etiqueta={p.clave.length > 12 ? p.clave.slice(0, 11) + "…" : p.clave} texto={soles(p.margen)} />
+                    ));
+                  })()}
                 </div>
               </div>
             )}

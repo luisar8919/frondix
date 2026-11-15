@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { claveValida } from "./enlaces.ts";
-import { totalesPorMes, topPor, sumaMonto, flujoCaja, progresoMetas } from "./reportes.ts";
+import { totalesPorMes, topPor, topPorMargen, sumaMonto, flujoCaja, progresoMetas } from "./reportes.ts";
 import { tipoModulo, type TipoModulo } from "./roles.ts";
 import { tieneSuscripcionActiva } from "./suscripcion.ts";
 import { esStock } from "./stock.ts";
@@ -42,6 +42,7 @@ export interface ModuloReporte {
   topCliente: ReturnType<typeof topPor> | null;
   topProveedor: ReturnType<typeof topPor> | null;
   porCategoria: ReturnType<typeof topPor> | null;
+  topMargenProducto: ReturnType<typeof topPorMargen> | null;
   sumaTotal: number | null;
   sumaGastos: number | null;
   flujoCaja: ReturnType<typeof flujoCaja> | null;
@@ -85,6 +86,9 @@ export async function calcularModulosReporte(supabase: SupabaseClient, empresaId
     const conTopProveedor = !!cProveedor;
     const conCategoria = !!(cCategoria && cMonto);
     const conFlujoCaja = !!(cMonto && cCosto);
+    // Margen por producto: mismo requisito que flujoCaja (Monto+Costo), además de
+    // Producto -- sin eso no hay por qué agrupar el margen.
+    const conMargenProducto = conFlujoCaja && conTopProducto;
     const conSumaTotal = !!cMonto && !conTotales && !conFlujoCaja;
     const conGastos = !!cGastos;
     if (!conTotales && !conTopProducto && !conTopCliente && !conTopProveedor && !conSumaTotal && !conFlujoCaja && !conGastos && !conCategoria) continue;
@@ -116,6 +120,7 @@ export async function calcularModulosReporte(supabase: SupabaseClient, empresaId
       conSumaTotal && "total_simple",
       conGastos && "gastos_adicionales",
       conCategoria && "por_categoria",
+      conMargenProducto && "margen_productos",
     ].filter((x): x is string => !!x);
 
     let metas: ModuloReporte["metas"] = null;
@@ -140,6 +145,7 @@ export async function calcularModulosReporte(supabase: SupabaseClient, empresaId
       // n=20: a diferencia de un "top 5", acá se quiere la composición completa (pocas
       // categorías típicamente), no solo las más grandes.
       porCategoria: conCategoria ? topPor(filas.map((f) => ({ clave: f.cat, m: f.m })), 20) : null,
+      topMargenProducto: conMargenProducto ? topPorMargen(filas.map((f) => ({ clave: f.p, m: f.m, costo: f.co })), 10) : null,
       sumaTotal: conSumaTotal ? sumaMonto(filas) : null,
       sumaGastos: conGastos ? sumaMonto(filas.map((f) => ({ m: f.g }))) : null,
       flujoCaja: conFlujoCaja ? flujoCaja(filas.map((f) => ({ m: f.m, costo: f.co })), !!d.incluye_igv) : null,
@@ -307,6 +313,7 @@ export function resumenParaIA(modulos: ModuloReporte[], opciones?: { omitirNombr
       if (m.sumaTotal !== null) lineas.push(`  Total: S/ ${m.sumaTotal}`);
       if (m.sumaGastos !== null) lineas.push(`  Gastos adicionales: S/ ${m.sumaGastos}`);
       if (m.topProducto?.length) lineas.push(`  Top productos: ${m.topProducto.map((p) => `${p.clave} (${p.total > 0 ? "S/ " + p.total : p.veces + "x"})`).join(", ")}`);
+      if (m.topMargenProducto?.length) lineas.push(`  Top productos por margen: ${m.topMargenProducto.slice(0, 5).map((p) => `${p.clave} (margen S/ ${p.margen})`).join(", ")}`);
       if (m.topCliente?.length && !opciones?.omitirNombresCliente) {
         lineas.push(`  Top clientes: ${m.topCliente.map((c) => `${c.clave} (${c.total > 0 ? "S/ " + c.total : c.veces + "x"})`).join(", ")}`);
       }
@@ -401,6 +408,7 @@ export function huellaModulos(modulos: ModuloReporte[]): string {
     sumaTotal: m.sumaTotal,
     sumaGastos: m.sumaGastos,
     flujoCaja: m.flujoCaja,
+    topMargenProducto: m.topMargenProducto,
     metas: m.metas?.map(({ id, ...resto }) => resto), // el id de la meta es aleatorio, no un dato real
   }));
   return createHash("sha256").update(JSON.stringify(datos)).digest("hex");

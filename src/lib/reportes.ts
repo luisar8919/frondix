@@ -14,7 +14,7 @@ export interface TotalMes {
   registros: number;
 }
 
-function aNumero(v: unknown): number | null {
+export function aNumero(v: unknown): number | null {
   if (typeof v === "number") return Number.isFinite(v) ? v : null;
   if (typeof v === "string" && v.trim() !== "") {
     const n = Number(v);
@@ -121,6 +121,40 @@ export function topPor(filas: FilaAgrupable[], n = 5): RankingItem[] {
   }
   const items = [...porClave.entries()].map(([clave, v]) => ({ clave, total: Math.round(v.total * 100) / 100, veces: v.veces }));
   items.sort((a, b) => (hayMontos ? b.total - a.total : b.veces - a.veces));
+  return items.slice(0, n);
+}
+
+export interface RankingMargen {
+  clave: string;
+  ventas: number;
+  costos: number;
+  margen: number;
+  veces: number;
+}
+
+// Igual que topPor, pero agrupa Venta Y Costo por clave (producto) y ordena por
+// margen (ventas - costos) en vez de por venta sola -- el "producto más vendido"
+// no siempre es el más rentable (ver Dashboard de margen, benchmark vs. Defontana).
+// Solo tiene sentido en un módulo con Producto + Monto + Costo marcados.
+export function topPorMargen(filas: { clave?: string | null; m?: string | number | null; costo?: string | number | null }[], n = 10): RankingMargen[] {
+  const porClave = new Map<string, { ventas: number; costos: number; veces: number }>();
+  for (const fila of filas) {
+    const clave = fila.clave?.toString().trim();
+    if (!clave) continue;
+    const actual = porClave.get(clave) ?? { ventas: 0, costos: 0, veces: 0 };
+    actual.ventas += aNumero(fila.m) ?? 0;
+    actual.costos += aNumero(fila.costo) ?? 0;
+    actual.veces++;
+    porClave.set(clave, actual);
+  }
+  const items = [...porClave.entries()].map(([clave, v]) => ({
+    clave,
+    ventas: redondear(v.ventas),
+    costos: redondear(v.costos),
+    margen: redondear(v.ventas - v.costos),
+    veces: v.veces,
+  }));
+  items.sort((a, b) => b.margen - a.margen);
   return items.slice(0, n);
 }
 
