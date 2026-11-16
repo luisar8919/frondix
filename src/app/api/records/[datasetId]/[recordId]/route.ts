@@ -6,6 +6,7 @@ import { aplicarReglasDesdeRegistro } from "@/lib/reglasAplicar";
 import type { Regla } from "@/lib/reglas";
 import { validarCamposRegistro, tipoModulo } from "@/lib/roles";
 import { datasetBloqueado } from "@/lib/limites";
+import { encontrarChoqueAgenda } from "@/lib/agenda";
 import type { Columna } from "@/lib/excel-parser";
 
 // Editar o eliminar un registro. Si otras tablas dependen de su valor, la primera llamada
@@ -71,6 +72,9 @@ export async function PATCH(req: NextRequest, ctx: Ctx) {
 
     const fallo = await validarEnlaces(supabase, columnas, data);
     if (fallo) return NextResponse.json({ error: fallo }, { status: 422 });
+
+    const choqueAgenda = await encontrarChoqueAgenda(supabase, datasetId, columnas, data, recordId);
+    if (choqueAgenda) return NextResponse.json({ error: choqueAgenda }, { status: 422 });
 
     if (!confirmar) {
       const advertencias = await advertenciasDeRegistro(supabase, datasetId, recordId, registro.data, data);

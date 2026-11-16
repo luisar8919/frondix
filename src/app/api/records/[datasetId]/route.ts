@@ -7,6 +7,7 @@ import { registrarAjusteManual } from "@/lib/stock";
 import { aplicarReglasDesdeRegistro } from "@/lib/reglasAplicar";
 import type { Regla } from "@/lib/reglas";
 import { validarCamposRegistro, tipoModulo } from "@/lib/roles";
+import { encontrarChoqueAgenda } from "@/lib/agenda";
 import { datasetBloqueado } from "@/lib/limites";
 import type { Columna } from "@/lib/excel-parser";
 
@@ -153,6 +154,9 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ dat
 
   const fallo = await validarEnlaces(supabase, columnas, body);
   if (fallo) return NextResponse.json({ error: fallo }, { status: 422 });
+
+  const choqueAgenda = await encontrarChoqueAgenda(supabase, datasetId, columnas, body);
+  if (choqueAgenda) return NextResponse.json({ error: choqueAgenda }, { status: 422 });
 
   const { data, error } = await supabase
     .from("records")

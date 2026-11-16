@@ -6,6 +6,8 @@ import DynamicTable from "@/components/DynamicTable";
 import DynamicForm from "@/components/DynamicForm";
 import EditarTabla from "@/components/EditarTabla";
 import KardexProducto from "@/components/KardexProducto";
+import CalendarioAgenda from "@/components/CalendarioAgenda";
+import { esAgenda } from "@/lib/agenda";
 import { enviarConfirmando } from "@/lib/confirmar";
 import type { Columna } from "@/lib/excel-parser";
 import type { Regla } from "@/lib/reglas";
@@ -360,6 +362,8 @@ export default function DatasetPage({
           />
         </div>
       </details>
+
+      {esAgenda(dataset.columnas) && <CalendarioAgenda columnas={dataset.columnas} registros={registros} />}
 
       {editando && (
         <div className="tarjeta" style={{ marginBottom: 20 }}>
