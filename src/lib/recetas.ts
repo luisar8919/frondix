@@ -101,6 +101,26 @@ export const RECETAS: Receta[] = [
     extraerValor: valorCondicionCampo,
   },
   {
+    clave: "notificacion_personalizada",
+    icono: "📣",
+    titulo: "Enviarme una notificación personalizada",
+    tipoValor: "texto",
+    valorPorDefecto: "Se registró un movimiento nuevo en este módulo.",
+    descripcion: (v) => `Cada vez que se cree un registro nuevo acá, te llega este mensaje: "${v}".`,
+    requisito: "",
+    aplicaA: () => true,
+    construir: (columnas, valor) => ({
+      activa: true, origen: "manual", evento: ["creacion"],
+      condicion: { tipo: "siempre" },
+      accion: { tipo: "notificacion_push", titulo: "Aviso personalizado", mensaje: valor || "Se registró un movimiento nuevo en este módulo." },
+    }),
+    // Por estructura (push + "siempre" + SOLO en creación), no por el mensaje
+    // en sí -- así reconoce la receta activa sin importar qué texto hayas
+    // puesto, y "Actualizar" la encuentra para editarla en vez de duplicarla.
+    coincideCon: (r) => r.accion.tipo === "notificacion_push" && r.accion.titulo === "Aviso personalizado" && r.condicion.tipo === "siempre" && !!r.evento && r.evento.length === 1 && r.evento[0] === "creacion",
+    extraerValor: (r) => (r.accion.tipo === "notificacion_push" ? r.accion.mensaje : ""),
+  },
+  {
     clave: "aviso_eliminacion",
     icono: "🗑️",
     titulo: "Avisarme si se elimina un registro",
