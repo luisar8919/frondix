@@ -31,7 +31,7 @@ interface CandidatoSumarCampo {
   opcionesObjetivo: string[] | null;
 }
 
-type TipoAccion = "excluir_de_reportes" | "cambiar_estado" | "ajustar_stock" | "enviar_whatsapp" | "agregar_seguimiento" | "notificacion_push" | "sumar_campo_enlazado" | "eliminar_registro";
+type TipoAccion = "excluir_de_reportes" | "cambiar_estado" | "ajustar_stock" | "enviar_whatsapp" | "enviar_correo_cliente" | "agregar_seguimiento" | "notificacion_push" | "sumar_campo_enlazado" | "eliminar_registro";
 
 export default function ReglasModulo({
   datasetId,
@@ -40,6 +40,7 @@ export default function ReglasModulo({
   reglas,
   ajustarStockInfo,
   hayTelefono,
+  hayCorreo,
   hayCliente,
   candidatosSumarCampo,
 }: {
@@ -58,6 +59,7 @@ export default function ReglasModulo({
   // "Enviar WhatsApp" necesita un campo rol "telefono" en ESTE módulo (a quién
   // escribirle); "Agregar a Seguimiento" necesita un campo rol "cliente".
   hayTelefono: boolean;
+  hayCorreo: boolean;
   hayCliente: boolean;
   // "Sumar un campo enlazado": un campo numérico candidato por cada columna de
   // este módulo que tenga un enlace -- ver /api/reglas (candidatosSumarCampo).
@@ -121,6 +123,7 @@ export default function ReglasModulo({
     cambiar_estado: "🔄",
     ajustar_stock: "📦",
     enviar_whatsapp: "💬",
+    enviar_correo_cliente: "📧",
     agregar_seguimiento: "👀",
     notificacion_push: "🔔",
     sumar_campo_enlazado: "➕",
@@ -159,6 +162,7 @@ export default function ReglasModulo({
       return `${ajustarStockInfo.tipoModulo === "ventas" ? "Restar" : "Sumar"} ${cant} de Cantidad en "${ajustarStockInfo.stockNombre}"`;
     }
     if (a.tipo === "enviar_whatsapp") return `Enviar WhatsApp${a.mensaje ? `: "${a.mensaje.slice(0, 40)}${a.mensaje.length > 40 ? "..." : ""}"` : ""}`;
+    if (a.tipo === "enviar_correo_cliente") return `Enviar correo al cliente${a.mensaje ? `: "${a.mensaje.slice(0, 40)}${a.mensaje.length > 40 ? "..." : ""}"` : ""}`;
     if (a.tipo === "notificacion_push") return `Notificar${a.titulo ? `: "${a.titulo}"` : ""}`;
     const c = candidatoDe(claveCandidato({ columnaEnlaceKey: a.columnaEnlaceKey, columnaObjetivoKey: a.columnaObjetivoKey } as CandidatoSumarCampo));
     const campo = `${c?.columnaObjetivoLabel ?? a.columnaObjetivoKey}${c ? ` en ${c.datasetObjetivoNombre}` : ""}`;
@@ -227,7 +231,7 @@ export default function ReglasModulo({
       cambiarRegla(i, { condicion, accion: { tipo } });
       return;
     }
-    if (tipo === "enviar_whatsapp") {
+    if (tipo === "enviar_whatsapp" || tipo === "enviar_correo_cliente") {
       cambiarRegla(i, { condicion, accion: { tipo, mensaje: "" } });
       return;
     }
@@ -365,6 +369,7 @@ export default function ReglasModulo({
                 {columnasDestino.length > 0 && <option value="cambiar_estado">Cambiar un campo a...</option>}
                 {puedeAjustarStock && !otraYaTieneAjustarStock && <option value="ajustar_stock">Ajustar Stock automáticamente</option>}
                 {hayTelefono && <option value="enviar_whatsapp">Enviar WhatsApp</option>}
+                {hayCorreo && <option value="enviar_correo_cliente">Enviar correo al cliente</option>}
                 {hayCliente && <option value="agregar_seguimiento">Agregar a Seguimiento</option>}
                 <option value="notificacion_push">Notificación push</option>
                 {candidatosSumarCampo.length > 0 && <option value="sumar_campo_enlazado">Sumar un campo enlazado</option>}
@@ -390,6 +395,16 @@ export default function ReglasModulo({
                   placeholder="Mensaje a enviar (texto fijo, sin {nombre} ni variables)"
                   value={r.accion.mensaje}
                   onChange={(e) => cambiarRegla(i, { accion: { tipo: "enviar_whatsapp", mensaje: e.target.value } })}
+                  style={{ minWidth: 260, flex: 1 }}
+                />
+              )}
+
+              {r.accion.tipo === "enviar_correo_cliente" && (
+                <input
+                  aria-label="Mensaje del correo al cliente"
+                  placeholder="Mensaje a enviar (texto fijo, sin {nombre} ni variables)"
+                  value={r.accion.mensaje}
+                  onChange={(e) => cambiarRegla(i, { accion: { tipo: "enviar_correo_cliente", mensaje: e.target.value } })}
                   style={{ minWidth: 260, flex: 1 }}
                 />
               )}

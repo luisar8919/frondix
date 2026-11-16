@@ -5,6 +5,7 @@ import { claveValida } from "./enlaces.ts";
 import { normalizarTexto, normalizarTelefonoPE } from "./seguimiento.ts";
 import { enviarTexto } from "./whatsapp.ts";
 import { enviarPush } from "./push.ts";
+import { enviarCorreoAlCliente } from "./email.ts";
 import { crearClienteAdmin } from "./supabase/admin.ts";
 import { condicionCumple, type Accion, type Evento, type Regla } from "./reglas.ts";
 
@@ -142,6 +143,18 @@ export async function aplicarReglasDesdeRegistro(
 ): Promise<void> {
   let datosFinal: Record<string, unknown> | undefined;
   let huboMutacion = false;
+  // Nombre de la empresa, pedido como mucho una vez por llamada (no por
+  // regla) -- solo lo necesita "enviar_correo_cliente", para el remitente
+  // visible y el asunto del correo.
+  let nombreEmpresaCache: string | null | undefined;
+  async function nombreEmpresa(): Promise<string> {
+    if (nombreEmpresaCache === undefined) {
+      const admin = crearClienteAdmin();
+      const { data } = await admin.from("empresas").select("nombre").eq("id", empresaId).single();
+      nombreEmpresaCache = data?.nombre ?? null;
+    }
+    return nombreEmpresaCache ?? "tu negocio";
+  }
   // Mismo criterio que ya usaba stock.ts para distinguir alta/edición/baja a
   // partir de qué lado viene presente -- ver comentario de `evento` en
   // reglas.ts. `regla.evento` filtra sobre este mismo valor.
@@ -210,6 +223,14 @@ export async function aplicarReglasDesdeRegistro(
         if (telefono) await enviarTexto(telefono, regla.accion.mensaje);
       } catch {
         // ver comentario de arriba -- ej. fuera de la ventana de 24h de WhatsApp
+      }
+    } else if (regla.accion.tipo === "enviar_correo_cliente") {
+      try {
+        const cCorreo = columnas.find((c) => c.rol === "correo");
+        const correo = cCorreo ? String(datosEval[cCorreo.key] ?? "").trim() : "";
+        if (correo) await enviarCorreoAlCliente(correo, await nombreEmpresa(), regla.accion.mensaje);
+      } catch {
+        // ver comentario de arriba -- ej. RESEND_API_KEY sin configurar o correo inválido
       }
     } else if (regla.accion.tipo === "agregar_seguimiento") {
       try {

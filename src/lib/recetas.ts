@@ -121,6 +121,26 @@ export const RECETAS: Receta[] = [
     extraerValor: (r) => (r.accion.tipo === "notificacion_push" ? r.accion.mensaje : ""),
   },
   {
+    clave: "notificar_cliente_correo",
+    icono: "📧",
+    titulo: "Enviarle un correo al cliente",
+    tipoValor: "texto",
+    valorPorDefecto: "Gracias por tu compra. Cualquier consulta, escríbenos.",
+    descripcion: (v) => `Cada vez que se cree un registro nuevo con su correo cargado, le llega este mensaje: "${v}".`,
+    requisito: "Necesita un campo con significado \"Correo electrónico\".",
+    aplicaA: (columnas) => !!col(columnas, "correo"),
+    construir: (columnas, valor) => ({
+      activa: true, origen: "manual", evento: ["creacion"],
+      condicion: { tipo: "siempre" },
+      accion: { tipo: "enviar_correo_cliente", mensaje: valor || "Gracias por tu compra. Cualquier consulta, escríbenos." },
+    }),
+    // Por estructura (igual criterio que "notificacion_personalizada"): no
+    // importa el texto del mensaje, importa que sea ESTA acción en "siempre"
+    // + solo creación.
+    coincideCon: (r) => r.accion.tipo === "enviar_correo_cliente" && r.condicion.tipo === "siempre" && !!r.evento && r.evento.length === 1 && r.evento[0] === "creacion",
+    extraerValor: (r) => (r.accion.tipo === "enviar_correo_cliente" ? r.accion.mensaje : ""),
+  },
+  {
     clave: "aviso_eliminacion",
     icono: "🗑️",
     titulo: "Avisarme si se elimina un registro",

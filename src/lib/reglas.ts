@@ -72,6 +72,12 @@ export type Accion =
   // Push a todos los miembros de la empresa (Firebase, misma función que ya
   // usa el cron de seguimiento).
   | { tipo: "notificacion_push"; titulo: string; mensaje: string }
+  // A diferencia de notificacion_push (al DUEÑO, por Firebase), esto manda un
+  // correo real al CLIENTE del negocio -- al campo con rol "telefono" le
+  // corresponde enviar_whatsapp, a este le corresponde el campo rol "correo"
+  // de ESE registro. El asunto se arma solo con el nombre de la empresa al
+  // momento de enviar (ver reglasAplicar.ts), no se guarda acá.
+  | { tipo: "enviar_correo_cliente"; mensaje: string }
   // Generaliza ajustar_stock a CUALQUIER campo de CUALQUIER módulo enlazado
   // (no solo Stock) -- ej. sumar 1 a "Visitas" en Clientes por cada venta, o
   // fijar "Último estado" a "Entregado" en el Pedido enlazado. Mismo patrón
