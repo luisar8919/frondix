@@ -5,9 +5,11 @@ import { enviarCorreo } from "@/lib/email";
 import type { Columna } from "@/lib/excel-parser";
 
 // Revisa cualquier módulo con una columna "Fecha de vencimiento" (rol
-// fecha_vencimiento, ver roles.ts -- típicamente un Stock de botica/veterinaria)
-// y manda UN push por empresa listando los productos que vencen dentro de
-// UMBRAL_DIAS o ya vencieron hace poco. Dispara un cron externo (GitHub
+// fecha_vencimiento, ver roles.ts) junto a una columna "producto" --
+// cubre tanto Stock físico (botica/veterinaria) como Membresías/Alquileres/
+// Matrículas (donde "producto" es el plan/propiedad/curso que vence, ver
+// plantillasModulo.ts) -- y manda UN push + correo por empresa listando lo
+// que vence dentro de UMBRAL_DIAS o venció hace poco. Dispara un cron externo (GitHub
 // Actions, ver .github/workflows/vencimientos-push.yml) con el secreto en el
 // header x-cron-secret, mismo patrón que /api/cron/seguimiento-push.
 const UMBRAL_DIAS_ANTES = 7;
@@ -113,9 +115,9 @@ export async function GET(req: NextRequest) {
         userIds,
         asunto,
         `<p>Hola,</p>
-         <p>En <strong>${empresa?.nombre ?? "tu negocio"}</strong> estos productos de tu Stock necesitan atención:</p>
+         <p>En <strong>${empresa?.nombre ?? "tu negocio"}</strong> esto necesita tu atención pronto:</p>
          <ul style="padding-left: 18px;">${filasHtml}</ul>
-         <p>Conviene revisarlos antes de que se pierdan o tengas que darlos de baja.</p>`
+         <p>Revísalo antes de la fecha para no perder el producto o el pago.</p>`
       );
     } catch (e) {
       empresasConError++;

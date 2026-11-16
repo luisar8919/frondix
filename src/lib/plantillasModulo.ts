@@ -185,7 +185,11 @@ export function plantillaMembresias(): Columna[] {
     { key: "telefono", label: "Teléfono", tipo: "texto", rol: "telefono", sospechosa: false },
     { key: "plan", label: "Plan", tipo: "texto", rol: "producto", sospechosa: false },
     { key: "monto_mensual", label: "Monto mensual", tipo: "numero", rol: "monto", sospechosa: false },
-    { key: "fecha_vencimiento", label: "Fecha de vencimiento", tipo: "fecha", rol: null, sospechosa: false },
+    // rol "fecha_vencimiento" (en vez de null): el cron de vencimientos
+    // (ver lib/agenda.ts... src/app/api/cron/vencimientos-push) avisa por
+    // push y correo unos días antes -- mismo mecanismo que ya usa Stock
+    // para productos físicos, acá aplicado a "cuándo vence la membresía".
+    { key: "fecha_vencimiento", label: "Fecha de vencimiento", tipo: "fecha", rol: "fecha_vencimiento", sospechosa: false },
     { key: "estado", label: "Estado", tipo: "texto", rol: "estado", sospechosa: false, opcionesFijas: ["Activa", "Vencida", "Cancelada"] },
   ];
 }
@@ -197,7 +201,7 @@ export function plantillaAlquileres(): Columna[] {
     { key: "telefono", label: "Teléfono", tipo: "texto", rol: "telefono", sospechosa: false },
     { key: "propiedad", label: "Propiedad", tipo: "texto", rol: "producto", sospechosa: false },
     { key: "monto_mensual", label: "Monto mensual", tipo: "numero", rol: "monto", sospechosa: false },
-    { key: "fecha_pago", label: "Próxima fecha de pago", tipo: "fecha", rol: null, sospechosa: false },
+    { key: "fecha_pago", label: "Próxima fecha de pago", tipo: "fecha", rol: "fecha_vencimiento", sospechosa: false },
     { key: "estado", label: "Estado", tipo: "texto", rol: "estado", sospechosa: false, opcionesFijas: ["Activo", "Vencido", "Cancelado"] },
   ];
 }
@@ -209,7 +213,7 @@ export function plantillaMatriculas(): Columna[] {
     { key: "telefono_apoderado", label: "Teléfono del apoderado", tipo: "texto", rol: "telefono", sospechosa: false },
     { key: "curso", label: "Curso", tipo: "texto", rol: "producto", sospechosa: false },
     { key: "mensualidad", label: "Mensualidad", tipo: "numero", rol: "monto", sospechosa: false },
-    { key: "fecha_vencimiento", label: "Fecha de vencimiento", tipo: "fecha", rol: null, sospechosa: false },
+    { key: "fecha_vencimiento", label: "Fecha de vencimiento", tipo: "fecha", rol: "fecha_vencimiento", sospechosa: false },
     { key: "estado", label: "Estado", tipo: "texto", rol: "estado", sospechosa: false, opcionesFijas: ["Activa", "Vencida", "Cancelada"] },
   ];
 }
