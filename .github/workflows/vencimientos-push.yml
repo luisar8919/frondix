@@ -1,0 +1,22 @@
+name: Push de vencimientos proximos
+
+# Revisa los modulos con columna "Fecha de vencimiento" (rol fecha_vencimiento)
+# y manda una notificacion push por cada producto que vence pronto o acaba de
+# vencer. Ver /api/cron/vencimientos-push.
+on:
+  schedule:
+    - cron: "0 12 * * *"
+  workflow_dispatch: {}
+
+jobs:
+  avisar:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Llamar al cron de vencimientos
+        run: |
+          curl -s -o /dev/null -w "HTTP %{http_code}\n" --fail \
+            --retry 2 --retry-delay 20 --retry-all-errors \
+            "https://www.frondix.com/api/cron/vencimientos-push" \
+            -H "x-cron-secret: $CRON_SECRET"
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}

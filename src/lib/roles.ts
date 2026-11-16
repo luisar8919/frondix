@@ -1,6 +1,6 @@
 // "Rol" = qué significa una columna para el negocio (no solo su tipo de dato).
 // El asistente lo necesita para saber, por ejemplo, cuál es el monto de una venta.
-export type RolColumna = "monto" | "fecha" | "cliente" | "producto" | "telefono" | "costo" | "proveedor" | "gastos" | "tipo_movimiento" | "stock" | "cantidad" | "stock_minimo" | "documento" | "direccion" | "correo" | "saldo_pendiente" | "codigo" | "categoria" | "unidad_medida" | "precio_mayorista" | "precio_minorista" | "descuento" | "estado";
+export type RolColumna = "monto" | "fecha" | "cliente" | "producto" | "telefono" | "costo" | "proveedor" | "gastos" | "tipo_movimiento" | "stock" | "cantidad" | "stock_minimo" | "documento" | "direccion" | "correo" | "saldo_pendiente" | "codigo" | "categoria" | "unidad_medida" | "precio_mayorista" | "precio_minorista" | "descuento" | "estado" | "fecha_vencimiento";
 
 export const ROLES: { valor: RolColumna; etiqueta: string }[] = [
   { valor: "monto", etiqueta: "Monto (importe de la venta o movimiento)" },
@@ -8,6 +8,7 @@ export const ROLES: { valor: RolColumna; etiqueta: string }[] = [
   { valor: "gastos", etiqueta: "Gastos adicionales (envío, comisión, etc.)" },
   { valor: "cantidad", etiqueta: "Cantidad (unidades de ese movimiento)" },
   { valor: "fecha", etiqueta: "Fecha" },
+  { valor: "fecha_vencimiento", etiqueta: "Fecha de vencimiento (te avisamos antes de que llegue)" },
   { valor: "cliente", etiqueta: "Cliente" },
   { valor: "proveedor", etiqueta: "Proveedor (a quién le compras)" },
   { valor: "producto", etiqueta: "Producto o concepto" },
@@ -45,6 +46,9 @@ const REGLAS: { rol: RolColumna; patron: RegExp; tipo?: string }[] = [
   { rol: "documento", patron: /\bruc\b|\bdni\b|documento/, tipo: "texto" },
   { rol: "direccion", patron: /direccion|domicilio/, tipo: "texto" },
   { rol: "correo", patron: /correo|email|e-mail/, tipo: "texto" },
+  // Va antes que "fecha" (más abajo) por lo mismo que documento/direccion/correo:
+  // "Fecha de vencimiento" no debe caer en el rol genérico.
+  { rol: "fecha_vencimiento", patron: /venc(e|i)miento|caduc|expira/, tipo: "fecha" },
   { rol: "fecha", patron: /fecha|date/, tipo: "fecha" },
   { rol: "tipo_movimiento", patron: /^tipo$|tipo.*(movim|transac|registro)/, tipo: "texto" },
   { rol: "estado", patron: /^estado$|^status$/, tipo: "texto" },

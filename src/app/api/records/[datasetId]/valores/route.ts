@@ -27,19 +27,25 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ data
   const cMayorista = dsColumnas.find((c) => c.rol === "precio_mayorista");
   const cMinorista = dsColumnas.find((c) => c.rol === "precio_minorista");
   const hayPrecios = !!(cGeneral || cMayorista || cMinorista);
+  // Si este dataset también tiene un código de barras/SKU (rol "codigo"), se
+  // devuelve el mapa código->valor para que el Punto de Venta pueda, al
+  // escanear, encontrar el producto sin que el cajero lo busque en la grilla.
+  const cCodigo = dsColumnas.find((c) => c.rol === "codigo");
+  const hayCodigo = !!cCodigo;
 
   const distintos = new Set<string>();
   const precios: Record<string, { general?: number; mayorista?: number; minorista?: number }> = {};
+  const codigos: Record<string, string> = {};
   for (let desde = 0; desde < TOPE_FILAS; desde += PAGINA) {
     const { data, error } = await supabase
       .from("records")
-      .select(hayPrecios ? "data" : `v:data->>${columna}`)
+      .select(hayPrecios || hayCodigo ? "data" : `v:data->>${columna}`)
       .eq("dataset_id", datasetId)
       .order("id")
       .range(desde, desde + PAGINA - 1);
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-    if (hayPrecios) {
+    if (hayPrecios || hayCodigo) {
       for (const fila of data as unknown as { data: Record<string, unknown> }[]) {
         const v = String(fila.data[columna] ?? "").trim();
         if (!v) continue;
@@ -49,6 +55,10 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ data
         if (cMayorista) { const n = Number(fila.data[cMayorista.key]); if (Number.isFinite(n)) p.mayorista = n; }
         if (cMinorista) { const n = Number(fila.data[cMinorista.key]); if (Number.isFinite(n)) p.minorista = n; }
         if (Object.keys(p).length) precios[v] = p;
+        if (cCodigo) {
+          const codigo = String(fila.data[cCodigo.key] ?? "").trim();
+          if (codigo) codigos[codigo] = v;
+        }
       }
     } else {
       for (const fila of data as unknown as { v: string | null }[]) {
@@ -59,5 +69,5 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ data
     if (data.length < PAGINA) break;
   }
 
-  return NextResponse.json({ valores: [...distintos].sort((a, b) => a.localeCompare(b, "es")), precios });
+  return NextResponse.json({ valores: [...distintos].sort((a, b) => a.localeCompare(b, "es")), precios, codigos });
 }

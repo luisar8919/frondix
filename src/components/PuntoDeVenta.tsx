@@ -3,6 +3,8 @@
 import { useEffect, useMemo, useState } from "react";
 import type { Columna } from "@/lib/excel-parser";
 import { formatearMonto } from "@/lib/moneda";
+import { Capacitor } from "@capacitor/core";
+import { BarcodeScanner } from "@capacitor-mlkit/barcode-scanning";
 
 interface LineaCarrito {
   producto: string;
@@ -35,7 +37,9 @@ export default function PuntoDeVenta() {
   const [columnas, setColumnas] = useState<Columna[]>([]);
   const [productos, setProductos] = useState<string[]>([]);
   const [precios, setPrecios] = useState<Record<string, PreciosProducto>>({});
+  const [codigos, setCodigos] = useState<Record<string, string>>({});
   const [cargando, setCargando] = useState(false);
+  const [escaneando, setEscaneando] = useState(false);
   const [error, setError] = useState("");
   const [cliente, setCliente] = useState("Cliente mostrador");
   const [carrito, setCarrito] = useState<LineaCarrito[]>([]);
@@ -77,6 +81,7 @@ export default function PuntoDeVenta() {
       const bodyValores = await resValores.json();
       setProductos(bodyValores.valores ?? []);
       setPrecios(bodyValores.precios ?? {});
+      setCodigos(bodyValores.codigos ?? {});
       setCargando(false);
     })();
   }, [ventasDatasetId]);
@@ -109,6 +114,34 @@ export default function PuntoDeVenta() {
   }
 
   const total = carrito.reduce((s, l) => s + l.cantidad * l.precioUnitario, 0);
+
+  // Escanea un código de barras (requiere que Stock tenga una columna con rol
+  // "codigo", ver el mapa `codigos` armado en /api/records/[datasetId]/valores)
+  // y suma el producto encontrado al carrito, igual que tocar su cuadrado.
+  async function escanear() {
+    setEscaneando(true);
+    setMensaje(null);
+    try {
+      const permiso = await BarcodeScanner.checkPermissions();
+      if (permiso.camera !== "granted") {
+        const pedido = await BarcodeScanner.requestPermissions();
+        if (pedido.camera !== "granted") return;
+      }
+      const { barcodes } = await BarcodeScanner.scan();
+      const codigo = barcodes[0]?.rawValue?.trim();
+      if (!codigo) return;
+      const producto = codigos[codigo];
+      if (!producto) {
+        setMensaje({ tipo: "error", texto: `No encontré ningún producto con el código "${codigo}" en Stock.` });
+        return;
+      }
+      agregarAlCarrito(producto);
+    } catch {
+      // el usuario cerró la cámara o no hay una disponible -- no es un error que avisar
+    } finally {
+      setEscaneando(false);
+    }
+  }
 
   async function cobrar() {
     if (!cProductoCol || !cMonto || carrito.length === 0) return;
@@ -166,12 +199,19 @@ export default function PuntoDeVenta() {
           <h1>Punto de Venta</h1>
           <p className="suave">Tocá un producto para sumarlo, ajustá cantidad o precio si hace falta, y cobrá.</p>
         </div>
-        {modulosVentas.length > 1 && (
-          <select value={ventasDatasetId} onChange={(e) => setVentasDatasetId(e.target.value)}>
-            <option value="" disabled>Elige un módulo de Ventas...</option>
-            {modulosVentas.map((m) => <option key={m.id} value={m.id}>{m.nombre}</option>)}
-          </select>
-        )}
+        <div style={{ display: "flex", gap: 8 }}>
+          {modulosVentas.length > 1 && (
+            <select value={ventasDatasetId} onChange={(e) => setVentasDatasetId(e.target.value)}>
+              <option value="" disabled>Elige un módulo de Ventas...</option>
+              {modulosVentas.map((m) => <option key={m.id} value={m.id}>{m.nombre}</option>)}
+            </select>
+          )}
+          {Capacitor.isNativePlatform() && Object.keys(codigos).length > 0 && (
+            <button type="button" className="btn btn-secundario" onClick={escanear} disabled={escaneando}>
+              {escaneando ? "Abriendo cámara..." : "📷 Escanear código"}
+            </button>
+          )}
+        </div>
       </div>
 
       {error && <p className="alerta alerta-error" role="alert">{error}</p>}
