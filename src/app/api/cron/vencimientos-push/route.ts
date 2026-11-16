@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { crearClienteAdmin } from "@/lib/supabase/admin";
 import { enviarPush } from "@/lib/push";
+import { enviarCorreo } from "@/lib/email";
 import type { Columna } from "@/lib/excel-parser";
 
 // Revisa cualquier módulo con una columna "Fecha de vencimiento" (rol
@@ -97,6 +98,14 @@ export async function GET(req: NextRequest) {
         ? `${nombres.join(", ")} en ${empresa?.nombre ?? "tu negocio"}.`
         : `${nombres.slice(0, 2).join(", ")} y ${nombres.length - 2} más.`;
       await enviarPush(supabase, userIds, titulo, cuerpo, { tipo: "vencimiento_proximo" });
+
+      const filasHtml = items.map((i) => `<li>${i.producto} ${i.dias < 0 ? "(vencido)" : i.dias === 0 ? "(vence hoy)" : `(en ${i.dias} día${i.dias === 1 ? "" : "s"})`}</li>`).join("");
+      await enviarCorreo(
+        supabase,
+        userIds,
+        titulo,
+        `<p>En <strong>${empresa?.nombre ?? "tu negocio"}</strong>:</p><ul>${filasHtml}</ul>`
+      );
     } catch (e) {
       empresasConError++;
       console.error(`vencimientos-push: fallo al notificar a la empresa ${empresaId}:`, e instanceof Error ? e.message : e);
