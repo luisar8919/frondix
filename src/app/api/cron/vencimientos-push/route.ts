@@ -99,12 +99,23 @@ export async function GET(req: NextRequest) {
         : `${nombres.slice(0, 2).join(", ")} y ${nombres.length - 2} más.`;
       await enviarPush(supabase, userIds, titulo, cuerpo, { tipo: "vencimiento_proximo" });
 
-      const filasHtml = items.map((i) => `<li>${i.producto} ${i.dias < 0 ? "(vencido)" : i.dias === 0 ? "(vence hoy)" : `(en ${i.dias} día${i.dias === 1 ? "" : "s"})`}</li>`).join("");
+      const filasHtml = items
+        .map((i) => {
+          const estado = i.dias < 0 ? "<strong style='color:#c0392b;'>vencido</strong>" : i.dias === 0 ? "<strong style='color:#c0392b;'>vence hoy</strong>" : `vence en ${i.dias} día${i.dias === 1 ? "" : "s"}`;
+          return `<li style="margin-bottom: 6px;">${i.producto} — ${estado}</li>`;
+        })
+        .join("");
+      const asunto = items.length === 1
+        ? `Frondix: "${items[0].producto}" está por vencer`
+        : `Frondix: ${items.length} productos de ${empresa?.nombre ?? "tu negocio"} están por vencer`;
       await enviarCorreo(
         supabase,
         userIds,
-        titulo,
-        `<p>En <strong>${empresa?.nombre ?? "tu negocio"}</strong>:</p><ul>${filasHtml}</ul>`
+        asunto,
+        `<p>Hola,</p>
+         <p>En <strong>${empresa?.nombre ?? "tu negocio"}</strong> estos productos de tu Stock necesitan atención:</p>
+         <ul style="padding-left: 18px;">${filasHtml}</ul>
+         <p>Conviene revisarlos antes de que se pierdan o tengas que darlos de baja.</p>`
       );
     } catch (e) {
       empresasConError++;
