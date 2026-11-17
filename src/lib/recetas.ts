@@ -246,6 +246,26 @@ export const RECETAS: Receta[] = [
     extraerValor: () => "",
   },
   {
+    clave: "descontar_insumos_por_venta",
+    icono: "🥘",
+    titulo: "Descontar insumos de una receta por cada venta",
+    tipoValor: "texto",
+    valorPorDefecto: "Carne:0.2, Papa:0.3, Cebolla:0.1",
+    descripcion: () => `Cada vez que se venda este producto, se descuenta del Stock enlazado lo que escribas acá (una fila por insumo, separadas por coma, "Insumo:cantidad por unidad vendida").`,
+    requisito: "Este módulo debe ser de Ventas, con un Producto enlazado a un módulo de Stock.",
+    aplicaA: (columnas, nombre) => {
+      const tipo = tipoModulo(columnas.map((c) => c.rol), nombre);
+      return tipo === "ventas" && !!col(columnas, "producto")?.enlace;
+    },
+    construir: (columnas, valor) => ({
+      activa: true, origen: "manual", evento: ["creacion", "modificacion", "eliminacion"],
+      condicion: { tipo: "siempre" },
+      accion: { tipo: "descontar_insumos", receta: valor },
+    }),
+    coincideCon: (r) => r.accion.tipo === "descontar_insumos",
+    extraerValor: (r) => (r.accion.tipo === "descontar_insumos" ? r.accion.receta : ""),
+  },
+  {
     clave: "eliminar_si_negativo",
     icono: "🧹",
     titulo: "Borrar producto si su Cantidad queda negativa",

@@ -31,7 +31,7 @@ interface CandidatoSumarCampo {
   opcionesObjetivo: string[] | null;
 }
 
-type TipoAccion = "excluir_de_reportes" | "cambiar_estado" | "ajustar_stock" | "enviar_whatsapp" | "enviar_correo_cliente" | "agregar_seguimiento" | "notificacion_push" | "sumar_campo_enlazado" | "eliminar_registro";
+type TipoAccion = "excluir_de_reportes" | "cambiar_estado" | "ajustar_stock" | "enviar_whatsapp" | "enviar_correo_cliente" | "agregar_seguimiento" | "notificacion_push" | "sumar_campo_enlazado" | "descontar_insumos" | "eliminar_registro";
 
 export default function ReglasModulo({
   datasetId,
@@ -124,6 +124,7 @@ export default function ReglasModulo({
     ajustar_stock: "📦",
     enviar_whatsapp: "💬",
     enviar_correo_cliente: "📧",
+    descontar_insumos: "🥘",
     agregar_seguimiento: "👀",
     notificacion_push: "🔔",
     sumar_campo_enlazado: "➕",
@@ -163,6 +164,7 @@ export default function ReglasModulo({
     }
     if (a.tipo === "enviar_whatsapp") return `Enviar WhatsApp${a.mensaje ? `: "${a.mensaje.slice(0, 40)}${a.mensaje.length > 40 ? "..." : ""}"` : ""}`;
     if (a.tipo === "enviar_correo_cliente") return `Enviar correo al cliente${a.mensaje ? `: "${a.mensaje.slice(0, 40)}${a.mensaje.length > 40 ? "..." : ""}"` : ""}`;
+    if (a.tipo === "descontar_insumos") return `Descontar insumos de la receta${a.receta ? `: "${a.receta.slice(0, 40)}${a.receta.length > 40 ? "..." : ""}"` : ""}`;
     if (a.tipo === "notificacion_push") return `Notificar${a.titulo ? `: "${a.titulo}"` : ""}`;
     const c = candidatoDe(claveCandidato({ columnaEnlaceKey: a.columnaEnlaceKey, columnaObjetivoKey: a.columnaObjetivoKey } as CandidatoSumarCampo));
     const campo = `${c?.columnaObjetivoLabel ?? a.columnaObjetivoKey}${c ? ` en ${c.datasetObjetivoNombre}` : ""}`;
@@ -233,6 +235,10 @@ export default function ReglasModulo({
     }
     if (tipo === "enviar_whatsapp" || tipo === "enviar_correo_cliente") {
       cambiarRegla(i, { condicion, accion: { tipo, mensaje: "" } });
+      return;
+    }
+    if (tipo === "descontar_insumos") {
+      cambiarRegla(i, { condicion: { tipo: "siempre" }, accion: { tipo, receta: "" } });
       return;
     }
     if (tipo === "notificacion_push") {
@@ -368,6 +374,7 @@ export default function ReglasModulo({
                 <option value="excluir_de_reportes">Excluir de reportes</option>
                 {columnasDestino.length > 0 && <option value="cambiar_estado">Cambiar un campo a...</option>}
                 {puedeAjustarStock && !otraYaTieneAjustarStock && <option value="ajustar_stock">Ajustar Stock automáticamente</option>}
+                {puedeAjustarStock && <option value="descontar_insumos">Descontar insumos de una receta</option>}
                 {hayTelefono && <option value="enviar_whatsapp">Enviar WhatsApp</option>}
                 {hayCorreo && <option value="enviar_correo_cliente">Enviar correo al cliente</option>}
                 {hayCliente && <option value="agregar_seguimiento">Agregar a Seguimiento</option>}
@@ -395,6 +402,16 @@ export default function ReglasModulo({
                   placeholder="Mensaje a enviar (texto fijo, sin {nombre} ni variables)"
                   value={r.accion.mensaje}
                   onChange={(e) => cambiarRegla(i, { accion: { tipo: "enviar_whatsapp", mensaje: e.target.value } })}
+                  style={{ minWidth: 260, flex: 1 }}
+                />
+              )}
+
+              {r.accion.tipo === "descontar_insumos" && (
+                <input
+                  aria-label="Receta de insumos"
+                  placeholder="Carne:0.2, Papa:0.3, Cebolla:0.1"
+                  value={r.accion.receta}
+                  onChange={(e) => cambiarRegla(i, { accion: { tipo: "descontar_insumos", receta: e.target.value } })}
                   style={{ minWidth: 260, flex: 1 }}
                 />
               )}

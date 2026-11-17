@@ -78,6 +78,13 @@ export type Accion =
   // de ESE registro. El asunto se arma solo con el nombre de la empresa al
   // momento de enviar (ver reglasAplicar.ts), no se guarda acá.
   | { tipo: "enviar_correo_cliente"; mensaje: string }
+  // Para Ventas de un PRODUCTO TERMINADO (ej. "Lomo saltado") que en realidad
+  // consume varios insumos del mismo Stock enlazado (carne, papa, cebolla) --
+  // `receta` es texto plano "Insumo:cantidad, Insumo:cantidad" (parseado en
+  // reglasAplicar.ts), cantidad POR UNIDAD vendida. Reusa sumarCampoEnlazado
+  // tal cual para cada insumo (mismo mecanismo de ajustar_stock, solo que
+  // contra varias filas del Stock en vez de una).
+  | { tipo: "descontar_insumos"; receta: string }
   // Generaliza ajustar_stock a CUALQUIER campo de CUALQUIER módulo enlazado
   // (no solo Stock) -- ej. sumar 1 a "Visitas" en Clientes por cada venta, o
   // fijar "Último estado" a "Entregado" en el Pedido enlazado. Mismo patrón

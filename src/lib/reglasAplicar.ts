@@ -95,6 +95,39 @@ async function fijarCampoEnlazado(
   }
 }
 
+// "Carne:0.2, Papa:0.3, Cebolla:0.1" -> [{nombre:"Carne",cantidad:0.2}, ...].
+// Entradas sin ":" o con cantidad no numérica/≤0 se descartan en silencio
+// (mejor esfuerzo, mismo criterio que el resto de este archivo).
+function parsearReceta(texto: string): { nombre: string; cantidad: number }[] {
+  return texto
+    .split(",")
+    .map((p) => p.trim())
+    .filter(Boolean)
+    .map((p) => {
+      const [nombre, cant] = p.split(":").map((s) => s.trim());
+      return { nombre: nombre ?? "", cantidad: Number(cant) };
+    })
+    .filter((i) => i.nombre && Number.isFinite(i.cantidad) && i.cantidad > 0);
+}
+
+// `signo` 1 = se vendió (resta insumos), -1 = se revierte una venta (repone).
+async function dispatchDescontarInsumos(
+  supabase: SupabaseClient,
+  columnas: Columna[],
+  accion: Extract<Accion, { tipo: "descontar_insumos" }>,
+  datos: Record<string, unknown>,
+  signo: 1 | -1
+): Promise<void> {
+  const cProducto = columnas.find((c) => c.rol === "producto" && c.enlace && claveValida(c.enlace.columnaKey));
+  if (!cProducto?.enlace) return;
+  const cCantidad = columnas.find((c) => c.rol === "cantidad");
+  const cantidadCruda = cCantidad ? Number(datos[cCantidad.key]) : NaN;
+  const multiplicador = Number.isFinite(cantidadCruda) && cantidadCruda > 0 ? cantidadCruda : 1;
+  for (const insumo of parsearReceta(accion.receta)) {
+    await sumarCampoEnlazado(supabase, cProducto.enlace.datasetId, cProducto.enlace.columnaKey, insumo.nombre, "cantidad", -signo * insumo.cantidad * multiplicador);
+  }
+}
+
 async function dispatchFijarCampoEnlazado(
   supabase: SupabaseClient,
   columnas: Columna[],
@@ -197,6 +230,20 @@ export async function aplicarReglasDesdeRegistro(
         } else if (datosViejos) {
           await dispatchSumarCampoEnlazado(supabase, columnas, regla.accion, datosViejos, -1);
           if (datosNuevos) await dispatchSumarCampoEnlazado(supabase, columnas, regla.accion, datosNuevos, 1);
+        }
+      } catch {
+        // mejor esfuerzo, ver comentario de arriba
+      }
+      continue;
+    }
+
+    if (regla.accion.tipo === "descontar_insumos") {
+      try {
+        if (datosNuevos && !datosViejos) {
+          await dispatchDescontarInsumos(supabase, columnas, regla.accion, datosNuevos, 1);
+        } else if (datosViejos) {
+          await dispatchDescontarInsumos(supabase, columnas, regla.accion, datosViejos, -1);
+          if (datosNuevos) await dispatchDescontarInsumos(supabase, columnas, regla.accion, datosNuevos, 1);
         }
       } catch {
         // mejor esfuerzo, ver comentario de arriba

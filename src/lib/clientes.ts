@@ -12,6 +12,13 @@ export interface ClienteLista extends ClienteResumen {
 }
 
 const columnaConRol = (columnas: Columna[], rol: string) => columnas.find((c) => c.rol === rol && claveValida(c.key));
+// Fallback para módulos tipo Reservas/Órdenes de servicio: su columna "cliente"
+// nace con rol null a propósito (ver plantillasModulo.ts, para no clasificar
+// como "ventas" en Reportes) -- pero para ESTA lista (relación con el cliente,
+// no dinero) sí queremos verlos. Nunca se usa en reportes/cobranzas, solo acá
+// y en historialCliente.ts.
+const columnaClienteAmplia = (columnas: Columna[]) =>
+  columnaConRol(columnas, "cliente") ?? columnas.find((c) => c.key === "cliente" && claveValida(c.key));
 
 async function leerFilas(supabase: SupabaseClient, datasetId: string, claves: Partial<Record<"c" | "f" | "t" | "m", string>>) {
   const seleccion = Object.entries(claves).map(([alias, clave]) => `${alias}:data->>${clave}`).join(",");
@@ -38,11 +45,11 @@ export async function listaClientes(supabase: SupabaseClient, empresaId: string)
 
   for (const d of datasets ?? []) {
     const columnas = d.columnas as Columna[];
-    const cCliente = columnaConRol(columnas, "cliente");
+    const cCliente = columnaClienteAmplia(columnas);
     const cFecha = columnas.find((c) => c.rol === "fecha" && c.tipo === "fecha" && claveValida(c.key));
     if (!cCliente || !cFecha) continue;
     const cTelefono = columnaConRol(columnas, "telefono");
-    const cMonto = columnaConRol(columnas, "monto");
+    const cMonto = columnaConRol(columnas, "monto") ?? columnaConRol(columnas, "costo");
 
     const filas = await leerFilas(supabase, d.id, {
       c: cCliente.key,
