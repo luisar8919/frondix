@@ -16,16 +16,22 @@ import { condicionCumple, type Accion, type Evento, type Regla } from "./reglas.
 // bundle del navegador). Los tipos (Condicion/Accion/Regla) viven en reglas.ts.
 
 // Suma (o resta) `delta` al campo `columnaObjetivoKey` de la fila del dataset
-// enlazado cuyo `claveMatch` valga `valorMatch` -- la crea en 0 antes de sumar
-// si todavía no existe. Mismo patrón que ajustarStock() en stock.ts, sin
-// Kardex (eso es específico del módulo Stock, no de un campo genérico).
+// enlazado cuyo `claveMatch` valga `valorMatch`. Por defecto la crea en 0
+// antes de sumar si todavía no existe (mismo patrón que ajustarStock() en
+// stock.ts, sin Kardex -- eso es específico del módulo Stock, no de un campo
+// genérico). `crearSiNoExiste: false` lo desactiva -- lo usa
+// dispatchDescontarInsumos: un insumo ahí es siempre un producto que YA
+// existe en Stock, así que un nombre que no matchea ninguna fila (typo, o un
+// insumo que todavía no se cargó) se ignora en silencio en vez de crear una
+// fila fantasma con cantidad negativa.
 async function sumarCampoEnlazado(
   supabase: SupabaseClient,
   datasetObjetivoId: string,
   claveMatch: string,
   valorMatch: string,
   columnaObjetivoKey: string,
-  delta: number
+  delta: number,
+  crearSiNoExiste = true
 ): Promise<void> {
   if (!claveValida(claveMatch) || !claveValida(columnaObjetivoKey) || !valorMatch || delta === 0) return;
   const { data: fila } = await supabase
@@ -37,7 +43,7 @@ async function sumarCampoEnlazado(
   if (fila) {
     const actual = Number((fila.data as Record<string, unknown>)[columnaObjetivoKey]) || 0;
     await supabase.from("records").update({ data: { ...(fila.data as object), [columnaObjetivoKey]: actual + delta } }).eq("id", fila.id);
-  } else {
+  } else if (crearSiNoExiste) {
     await supabase.from("records").insert({ dataset_id: datasetObjetivoId, data: { [claveMatch]: valorMatch, [columnaObjetivoKey]: delta } });
   }
 }
@@ -124,7 +130,7 @@ async function dispatchDescontarInsumos(
   const cantidadCruda = cCantidad ? Number(datos[cCantidad.key]) : NaN;
   const multiplicador = Number.isFinite(cantidadCruda) && cantidadCruda > 0 ? cantidadCruda : 1;
   for (const insumo of parsearReceta(accion.receta)) {
-    await sumarCampoEnlazado(supabase, cProducto.enlace.datasetId, cProducto.enlace.columnaKey, insumo.nombre, "cantidad", -signo * insumo.cantidad * multiplicador);
+    await sumarCampoEnlazado(supabase, cProducto.enlace.datasetId, cProducto.enlace.columnaKey, insumo.nombre, "cantidad", -signo * insumo.cantidad * multiplicador, false);
   }
 }
 
