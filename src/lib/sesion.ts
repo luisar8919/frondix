@@ -61,7 +61,15 @@ export function elegirEmpresaActiva(empresaId: string) {
 export async function empresaDelUsuario(
   supabase: SupabaseClient
 ): Promise<{ ok: true; empresaId: string; empresas: EmpresaDeUsuario[] } | { ok: false; error: string }> {
-  const { data: { user } } = await supabase.auth.getUser();
+  let { data: { user } } = await supabase.auth.getUser();
+  // Un solo reintento: si el token local quedó desfasado (otra pestaña ya lo
+  // rotó, o pasó el rato justo en el borde de expirar), refrescarlo una vez
+  // alcanza casi siempre -- recién si ESO también falla es una sesión
+  // realmente vencida, no un problema de timing entre pestañas/cargas.
+  if (!user) {
+    const { data: refrescada } = await supabase.auth.refreshSession();
+    user = refrescada.user;
+  }
   if (!user) return { ok: false, error: MENSAJE_SESION_VENCIDA };
 
   const empresas = await misEmpresas(supabase, user.id);
