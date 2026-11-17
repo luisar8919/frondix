@@ -7,6 +7,7 @@ import DynamicForm from "@/components/DynamicForm";
 import EditarTabla from "@/components/EditarTabla";
 import KardexProducto from "@/components/KardexProducto";
 import CalendarioAgenda from "@/components/CalendarioAgenda";
+import AdjuntosRegistro from "@/components/AdjuntosRegistro";
 import { esAgenda } from "@/lib/agenda";
 import { enviarConfirmando } from "@/lib/confirmar";
 import type { Columna } from "@/lib/excel-parser";
@@ -380,6 +381,7 @@ export default function DatasetPage({
             onSubmit={guardarEdicion}
             onCancelar={() => setEditando(null)}
           />
+          <AdjuntosRegistro datasetId={datasetId} recordId={editando.id} />
         </div>
       )}
 
