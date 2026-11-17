@@ -224,12 +224,12 @@ export async function aplicarReglasDesdeRegistro(
         if (regla.accion.modo === "fijar") {
           // Idempotente: solo tiene sentido en creación/modificación, con los
           // datos nuevos -- no hay "deshacer" un valor fijo al eliminar.
-          if (datosNuevos) await dispatchFijarCampoEnlazado(supabase, columnas, regla.accion, datosNuevos);
+          if (datosNuevos && condicionCumple(regla.condicion, datosNuevos)) await dispatchFijarCampoEnlazado(supabase, columnas, regla.accion, datosNuevos);
         } else if (datosNuevos && !datosViejos) {
-          await dispatchSumarCampoEnlazado(supabase, columnas, regla.accion, datosNuevos, 1);
+          if (condicionCumple(regla.condicion, datosNuevos)) await dispatchSumarCampoEnlazado(supabase, columnas, regla.accion, datosNuevos, 1);
         } else if (datosViejos) {
-          await dispatchSumarCampoEnlazado(supabase, columnas, regla.accion, datosViejos, -1);
-          if (datosNuevos) await dispatchSumarCampoEnlazado(supabase, columnas, regla.accion, datosNuevos, 1);
+          if (condicionCumple(regla.condicion, datosViejos)) await dispatchSumarCampoEnlazado(supabase, columnas, regla.accion, datosViejos, -1);
+          if (datosNuevos && condicionCumple(regla.condicion, datosNuevos)) await dispatchSumarCampoEnlazado(supabase, columnas, regla.accion, datosNuevos, 1);
         }
       } catch {
         // mejor esfuerzo, ver comentario de arriba
@@ -240,10 +240,10 @@ export async function aplicarReglasDesdeRegistro(
     if (regla.accion.tipo === "descontar_insumos") {
       try {
         if (datosNuevos && !datosViejos) {
-          await dispatchDescontarInsumos(supabase, columnas, regla.accion, datosNuevos, 1);
+          if (condicionCumple(regla.condicion, datosNuevos)) await dispatchDescontarInsumos(supabase, columnas, regla.accion, datosNuevos, 1);
         } else if (datosViejos) {
-          await dispatchDescontarInsumos(supabase, columnas, regla.accion, datosViejos, -1);
-          if (datosNuevos) await dispatchDescontarInsumos(supabase, columnas, regla.accion, datosNuevos, 1);
+          if (condicionCumple(regla.condicion, datosViejos)) await dispatchDescontarInsumos(supabase, columnas, regla.accion, datosViejos, -1);
+          if (datosNuevos && condicionCumple(regla.condicion, datosNuevos)) await dispatchDescontarInsumos(supabase, columnas, regla.accion, datosNuevos, 1);
         }
       } catch {
         // mejor esfuerzo, ver comentario de arriba
