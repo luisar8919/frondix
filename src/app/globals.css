@@ -197,6 +197,23 @@ th.num, td.num { text-align: right; font-variant-numeric: tabular-nums; }
 .banda-cta { background: var(--verde-800); color: #fff; border-radius: 24px; padding: 48px 32px; text-align: center; }
 .banda-cta h2 { color: #fff; }
 .banda-cta p { color: var(--verde-200); font-size: 17px; }
+
+/* ----- Agenda de reunion (calendario del landing) ----- */
+.agenda-grilla { display: grid; grid-template-columns: 1fr 1fr; gap: 32px; align-items: start; background: var(--verde-50); border-radius: 24px; padding: 32px; }
+.agenda-calendario { padding: 16px; }
+.agenda-calendario-cabecera { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+.agenda-calendario-cabecera button { width: 28px; height: 28px; min-height: 0; padding: 0; border-radius: 8px; border: 1px solid var(--linea-fuerte); background: var(--papel); cursor: pointer; }
+.agenda-calendario-cabecera button:disabled { opacity: 0.4; cursor: not-allowed; }
+.agenda-calendario-grilla { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; text-align: center; }
+.agenda-dow { font-size: 11px; font-weight: 700; color: var(--suave); padding-bottom: 4px; }
+.agenda-dia { aspect-ratio: 1; display: grid; place-items: center; border-radius: 9px; font-size: 13px; border: 1px solid transparent; background: transparent; color: var(--tinta); cursor: pointer; min-height: 0; padding: 0; }
+.agenda-dia-hoy { border-color: var(--verde-500); }
+.agenda-dia[aria-pressed="true"] { background: var(--verde-600); color: #fff; }
+.agenda-dia:disabled { color: var(--verde-200); cursor: not-allowed; }
+.agenda-horarios-grilla { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
+.agenda-horario { font-size: 13px; text-align: center; padding: 10px 6px; min-height: 0; border-radius: 9px; border: 1px solid var(--linea-fuerte); background: var(--papel); cursor: pointer; font-weight: 600; }
+.agenda-horario[aria-pressed="true"] { background: var(--verde-600); color: #fff; border-color: var(--verde-600); }
+@media (max-width: 760px) { .agenda-grilla { grid-template-columns: 1fr; padding: 20px; } }
 .pie { padding: 32px 0 48px; color: var(--suave); font-size: 14px; }
 .pie-fila { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; }
 

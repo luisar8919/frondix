@@ -1,12 +1,7 @@
 import Link from "next/link";
 import Logo from "@/components/Logo";
 import CalculadoraAhorro from "@/components/CalculadoraAhorro";
-
-// Piloto gratis por WhatsApp directo con el fundador (ver campaña "Primeros 10 talleres").
-const WHATSAPP_FUNDADOR = "998235775";
-const enlaceWhatsappFundador = `https://wa.me/51${WHATSAPP_FUNDADOR}?text=${encodeURIComponent(
-  "Hola, vi Frondix y quiero probarlo gratis con mi propio Excel."
-)}`;
+import AgendaReunion from "@/components/AgendaReunion";
 
 const dolores = [
   { titulo: "Alguien más carga datos", texto: "y no sabes cómo evitar que te rompa una hoja o borre lo que ya estaba." },
@@ -69,9 +64,7 @@ export default function Portada() {
             </p>
             <div className="hero-cta">
               <Link href="/signup" className="btn btn-primario btn-grande">Pruébalo con tu propio Excel</Link>
-              <a href={enlaceWhatsappFundador} target="_blank" rel="noopener noreferrer" className="btn btn-secundario btn-grande">
-                Pide tu piloto gratis por WhatsApp
-              </a>
+              <a href="#agenda" className="btn btn-secundario btn-grande">Agenda una reunión</a>
             </div>
             <p className="ayuda" style={{ marginTop: 14 }}>Gratis para empezar. Sin tarjeta.</p>
           </div>
@@ -235,6 +228,15 @@ export default function Portada() {
             <p>Sube tu Excel y mira cómo queda. Toma menos de lo que tarda en enfriarse un café.</p>
             <Link href="/signup" className="btn btn-claro btn-grande">Probar Frondix gratis</Link>
           </div>
+        </section>
+
+        <section id="agenda" className="seccion contenedor">
+          <div className="seccion-titulo">
+            <span className="eyebrow">¿Todavía tenés dudas?</span>
+            <h2>Agenda una reunión de 20 minutos</h2>
+            <p>Elegí un día y horario, dejanos tu correo y te confirmamos. Te mostramos Frondix armado para tu rubro puntual.</p>
+          </div>
+          <AgendaReunion />
         </section>
       </main>
 
