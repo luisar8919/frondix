@@ -14,6 +14,12 @@ interface LineaCarrito {
 
 interface PreciosProducto { general?: number; mayorista?: number; minorista?: number }
 
+// Sin mesas activado: todo va a esta única "mesa" invisible -- el POS se
+// comporta exactamente igual que antes (un carrito, un cliente). Con mesas
+// activado, cada una tiene su propio carrito/cliente, para un mozo que toma
+// pedidos de varias mesas a la vez sin perder lo que ya cargó en las demás.
+const MESA_UNICA = "__unica__";
+
 // Punto de Venta: grilla táctil de productos (tocar para sumar al carrito) en
 // vez del formulario de "Agregar registro" -- pensado para vender parado, no
 // sentado llenando campos. Cada "cobrar" dispara un POST normal a
@@ -41,8 +47,11 @@ export default function PuntoDeVenta() {
   const [cargando, setCargando] = useState(false);
   const [escaneando, setEscaneando] = useState(false);
   const [error, setError] = useState("");
-  const [cliente, setCliente] = useState("Cliente mostrador");
-  const [carrito, setCarrito] = useState<LineaCarrito[]>([]);
+  const [usarMesas, setUsarMesas] = useState(false);
+  const [mesas, setMesas] = useState<string[]>([MESA_UNICA]);
+  const [mesaActual, setMesaActual] = useState(MESA_UNICA);
+  const [carritoPorMesa, setCarritoPorMesa] = useState<Record<string, LineaCarrito[]>>({});
+  const [clientePorMesa, setClientePorMesa] = useState<Record<string, string>>({});
   const [cobrando, setCobrando] = useState(false);
   const [mensaje, setMensaje] = useState<{ tipo: "ok" | "error"; texto: string } | null>(null);
 
@@ -61,7 +70,10 @@ export default function PuntoDeVenta() {
     if (!ventasDatasetId) return;
     setCargando(true);
     setError("");
-    setCarrito([]);
+    setCarritoPorMesa({});
+    setClientePorMesa({});
+    setMesas([MESA_UNICA]);
+    setMesaActual(MESA_UNICA);
     (async () => {
       // Mismo truco que la Papelera: pedir 1 registro trae igual `dataset.columnas` completo.
       const res = await fetch(`/api/records/${ventasDatasetId}?limite=1`);
@@ -97,8 +109,23 @@ export default function PuntoDeVenta() {
     return p?.general ?? p?.mayorista ?? p?.minorista ?? 0;
   }
 
+  const carrito = carritoPorMesa[mesaActual] ?? [];
+  const cliente = clientePorMesa[mesaActual] ?? (usarMesas ? mesaActual : "Cliente mostrador");
+  function setCliente(valor: string) {
+    setClientePorMesa((cs) => ({ ...cs, [mesaActual]: valor }));
+  }
+  function actualizarCarritoActual(fn: (c: LineaCarrito[]) => LineaCarrito[]) {
+    setCarritoPorMesa((cs) => ({ ...cs, [mesaActual]: fn(cs[mesaActual] ?? []) }));
+  }
+
+  function agregarMesa() {
+    const nombre = `Mesa ${mesas.length}`;
+    setMesas((m) => [...m, nombre]);
+    setMesaActual(nombre);
+  }
+
   function agregarAlCarrito(producto: string) {
-    setCarrito((c) => {
+    actualizarCarritoActual((c) => {
       const existente = c.find((l) => l.producto === producto);
       if (existente) return c.map((l) => (l.producto === producto ? { ...l, cantidad: l.cantidad + 1 } : l));
       return [...c, { producto, cantidad: 1, precioUnitario: precioDe(producto) }];
@@ -106,11 +133,11 @@ export default function PuntoDeVenta() {
   }
 
   function cambiarCantidad(producto: string, cantidad: number) {
-    setCarrito((c) => (cantidad <= 0 ? c.filter((l) => l.producto !== producto) : c.map((l) => (l.producto === producto ? { ...l, cantidad } : l))));
+    actualizarCarritoActual((c) => (cantidad <= 0 ? c.filter((l) => l.producto !== producto) : c.map((l) => (l.producto === producto ? { ...l, cantidad } : l))));
   }
 
   function cambiarPrecio(producto: string, precioUnitario: number) {
-    setCarrito((c) => c.map((l) => (l.producto === producto ? { ...l, precioUnitario } : l)));
+    actualizarCarritoActual((c) => c.map((l) => (l.producto === producto ? { ...l, precioUnitario } : l)));
   }
 
   const total = carrito.reduce((s, l) => s + l.cantidad * l.precioUnitario, 0);
@@ -170,7 +197,7 @@ export default function PuntoDeVenta() {
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
         setCobrando(false);
-        setCarrito(pendientes);
+        actualizarCarritoActual(() => pendientes);
         setMensaje({ tipo: "error", texto: `Falló "${linea.producto}": ${body.error ?? "error desconocido"}. El resto del carrito sigue acá para reintentar.` });
         return;
       }
@@ -178,7 +205,7 @@ export default function PuntoDeVenta() {
     }
     setCobrando(false);
     setMensaje({ tipo: "ok", texto: `Venta registrada: ${cantidadInicial} producto(s), total ${formatearMonto(total, "PEN")}.` });
-    setCarrito([]);
+    actualizarCarritoActual(() => []);
   }
 
   if (modulosVentas === null) return <p className="suave">Cargando...</p>;
@@ -199,7 +226,18 @@ export default function PuntoDeVenta() {
           <h1>Punto de Venta</h1>
           <p className="suave">Tocá un producto para sumarlo, ajustá cantidad o precio si hace falta, y cobrá.</p>
         </div>
-        <div style={{ display: "flex", gap: 8 }}>
+        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+          <label className="pequeno" style={{ display: "flex", alignItems: "center", gap: 4 }}>
+            <input
+              type="checkbox"
+              checked={usarMesas}
+              onChange={(e) => {
+                setUsarMesas(e.target.checked);
+                setMesaActual(MESA_UNICA);
+              }}
+            />
+            Usar mesas
+          </label>
           {modulosVentas.length > 1 && (
             <select value={ventasDatasetId} onChange={(e) => setVentasDatasetId(e.target.value)}>
               <option value="" disabled>Elige un módulo de Ventas...</option>
@@ -213,6 +251,27 @@ export default function PuntoDeVenta() {
           )}
         </div>
       </div>
+
+      {usarMesas && (
+        <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 14 }}>
+          {mesas.filter((m) => m !== MESA_UNICA).map((m) => {
+            const ocupada = (carritoPorMesa[m]?.length ?? 0) > 0;
+            return (
+              <button
+                key={m}
+                type="button"
+                onClick={() => setMesaActual(m)}
+                className={`btn ${m === mesaActual ? "btn-primario" : "btn-secundario"}`}
+                style={{ position: "relative" }}
+              >
+                {m}
+                {ocupada && m !== mesaActual && <span style={{ marginLeft: 6 }}>●</span>}
+              </button>
+            );
+          })}
+          <button type="button" className="btn btn-fantasma" onClick={agregarMesa}>+ Nueva mesa</button>
+        </div>
+      )}
 
       {error && <p className="alerta alerta-error" role="alert">{error}</p>}
       {cargando && <p className="suave">Cargando productos...</p>}
@@ -248,7 +307,7 @@ export default function PuntoDeVenta() {
           </div>
 
           <div className="tarjeta" style={{ flex: "1 1 280px", position: "sticky", top: 20 }}>
-            <h3 style={{ margin: 0 }}>Carrito</h3>
+            <h3 style={{ margin: 0 }}>Carrito{usarMesas && mesaActual !== MESA_UNICA ? ` - ${mesaActual}` : ""}</h3>
             <div className="campo" style={{ marginTop: 10 }}>
               <label className="pequeno">Cliente</label>
               <input value={cliente} onChange={(e) => setCliente(e.target.value)} />

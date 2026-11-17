@@ -227,6 +227,28 @@ export function plantillaObras(): Columna[] {
     { key: "avance", label: "Avance (%)", tipo: "numero", rol: null, sospechosa: false },
     { key: "fecha_fin_estimada", label: "Fecha fin estimada", tipo: "fecha", rol: null, sospechosa: false },
     { key: "estado", label: "Estado", tipo: "texto", rol: "estado", sospechosa: false, opcionesFijas: ["En curso", "Pausada", "Finalizada", "Cancelada"] },
+    // rol "saldo_pendiente": con esto solo, el proyecto aparece solo en
+    // "Cuentas por cobrar" (ver cuentasPorCobrar.ts, ya genérico por rol para
+    // cualquier módulo que clasifique como ventas) -- así se registran los
+    // adelantos/pagos parciales restando a mano el saldo real, sin ningún
+    // código nuevo: Obras ya clasifica como "ventas" (cliente+producto+monto).
+    { key: "saldo_pendiente", label: "Saldo pendiente", tipo: "numero", rol: "saldo_pendiente", sospechosa: false },
+  ];
+}
+
+// Checklist de hitos por proyecto: NO es una columna nueva dentro de Obras
+// (una fila de Frondix es plana, no admite una sublista) -- es un módulo
+// propio, con una columna "Proyecto" para enlazar a mano (Editar tabla y
+// campos > Enlaces) con la columna "Proyecto" real de Obras. Una vez
+// enlazado, DynamicTable YA muestra los hitos de cada obra como "registros
+// relacionados" (relacionesEntrantes, mecanismo genérico existente) -- cero
+// código nuevo de UI o del motor, solo esta plantilla.
+export function plantillaHitosProyecto(): Columna[] {
+  return [
+    { key: "proyecto", label: "Proyecto", tipo: "texto", rol: null, sospechosa: false },
+    { key: "hito", label: "Hito / tarea", tipo: "texto", rol: null, sospechosa: false },
+    { key: "fecha_objetivo", label: "Fecha objetivo", tipo: "fecha", rol: "fecha", sospechosa: false },
+    { key: "estado", label: "Estado", tipo: "texto", rol: "estado", sospechosa: false, opcionesFijas: ["Pendiente", "En curso", "Hecho"] },
   ];
 }
 
@@ -316,5 +338,6 @@ export const PLANTILLAS_EXTRA = [
   { clave: "alquileres", nombre: "Alquileres", descripcion: "Propiedades o locales que alquilas, con inquilino y fecha de pago.", categoria: "cobro_recurrente", columnas: plantillaAlquileres, reglasSugeridas: () => reglaExcluirCancelado("Cancelado") },
   { clave: "matriculas", nombre: "Matrículas", descripcion: "Colegios, institutos, guarderías: mensualidad por alumno.", categoria: "cobro_recurrente", columnas: plantillaMatriculas, reglasSugeridas: () => reglaExcluirCancelado("Cancelada") },
   { clave: "obras", nombre: "Obras / proyectos", descripcion: "Construcción o contratistas: presupuesto y avance por proyecto.", categoria: "proyectos", columnas: plantillaObras, reglasSugeridas: () => reglaExcluirCancelado("Cancelada") },
+  { clave: "hitos_proyecto", nombre: "Hitos de proyecto", descripcion: "Lista de tareas/hitos por proyecto -- enlázala a tu módulo de Obras para verla junto a cada proyecto.", categoria: "proyectos", columnas: plantillaHitosProyecto, reglasSugeridas: undefined },
   { clave: "eventos", nombre: "Eventos", descripcion: "Fiestas, catering, eventos corporativos: un cobro por cada evento.", categoria: "proyectos", columnas: plantillaEventos, reglasSugeridas: () => reglaExcluirCancelado("Cancelado") },
 ] as const;
