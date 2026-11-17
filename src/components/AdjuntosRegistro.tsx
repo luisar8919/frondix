@@ -42,7 +42,7 @@ export default function AdjuntosRegistro({ datasetId, recordId }: { datasetId: s
     const archivo = e.target.files?.[0];
     e.target.value = ""; // permite volver a elegir el mismo archivo después
     if (!archivo) return;
-    if (archivo.size > 5 * 1024 * 1024) return setError("El archivo pesa más de 5 MB.");
+    if (archivo.size > 2 * 1024 * 1024) return setError("El archivo pesa más de 2 MB.");
     setSubiendo(true);
     setError("");
     const lector = new FileReader();
@@ -76,7 +76,7 @@ export default function AdjuntosRegistro({ datasetId, recordId }: { datasetId: s
         {subiendo ? "Subiendo..." : "+ Adjuntar archivo"}
         <input type="file" onChange={subir} disabled={subiendo} style={{ display: "none" }} />
       </label>
-      <p className="ayuda" style={{ marginTop: 6 }}>Fotos, PDF, lo que necesites guardar con este registro. Máximo 5 MB.</p>
+      <p className="ayuda" style={{ marginTop: 6 }}>Fotos, PDF, lo que necesites guardar con este registro. Máximo 2 MB.</p>
       {error && <p className="alerta alerta-error pequeno" role="alert">{error}</p>}
 
       {adjuntos === null && <p className="suave pequeno">Cargando...</p>}

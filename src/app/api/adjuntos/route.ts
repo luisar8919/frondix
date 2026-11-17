@@ -8,7 +8,7 @@ import { crearClienteAdmin } from "@/lib/supabase/admin";
 // Storage directo: todo pasa por acá con el cliente de servicio, que valida
 // membresía a mano (mismo criterio que /api/empresas/smtp) -- así no hace
 // falta ninguna policy de Storage, solo la tabla de metadatos.
-const LIMITE_BYTES = 5 * 1024 * 1024; // 5 MB, mismo tope del bucket
+const LIMITE_BYTES = 2 * 1024 * 1024; // 2 MB, mismo tope del bucket
 
 async function empresaDelDataset(supabase: Awaited<ReturnType<typeof crearClienteServidor>>, datasetId: string) {
   const { data } = await supabase.from("datasets").select("empresa_id").eq("id", datasetId).single();
@@ -65,7 +65,7 @@ export async function POST(req: NextRequest) {
   if (!match) return NextResponse.json({ error: "Archivo inválido" }, { status: 400 });
   const tipoMime = match[1];
   const buffer = Buffer.from(match[2], "base64");
-  if (buffer.length > LIMITE_BYTES) return NextResponse.json({ error: "El archivo pesa más de 5 MB" }, { status: 413 });
+  if (buffer.length > LIMITE_BYTES) return NextResponse.json({ error: "El archivo pesa más de 2 MB" }, { status: 413 });
 
   const nombreSeguro = String(nombre).replace(/[^a-zA-Z0-9._-]/g, "_").slice(-100);
   const ruta = `${empresaId}/${datasetId}/${recordId}/${crypto.randomUUID()}-${nombreSeguro}`;
