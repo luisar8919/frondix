@@ -5,7 +5,8 @@ import { claveValida } from "./enlaces.ts";
 import { normalizarTexto, normalizarTelefonoPE } from "./seguimiento.ts";
 import { enviarTexto } from "./whatsapp.ts";
 import { enviarPush } from "./push.ts";
-import { enviarCorreoAlCliente } from "./email.ts";
+import { enviarCorreoAlCliente, type SmtpPropio } from "./email.ts";
+import { descifrar } from "./cifrado.ts";
 import { crearClienteAdmin } from "./supabase/admin.ts";
 import { condicionCumple, type Accion, type Evento, type Regla } from "./reglas.ts";
 
@@ -143,17 +144,29 @@ export async function aplicarReglasDesdeRegistro(
 ): Promise<void> {
   let datosFinal: Record<string, unknown> | undefined;
   let huboMutacion = false;
-  // Nombre de la empresa, pedido como mucho una vez por llamada (no por
-  // regla) -- solo lo necesita "enviar_correo_cliente", para el remitente
-  // visible y el asunto del correo.
-  let nombreEmpresaCache: string | null | undefined;
-  async function nombreEmpresa(): Promise<string> {
-    if (nombreEmpresaCache === undefined) {
+  // Nombre + SMTP propio de la empresa, pedidos como mucho una vez por
+  // llamada (no por regla) -- solo los necesita "enviar_correo_cliente".
+  let empresaInfoCache: { nombre: string; smtp: SmtpPropio | null } | undefined;
+  async function empresaInfo(): Promise<{ nombre: string; smtp: SmtpPropio | null }> {
+    if (empresaInfoCache === undefined) {
       const admin = crearClienteAdmin();
-      const { data } = await admin.from("empresas").select("nombre").eq("id", empresaId).single();
-      nombreEmpresaCache = data?.nombre ?? null;
+      const { data } = await admin
+        .from("empresas")
+        .select("nombre, smtp_activo, smtp_host, smtp_port, smtp_usuario, smtp_password_cifrado, smtp_from")
+        .eq("id", empresaId)
+        .single();
+      const nombre = data?.nombre ?? "tu negocio";
+      let smtp: SmtpPropio | null = null;
+      if (data?.smtp_activo && data.smtp_host && data.smtp_port && data.smtp_usuario && data.smtp_password_cifrado && data.smtp_from) {
+        try {
+          smtp = { host: data.smtp_host, port: data.smtp_port, usuario: data.smtp_usuario, password: descifrar(data.smtp_password_cifrado), from: data.smtp_from };
+        } catch {
+          smtp = null; // clave de cifrado mal configurada o dato corrupto -- cae al de Frondix
+        }
+      }
+      empresaInfoCache = { nombre, smtp };
     }
-    return nombreEmpresaCache ?? "tu negocio";
+    return empresaInfoCache;
   }
   // Mismo criterio que ya usaba stock.ts para distinguir alta/edición/baja a
   // partir de qué lado viene presente -- ver comentario de `evento` en
@@ -228,7 +241,10 @@ export async function aplicarReglasDesdeRegistro(
       try {
         const cCorreo = columnas.find((c) => c.rol === "correo");
         const correo = cCorreo ? String(datosEval[cCorreo.key] ?? "").trim() : "";
-        if (correo) await enviarCorreoAlCliente(correo, await nombreEmpresa(), regla.accion.mensaje);
+        if (correo) {
+          const info = await empresaInfo();
+          await enviarCorreoAlCliente(correo, info.nombre, regla.accion.mensaje, info.smtp);
+        }
       } catch {
         // ver comentario de arriba -- ej. RESEND_API_KEY sin configurar o correo inválido
       }

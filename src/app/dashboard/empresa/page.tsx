@@ -31,6 +31,17 @@ export default function EmpresaPage() {
   const [errorEliminar, setErrorEliminar] = useState<string | null>(null);
   const [eliminando, setEliminando] = useState(false);
 
+  const [smtpHost, setSmtpHost] = useState("");
+  const [smtpPort, setSmtpPort] = useState("587");
+  const [smtpUsuario, setSmtpUsuario] = useState("");
+  const [smtpPassword, setSmtpPassword] = useState("");
+  const [smtpHayPassword, setSmtpHayPassword] = useState(false);
+  const [smtpFrom, setSmtpFrom] = useState("");
+  const [smtpActivo, setSmtpActivo] = useState(false);
+  const [guardandoSmtp, setGuardandoSmtp] = useState(false);
+  const [probandoSmtp, setProbandoSmtp] = useState(false);
+  const [mensajeSmtp, setMensajeSmtp] = useState<{ tipo: "ok" | "error"; texto: string } | null>(null);
+
   async function cargar() {
     const supabase = crearClienteBrowser();
     const sesion = await empresaDelUsuario(supabase);
@@ -56,6 +67,19 @@ export default function EmpresaPage() {
       const resMiembros = await fetch(`/api/team/miembros?empresaId=${sesion.empresaId}`);
       const bodyMiembros = await resMiembros.json();
       if (resMiembros.ok) setOtrosMiembros(bodyMiembros.miembros.filter((m: { rol: string }) => m.rol !== "dueno"));
+    }
+
+    if (miRolActual === "dueno" || miRolActual === "admin") {
+      const resSmtp = await fetch(`/api/empresas/smtp?empresaId=${sesion.empresaId}`);
+      const bodySmtp = await resSmtp.json();
+      if (resSmtp.ok) {
+        setSmtpHost(bodySmtp.host);
+        setSmtpPort(String(bodySmtp.port));
+        setSmtpUsuario(bodySmtp.usuario);
+        setSmtpFrom(bodySmtp.from);
+        setSmtpActivo(bodySmtp.activo);
+        setSmtpHayPassword(bodySmtp.hayPassword);
+      }
     }
 
     setCargando(false);
@@ -131,6 +155,38 @@ export default function EmpresaPage() {
     window.location.href = "/dashboard";
   }
 
+  async function guardarSmtp(e: React.FormEvent) {
+    e.preventDefault();
+    if (!empresaId) return;
+    setGuardandoSmtp(true);
+    setMensajeSmtp(null);
+    const res = await fetch("/api/empresas/smtp", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ empresaId, host: smtpHost, port: Number(smtpPort), usuario: smtpUsuario, password: smtpPassword, from: smtpFrom, activo: smtpActivo }),
+    });
+    const body = await res.json();
+    setGuardandoSmtp(false);
+    if (!res.ok) return setMensajeSmtp({ tipo: "error", texto: body.error ?? "No se pudo guardar" });
+    if (smtpPassword.trim()) setSmtpHayPassword(true);
+    setSmtpPassword("");
+    setMensajeSmtp({ tipo: "ok", texto: "Guardado." });
+  }
+
+  async function probarSmtp() {
+    if (!empresaId) return;
+    setProbandoSmtp(true);
+    setMensajeSmtp(null);
+    const res = await fetch("/api/empresas/smtp/probar", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ empresaId }),
+    });
+    const body = await res.json();
+    setProbandoSmtp(false);
+    setMensajeSmtp(res.ok ? { tipo: "ok", texto: `Correo de prueba enviado a ${body.enviadoA}. Revisa esa bandeja.` } : { tipo: "error", texto: body.error ?? "No se pudo enviar la prueba" });
+  }
+
   if (cargando) return null;
 
   const puedeEditar = rol === "dueno" || rol === "admin";
@@ -188,6 +244,60 @@ export default function EmpresaPage() {
           </button>
         )}
       </form>
+
+      {puedeEditar && (
+        <form onSubmit={guardarSmtp} className="tarjeta" style={{ maxWidth: 460, marginBottom: 20 }}>
+          <h3 style={{ marginTop: 0 }}>Correo propio al cliente</h3>
+          <p className="suave pequeno" style={{ marginBottom: 14 }}>
+            Cuando actives una receta de "Enviarle un correo al cliente", le va a llegar desde tu propia casilla (ej. tu
+            Gmail o el correo de tu negocio) en vez de desde Frondix. Sin esto configurado, sigue funcionando igual pero
+            con el remitente de Frondix.
+          </p>
+
+          <div className="campo">
+            <label htmlFor="smtp-host">Servidor SMTP (host)</label>
+            <input id="smtp-host" value={smtpHost} onChange={(e) => setSmtpHost(e.target.value)} placeholder="smtp.gmail.com" />
+          </div>
+          <div className="campo">
+            <label htmlFor="smtp-port">Puerto</label>
+            <input id="smtp-port" type="number" value={smtpPort} onChange={(e) => setSmtpPort(e.target.value)} placeholder="587" />
+            <p className="ayuda">Usa 587 o 465, el que te haya dado tu proveedor de correo.</p>
+          </div>
+          <div className="campo">
+            <label htmlFor="smtp-usuario">Usuario</label>
+            <input id="smtp-usuario" value={smtpUsuario} onChange={(e) => setSmtpUsuario(e.target.value)} placeholder="tucorreo@tudominio.com" />
+          </div>
+          <div className="campo">
+            <label htmlFor="smtp-password">Contraseña</label>
+            <input
+              id="smtp-password"
+              type="password"
+              value={smtpPassword}
+              onChange={(e) => setSmtpPassword(e.target.value)}
+              placeholder={smtpHayPassword ? "••••••••  (ya guardada, déjalo vacío para no cambiarla)" : "Tu contraseña o contraseña de aplicación"}
+            />
+          </div>
+          <div className="campo">
+            <label htmlFor="smtp-from">Remitente que verá tu cliente</label>
+            <input id="smtp-from" value={smtpFrom} onChange={(e) => setSmtpFrom(e.target.value)} placeholder="Mi Negocio <tucorreo@tudominio.com>" />
+          </div>
+          <div className="campo" style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+            <input id="smtp-activo" type="checkbox" checked={smtpActivo} onChange={(e) => setSmtpActivo(e.target.checked)} style={{ width: "auto" }} />
+            <label htmlFor="smtp-activo" style={{ margin: 0 }}>Usar este SMTP para los correos al cliente</label>
+          </div>
+
+          {mensajeSmtp && <p className={`alerta alerta-${mensajeSmtp.tipo}`} role="status">{mensajeSmtp.texto}</p>}
+
+          <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
+            <button type="submit" className="btn btn-primario" disabled={guardandoSmtp}>
+              {guardandoSmtp ? "Guardando..." : "Guardar"}
+            </button>
+            <button type="button" className="btn btn-secundario" onClick={probarSmtp} disabled={probandoSmtp || !smtpHayPassword}>
+              {probandoSmtp ? "Enviando..." : "Enviar correo de prueba"}
+            </button>
+          </div>
+        </form>
+      )}
 
       {limites && (
         <div className="tarjeta" style={{ maxWidth: 460 }}>

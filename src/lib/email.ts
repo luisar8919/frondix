@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import nodemailer from "nodemailer";
 
 // Envío de correos transaccionales (Resend, resend.com). Las credenciales
 // NUNCA van al repo -- viven solo en RESEND_API_KEY/RESEND_FROM_EMAIL
@@ -55,27 +56,89 @@ function plantillaCorreoCliente(nombreEmpresa: string, cuerpoInterno: string): s
     </div>`;
 }
 
+export interface SmtpPropio {
+  host: string;
+  port: number;
+  usuario: string;
+  password: string; // ya descifrada por quien llama, ver lib/cifrado.ts
+  from: string; // "Nombre del negocio <correo@su-dominio.com>"
+}
+
+// Intenta el SMTP propio de la empresa (si está activo y configurado) antes
+// que el de Frondix -- así el cliente ve el correo venir del dominio real
+// del negocio, no de frondix.com. "Mejor esfuerzo": si el SMTP propio falla
+// (datos mal puestos, servidor caído), cae solo al de Frondix en vez de no
+// mandar nada -- quien usa Frondix no debería dejar de avisarle a su
+// cliente por un typo en su configuración.
+async function intentarSmtpPropio(smtp: SmtpPropio, destinatario: string, asunto: string, html: string, text: string): Promise<boolean> {
+  try {
+    const transporte = nodemailer.createTransport({
+      host: smtp.host,
+      port: smtp.port,
+      secure: smtp.port === 465,
+      auth: { user: smtp.usuario, pass: smtp.password },
+    });
+    await transporte.sendMail({ from: smtp.from, to: destinatario, subject: asunto, html, text });
+    return true;
+  } catch (e) {
+    console.error(`email: fallo con el SMTP propio (${smtp.host}), usando el de Frondix:`, e instanceof Error ? e.message : e);
+    return false;
+  }
+}
+
+// Para el botón "Enviar correo de prueba" de /dashboard/empresa -- a
+// diferencia de intentarSmtpPropio (mejor esfuerzo, solo loguea y cae al de
+// Frondix), acá SÍ hace falta el detalle del error para mostrárselo al
+// dueño y que pueda corregir host/puerto/usuario/clave.
+export async function probarSmtpPropio(smtp: SmtpPropio, destinatario: string): Promise<{ ok: true } | { ok: false; error: string }> {
+  try {
+    const transporte = nodemailer.createTransport({
+      host: smtp.host,
+      port: smtp.port,
+      secure: smtp.port === 465,
+      auth: { user: smtp.usuario, pass: smtp.password },
+    });
+    await transporte.sendMail({
+      from: smtp.from,
+      to: destinatario,
+      subject: "Prueba de SMTP propio - Frondix",
+      html: "<p>Si ves este correo, tu SMTP propio en Frondix quedó bien configurado.</p>",
+      text: "Si ves este correo, tu SMTP propio en Frondix quedó bien configurado.",
+    });
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Error desconocido" };
+  }
+}
+
 // Correo directo a UN destinatario externo (el cliente del negocio, no un
 // usuario de Frondix) -- a diferencia de enviarCorreo(), que busca el email
 // vía Supabase Auth, acá el destinatario ya viene como string (el valor de
-// la columna rol "correo" de ese registro).
+// la columna rol "correo" de ese registro). `smtp` es opcional: sin él (o si
+// falla), usa el Resend de Frondix como siempre.
 export async function enviarCorreoAlCliente(
   destinatario: string,
   nombreEmpresa: string,
-  mensaje: string
+  mensaje: string,
+  smtp?: SmtpPropio | null
 ): Promise<void> {
-  const apiKey = process.env.RESEND_API_KEY;
-  if (!apiKey) return; // sin configurar -- mejor esfuerzo, no rompe la regla
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(destinatario)) return; // dato sucio, no se intenta mandar
 
-  const from = process.env.RESEND_FROM_EMAIL || "Frondix <avisos@frondix.com>";
   const html = plantillaCorreoCliente(nombreEmpresa, `<p>${mensaje}</p>`);
+  const asunto = `Mensaje de ${nombreEmpresa}`;
+  const text = textoPlano(html);
 
+  if (smtp && (await intentarSmtpPropio(smtp, destinatario, asunto, html, text))) return;
+
+  const apiKey = process.env.RESEND_API_KEY;
+  if (!apiKey) return; // sin configurar -- mejor esfuerzo, no rompe la regla
+
+  const from = process.env.RESEND_FROM_EMAIL || "Frondix <avisos@frondix.com>";
   try {
     const res = await fetch("https://api.resend.com/emails", {
       method: "POST",
       headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ from, to: destinatario, subject: `Mensaje de ${nombreEmpresa}`, html, text: textoPlano(html) }),
+      body: JSON.stringify({ from, to: destinatario, subject: asunto, html, text }),
     });
     if (!res.ok) console.error(`email: fallo enviando a cliente ${destinatario}:`, await res.text());
   } catch (e) {
