@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { crearClienteAdmin } from "@/lib/supabase/admin";
-import { agruparClientes, diasDesde, type FilaCruda } from "@/lib/seguimiento";
+import { agruparClientes, diasDesde, normalizarTelefonoPE, type FilaCruda } from "@/lib/seguimiento";
 import { enviarPush } from "@/lib/push";
+import { enviarPlantilla } from "@/lib/whatsapp";
 import type { Columna } from "@/lib/excel-parser";
 
 // Revisa los clientes con seguimiento activado (checkbox en la pantalla de
@@ -111,12 +112,23 @@ export async function GET(req: NextRequest) {
     try {
       const { data: miembros } = await supabase.from("miembros").select("user_id").eq("empresa_id", empresaId);
       const userIds = (miembros ?? []).map((m) => m.user_id);
-      const { data: empresa } = await supabase.from("empresas").select("nombre").eq("id", empresaId).single();
+      const { data: empresa } = await supabase.from("empresas").select("nombre, telefono").eq("id", empresaId).single();
       const titulo = nombres.length === 1 ? "Un cliente no volvió" : `${nombres.length} clientes no volvieron`;
       const cuerpo = nombres.length <= 3
         ? `${nombres.join(", ")} llevan ${UMBRAL_DIAS}+ días sin comprar en ${empresa?.nombre ?? "tu negocio"}.`
         : `${nombres.slice(0, 2).join(", ")} y ${nombres.length - 2} más llevan ${UMBRAL_DIAS}+ días sin comprar.`;
       await enviarPush(supabase, userIds, titulo, cuerpo, { tipo: "seguimiento_caducado" });
+
+      // Mismo "mejor esfuerzo", aparte: si el WhatsApp falla (número inválido,
+      // plantilla rechazada, etc.) no debe tirar abajo el push que ya se mandó.
+      const telefonoWhatsapp = normalizarTelefonoPE(empresa?.telefono);
+      if (telefonoWhatsapp) {
+        try {
+          await enviarPlantilla(telefonoWhatsapp, "aviso_clientes_inactivos", [empresa?.nombre ?? "tu negocio", String(UMBRAL_DIAS)]);
+        } catch (e) {
+          console.error(`seguimiento-push: fallo el WhatsApp a la empresa ${empresaId}:`, e instanceof Error ? e.message : e);
+        }
+      }
     } catch (e) {
       empresasConError++;
       console.error(`seguimiento-push: fallo al notificar a la empresa ${empresaId}:`, e instanceof Error ? e.message : e);

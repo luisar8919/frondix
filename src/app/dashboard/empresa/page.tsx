@@ -31,6 +31,16 @@ export default function EmpresaPage() {
   const [errorEliminar, setErrorEliminar] = useState<string | null>(null);
   const [eliminando, setEliminando] = useState(false);
 
+  const [factproRuc, setFactproRuc] = useState("");
+  const [factproToken, setFactproToken] = useState<string | null>(null);
+  const [factproEntorno, setFactproEntorno] = useState<string>("demo");
+  const [factproRucForm, setFactproRucForm] = useState("");
+  const [factproDireccion, setFactproDireccion] = useState("");
+  const [factproUbigeo, setFactproUbigeo] = useState("");
+  const [activandoFactpro, setActivandoFactpro] = useState(false);
+  const [pasandoProduccion, setPasandoProduccion] = useState(false);
+  const [mensajeFactpro, setMensajeFactpro] = useState<{ tipo: "ok" | "error"; texto: string } | null>(null);
+
   const [smtpHost, setSmtpHost] = useState("");
   const [smtpPort, setSmtpPort] = useState("587");
   const [smtpUsuario, setSmtpUsuario] = useState("");
@@ -56,10 +66,17 @@ export default function EmpresaPage() {
     const { data: { user } } = await supabase.auth.getUser();
     if (user) setLimites(await limitesDelUsuario(supabase, user.id));
 
-    const { data: empresa } = await supabase.from("empresas").select("nombre, telefono").eq("id", sesion.empresaId).single();
+    const { data: empresa } = await supabase
+      .from("empresas")
+      .select("nombre, telefono, ruc, factpro_token, factpro_entorno")
+      .eq("id", sesion.empresaId)
+      .single();
     if (empresa) {
       setNombre(empresa.nombre ?? "");
       setTelefono(empresa.telefono ?? "");
+      setFactproRuc(empresa.ruc ?? "");
+      setFactproToken(empresa.factpro_token ?? null);
+      setFactproEntorno(empresa.factpro_entorno ?? "demo");
     }
 
     const miRolActual = sesion.empresas.find((e) => e.empresaId === sesion.empresaId)?.rol;
@@ -153,6 +170,34 @@ export default function EmpresaPage() {
       return setErrorEliminar(body.error ?? "No se pudo eliminar");
     }
     window.location.href = "/dashboard";
+  }
+
+  async function activarFactpro(e: React.FormEvent) {
+    e.preventDefault();
+    setActivandoFactpro(true);
+    setMensajeFactpro(null);
+    const res = await fetch("/api/facturacion-electronica/activar", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ruc: factproRucForm, direccion: factproDireccion, ubigeoId: factproUbigeo }),
+    });
+    const body = await res.json();
+    setActivandoFactpro(false);
+    if (!res.ok) return setMensajeFactpro({ tipo: "error", texto: body.error ?? "No se pudo activar" });
+    setFactproRuc(factproRucForm);
+    setFactproToken("activo"); // no necesitamos el token real en el cliente, solo saber que ya existe
+    setMensajeFactpro({ tipo: "ok", texto: "Listo. Ahora haz el Alta de PSE en SUNAT (ver abajo) antes de pasar a producción." });
+  }
+
+  async function pasarAProduccion() {
+    setPasandoProduccion(true);
+    setMensajeFactpro(null);
+    const res = await fetch("/api/facturacion-electronica/produccion", { method: "POST" });
+    const body = await res.json();
+    setPasandoProduccion(false);
+    if (!res.ok) return setMensajeFactpro({ tipo: "error", texto: body.error ?? "No se pudo pasar a producción" });
+    setFactproEntorno("produccion");
+    setMensajeFactpro({ tipo: "ok", texto: "Listo, tu empresa ya factura en producción." });
   }
 
   async function guardarSmtp(e: React.FormEvent) {
@@ -297,6 +342,78 @@ export default function EmpresaPage() {
             </button>
           </div>
         </form>
+      )}
+
+      {puedeEditar && (
+        <div className="tarjeta" style={{ maxWidth: 460, marginBottom: 20 }}>
+          <h3 style={{ marginTop: 0 }}>Facturación electrónica</h3>
+
+          {!factproToken && (
+            <form onSubmit={activarFactpro}>
+              <p className="suave pequeno" style={{ marginBottom: 14 }}>
+                Emite facturas y boletas válidas ante SUNAT directo desde Frondix. Completa estos datos para registrar tu
+                empresa.
+              </p>
+              <div className="campo">
+                <label htmlFor="factpro-ruc">RUC</label>
+                <input id="factpro-ruc" value={factproRucForm} onChange={(e) => setFactproRucForm(e.target.value.replace(/\D/g, "").slice(0, 11))} required />
+              </div>
+              <div className="campo">
+                <label htmlFor="factpro-direccion">Dirección fiscal</label>
+                <input id="factpro-direccion" value={factproDireccion} onChange={(e) => setFactproDireccion(e.target.value)} required />
+              </div>
+              <div className="campo">
+                <label htmlFor="factpro-ubigeo">Ubigeo (código de 6 dígitos)</label>
+                <input id="factpro-ubigeo" value={factproUbigeo} onChange={(e) => setFactproUbigeo(e.target.value.replace(/\D/g, "").slice(0, 6))} placeholder="150101" required />
+                <p className="ayuda">
+                  Busca tu distrito en el{" "}
+                  <a href="https://www.sunat.gob.pe/cl-ti-itmerced/jcrS00Alias" target="_blank" rel="noreferrer">buscador de ubigeos de SUNAT</a>.
+                </p>
+              </div>
+              {mensajeFactpro && <p className={`alerta alerta-${mensajeFactpro.tipo}`} role="status">{mensajeFactpro.texto}</p>}
+              <button type="submit" className="btn btn-primario" disabled={activandoFactpro}>
+                {activandoFactpro ? "Activando..." : "Activar facturación electrónica"}
+              </button>
+            </form>
+          )}
+
+          {factproToken && (
+            <>
+              <p className="suave pequeno" style={{ marginBottom: 14 }}>RUC {factproRuc} registrado.</p>
+
+              <ol className="pequeno" style={{ paddingLeft: 18, marginBottom: 14 }}>
+                <li>✅ Empresa y series creadas en Frondix.</li>
+                <li>
+                  {factproEntorno === "produccion" ? "✅" : "⬜"} Hacer el <strong>Alta de PSE</strong> en SUNAT (ver tutorial
+                  abajo) — lo haces tú mismo, con tu propia Clave SOL. Frondix nunca te pide esa contraseña.
+                </li>
+                <li>{factproEntorno === "produccion" ? "✅" : "⬜"} Pasar a producción (recién al día siguiente del Alta de PSE).</li>
+              </ol>
+
+              <details style={{ marginBottom: 14 }}>
+                <summary style={{ cursor: "pointer", fontWeight: 600 }}>¿Cómo hago el Alta de PSE en SUNAT?</summary>
+                <ol className="pequeno" style={{ paddingLeft: 18, marginTop: 10 }}>
+                  <li>Entra a <a href="https://www.sunat.gob.pe/sol.html" target="_blank" rel="noreferrer">SUNAT Operaciones en Línea</a> con tu RUC, usuario y Clave SOL.</li>
+                  <li>En el buscador principal, escribe <strong>&quot;altas&quot;</strong> y entra a <strong>&quot;Altas/Bajas de PSE&quot;</strong>.</li>
+                  <li>En <strong>&quot;Comunicación Tercerización con PSE&quot;</strong>, haz clic en <strong>&quot;Alta Servicio&quot;</strong>.</li>
+                  <li>
+                    Agrega el RUC <strong>20600337832</strong> (VIDA SOFTWARE S.A.C., el PSE que usa Frondix) y guarda.
+                  </li>
+                  <li>La autorización entra en vigencia recién al <strong>día siguiente</strong> — hazlo con 1-2 días de anticipación antes de necesitar facturar de verdad.</li>
+                </ol>
+              </details>
+
+              {factproEntorno !== "produccion" && (
+                <button type="button" className="btn btn-primario" onClick={pasarAProduccion} disabled={pasandoProduccion}>
+                  {pasandoProduccion ? "Pasando a producción..." : "Ya hice el Alta de PSE, pasar a producción"}
+                </button>
+              )}
+              {factproEntorno === "produccion" && <p className="alerta alerta-ok">Ya estás emitiendo en producción.</p>}
+
+              {mensajeFactpro && <p className={`alerta alerta-${mensajeFactpro.tipo}`} role="status" style={{ marginTop: 10 }}>{mensajeFactpro.texto}</p>}
+            </>
+          )}
+        </div>
       )}
 
       {limites && (

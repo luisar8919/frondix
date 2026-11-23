@@ -5,7 +5,21 @@ import { useState } from "react";
 // Mismo precio que la sección de Precios (S/ 30/mes, plan Completo) -- si ese
 // precio cambia, cambiarlo también acá.
 const PRECIO_FRONDIX = 30;
-const SUELDO_SUGERIDO = 1500; // referencia: asistente administrativo part-time en Lima, no RMV (ese es para jornada completa)
+
+// Cada tarea mapea a una función real de Frondix (no son categorías inventadas):
+// "ventas" -> carga/orden de ventas y compras (el Excel); "stock" -> stock.ts +
+// valorizacionInventario.ts + alertas de stock; "facturacion" -> integración
+// FactPro (factura/boleta electrónica real ante SUNAT); "cobranza" ->
+// seguimiento.ts + cuentas por cobrar + notificaciones; "reportes" -> reportes.ts
+// (flujo de caja, balance). `activo` son los defaults más universales -- las
+// demás las prende el visitante si le aplican a su negocio.
+const TAREAS = [
+  { clave: "ventas", etiqueta: "Cargar y ordenar tus ventas y compras", montoDefault: 1500, activo: true },
+  { clave: "stock", etiqueta: "Controlar y alertar tu stock/inventario", montoDefault: 900, activo: true },
+  { clave: "facturacion", etiqueta: "Armar comprobantes y coordinar con tu contador", montoDefault: 250, activo: false },
+  { clave: "cobranza", etiqueta: "Hacer seguimiento y cobrar a clientes morosos", montoDefault: 600, activo: false },
+  { clave: "reportes", etiqueta: "Armar reportes de ventas y flujo de caja", montoDefault: 350, activo: false },
+];
 
 // Beneficios de ley que se suman al sueldo bruto al contratar a alguien en
 // planilla (Perú): se expresan como % porque cada uno equivale a un pago
@@ -19,8 +33,19 @@ const BENEFICIOS = [
 const soles = (n: number) => `S/ ${Math.round(n).toLocaleString("es-PE")}`;
 
 export default function CalculadoraAhorro() {
-  const [sueldo, setSueldo] = useState(SUELDO_SUGERIDO);
+  const [tareas, setTareas] = useState(
+    TAREAS.map((t) => ({ ...t, monto: t.montoDefault }))
+  );
 
+  function toggleTarea(clave: string) {
+    setTareas((prev) => prev.map((t) => (t.clave === clave ? { ...t, activo: !t.activo } : t)));
+  }
+
+  function cambiarMonto(clave: string, monto: number) {
+    setTareas((prev) => prev.map((t) => (t.clave === clave ? { ...t, monto: Math.max(0, monto) } : t)));
+  }
+
+  const sueldo = tareas.reduce((suma, t) => suma + (t.activo ? t.monto : 0), 0);
   const extra = BENEFICIOS.reduce((suma, b) => suma + sueldo * b.pct, 0);
   const costoReal = sueldo + extra;
   const ahorroMensual = Math.max(0, costoReal - PRECIO_FRONDIX);
@@ -29,22 +54,38 @@ export default function CalculadoraAhorro() {
 
   return (
     <div className="tarjeta tarjeta-elevada calculadora-ahorro">
-      <div className="campo">
-        <label htmlFor="sueldo-referencia">
-          ¿Cuánto le pagarías al mes a alguien para cargar y ordenar tus ventas y compras?
-        </label>
-        <input
-          id="sueldo-referencia"
-          type="number"
-          min={0}
-          step={50}
-          inputMode="numeric"
-          value={sueldo}
-          onChange={(e) => setSueldo(Math.max(0, Number(e.target.value) || 0))}
-        />
-        <p className="ayuda" style={{ marginTop: 4 }}>
-          Referencia: un asistente part-time para esto suele cobrar desde S/ {SUELDO_SUGERIDO.toLocaleString("es-PE")}/mes.
-        </p>
+      <p className="suave pequeno" style={{ margin: "0 0 10px" }}>
+        ¿Qué le pagarías hoy a alguien para que haga esto por ti? Marca lo que te aplica.
+      </p>
+
+      <div className="calculadora-tareas">
+        {tareas.map((t) => (
+          <div key={t.clave} className="calculadora-tarea-fila" style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
+            <input
+              id={`tarea-${t.clave}`}
+              type="checkbox"
+              checked={t.activo}
+              onChange={() => toggleTarea(t.clave)}
+              style={{ width: "auto", flexShrink: 0 }}
+            />
+            <label htmlFor={`tarea-${t.clave}`} style={{ flex: 1, margin: 0, cursor: "pointer" }}>
+              {t.etiqueta}
+            </label>
+            <div style={{ display: "flex", alignItems: "center", gap: 4, flexShrink: 0 }}>
+              <span className="suave pequeno">S/</span>
+              <input
+                type="number"
+                min={0}
+                step={50}
+                inputMode="numeric"
+                value={t.monto}
+                disabled={!t.activo}
+                onChange={(e) => cambiarMonto(t.clave, Number(e.target.value) || 0)}
+                style={{ width: 90 }}
+              />
+            </div>
+          </div>
+        ))}
       </div>
 
       <div className="calculadora-beneficios">
@@ -91,7 +132,7 @@ export default function CalculadoraAhorro() {
       <p className="suave pequeno calculadora-nota-gratis">
         Y esto ya lo puedes hacer <strong>gratis</strong> en Frondix: cargar tu Excel, buscar y registrar. Pagar no es
         para empezar — es para cuando quieras subir de nivel la gestión de tu negocio (tu equipo trabajando junto,
-        seguimiento automático de clientes).
+        seguimiento automático de clientes, facturación electrónica).
       </p>
     </div>
   );
