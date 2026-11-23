@@ -10,14 +10,13 @@ const dolores = [
   { titulo: "Ya no encuentras nada", texto: "el Excel creció tanto que buscar un dato es recorrer la hoja sin fin." },
 ];
 
-// Posicionamiento explícito frente a la objeción más común ("¿y la
-// facturación?"): Frondix no es un POS ni un facturador -- es el ERP liviano
-// que ordena lo que esos sistemas no muestran (stock, ventas, ganancia real),
-// a propósito sin meterse en la parte fiscal. Dos públicos, cada uno con su
-// propio motivo para no necesitar esa capa aquí.
+// Frondix ya emite factura/boleta electrónica real ante SUNAT (integración
+// FactPro) -- dos públicos, cada uno llega a esa misma capacidad desde un
+// punto distinto: el que hoy no factura nada, y el que ya factura en otro
+// lado y puede migrar cuando quiera, sin perder lo que ya tiene en Frondix.
 const publicos = [
-  { icono: "🛍️", titulo: "¿Todavía no facturas cada venta?", texto: "Si tu negocio es informal o semi-formal, Frondix es tu sistema completo: ventas, compras, stock y clientes ordenados, sin obligarte a facturar lo que hoy no facturas." },
-  { icono: "🤝", titulo: "¿Ya facturas en otro sistema?", texto: "Frondix se monta al lado del que ya usas para facturar: tú sigues emitiendo tus comprobantes ahí, y acá tienes la visibilidad real de tu negocio que ese sistema no te da. Si necesitas los datos para SUNAT, te los dejamos listos para copiar." },
+  { icono: "🛍️", titulo: "¿Todavía no facturas cada venta?", texto: "Frondix ya emite facturas y boletas electrónicas válidas ante SUNAT, directo desde tu cuenta. Actívalo cuando quieras: mientras tanto, sigue funcionando igual de bien sin obligarte a facturar lo que hoy no facturas." },
+  { icono: "🤝", titulo: "¿Ya facturas en otro sistema?", texto: "Puedes seguir usándolo sin problema, o migrar tu facturación a Frondix cuando te convenga, para tener ventas, compras, stock y comprobantes en un solo lugar." },
 ];
 
 const pasos = [
@@ -35,7 +34,7 @@ const diferenciadores = [
   { icono: "🧩", titulo: "Se estructura solo", texto: "Subes tu Excel desordenado y Frondix detecta qué es cada columna (producto, cliente, monto, fecha) y arma el módulo. No hay plantillas que llenar ni campos que inventar." },
   { icono: "📦", titulo: "Stock que se ajusta solo", texto: "Cada venta o compra suma o descuenta stock automáticamente, con alertas cuando un producto está por acabarse." },
   { icono: "📊", titulo: "Visibilidad para decidir", texto: "Ganancia neta, productos más vendidos y flujo de caja, actualizados solos cada vez que registras algo." },
-  { icono: "🧾", titulo: "Listo para tu facturación", texto: "Exporta tus ventas y compras con los datos que pide SUNAT (valor de venta, IGV, total) para registrar tus comprobantes donde ya facturas." },
+  { icono: "🧾", titulo: "Factura electrónica real", texto: "Emite facturas y boletas válidas ante SUNAT directo desde Frondix, sin pasarte a otro sistema ni volver a cargar tus datos a mano." },
   { icono: "🌎", titulo: "Para toda Latinoamérica", texto: "Soles, dólares, pesos mexicanos, colombianos, chilenos, argentinos, reales o euros: cada módulo con su propia moneda." },
   { icono: "📱", titulo: "Pensado para el celular", texto: "Tablas legibles desde el teléfono, no solo desde la computadora de la oficina." },
 ];
@@ -176,10 +175,10 @@ export default function Portada() {
         <section className="seccion contenedor">
           <div className="seccion-titulo seccion-titulo-centrado">
             <span className="eyebrow">Sin rodeos</span>
-            <h2>Frondix no factura. Y es a propósito.</h2>
+            <h2>Factura electrónica real, sin salir de Frondix</h2>
             <p>
-              No competimos contra tu facturador ni contra un POS completo. Ordenamos lo que ninguno de los dos te
-              muestra: tu stock, tus ventas y tu ganancia real, listos en minutos desde tu propio Excel.
+              Emite facturas y boletas válidas ante SUNAT directo desde tu cuenta, sin perder lo que Frondix ya hace
+              bien: tu stock, tus ventas y tu ganancia real, ordenados en minutos desde tu propio Excel.
             </p>
           </div>
           <div className="grilla-2">
