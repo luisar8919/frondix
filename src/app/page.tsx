@@ -62,6 +62,9 @@ export default function Portada() {
               Si nunca te pasó, tu Excel está bien como está. Si te pasó, Frondix convierte esa misma hoja de cálculo
               en una herramienta que no se rompe, donde cada persona ve solo lo que le corresponde.
             </p>
+            <p className="suave pequeno" style={{ marginTop: 10 }}>
+              Nada de cursos ni manuales de 40 páginas: si sabes usar un Excel, ya sabes usar Frondix.
+            </p>
             <div className="hero-cta">
               <Link href="/signup" className="btn btn-primario btn-grande">Pruébalo con tu propio Excel</Link>
               <a href="#agenda" className="btn btn-secundario btn-grande">Agenda una reunión</a>
@@ -149,6 +152,27 @@ export default function Portada() {
           </div>
         </section>
 
+        <section className="seccion seccion-suave">
+          <div className="contenedor seccion-titulo-centrado">
+            <span className="eyebrow">Números reales</span>
+            <h2>Negocios de verdad ya están ordenando su Excel con Frondix</h2>
+            <div className="grilla-3" style={{ marginTop: 10 }}>
+              <div className="tarjeta" style={{ textAlign: "center" }}>
+                <div style={{ fontSize: 36, fontWeight: 800, color: "var(--verde-700)" }}>35+</div>
+                <p className="suave pequeno" style={{ margin: 0 }}>negocios con su cuenta activa</p>
+              </div>
+              <div className="tarjeta" style={{ textAlign: "center" }}>
+                <div style={{ fontSize: 36, fontWeight: 800, color: "var(--verde-700)" }}>80+</div>
+                <p className="suave pequeno" style={{ margin: 0 }}>módulos armados desde un Excel</p>
+              </div>
+              <div className="tarjeta" style={{ textAlign: "center" }}>
+                <div style={{ fontSize: 36, fontWeight: 800, color: "var(--verde-700)" }}>1,000+</div>
+                <p className="suave pequeno" style={{ margin: 0 }}>registros ya cargados y ordenados</p>
+              </div>
+            </div>
+          </div>
+        </section>
+
         <section className="seccion contenedor">
           <div className="seccion-titulo seccion-titulo-centrado">
             <span className="eyebrow">Sin rodeos</span>
@@ -175,6 +199,10 @@ export default function Portada() {
               <span className="eyebrow">Sin letra pequeña</span>
               <h2>Empieza gratis, crece cuando lo necesites</h2>
               <p>Frondix ya funciona gratis para cargar tu Excel y ordenarlo. Pagar no es para empezar, es para cuando quieras subir de nivel la gestión.</p>
+              <p style={{ fontWeight: 700, color: "var(--verde-700)" }}>
+                El plan Mensual trae el primer mes gratis, sin pedirte tarjeta. Lo cancelas cuando quieras, sin
+                contrato ni permanencia.
+              </p>
             </div>
             <div className="precios precios-3">
               <div className="tarjeta precio">
@@ -227,6 +255,7 @@ export default function Portada() {
             <h2>Cultiva tu cartera de clientes</h2>
             <p>Sube tu Excel y mira cómo queda. Toma menos de lo que tarda en enfriarse un café.</p>
             <Link href="/signup" className="btn btn-claro btn-grande">Probar Frondix gratis</Link>
+            <p className="suave pequeno" style={{ marginTop: 10 }}>Sin contrato. Cancela cuando quieras.</p>
           </div>
         </section>
 

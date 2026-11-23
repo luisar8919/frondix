@@ -129,6 +129,10 @@ export default function CalculadoraAhorro() {
         <p className="suave pequeno" style={{ margin: "4px 0 0" }}>{soles(ahorroAnual)} al año</p>
       </div>
 
+      <p className="suave pequeno" style={{ textAlign: "center", fontStyle: "italic" }}>
+        Es como tener a alguien part-time ordenando tu negocio, sin el sueldo ni los beneficios de ley.
+      </p>
+
       <p className="suave pequeno calculadora-nota-gratis">
         Y esto ya lo puedes hacer <strong>gratis</strong> en Frondix: cargar tu Excel, buscar y registrar. Pagar no es
         para empezar — es para cuando quieras subir de nivel la gestión de tu negocio (tu equipo trabajando junto,
