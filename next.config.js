@@ -20,9 +20,14 @@ module.exports = {
   },
   // Headers de seguridad basicos (encontrados ausentes en una auditoria,
   // 2026-10-29). CSP (auditoria ISO 27001, 2026-11-03): dominios inventariados
-  // a mano (grep de URLs en src/) para PayPal/Paddle (unicos scripts externos,
-  // /dashboard/billing) y Supabase (*.supabase.co, API + auth, sin Realtime --
-  // no se usa .channel()/websockets en el proyecto). 'unsafe-inline' en
+  // a mano (grep de URLs en src/) para PayPal/Paddle/Culqi (unicos scripts
+  // externos, /dashboard/billing) y Supabase (*.supabase.co, API + auth, sin
+  // Realtime -- no se usa .channel()/websockets en el proyecto). Culqi
+  // (checkout.culqi.com para el script, checkoutview.culqi.com para el
+  // iframe del formulario) se agrego el 2026-11-24, confirmado por las
+  // violaciones reales en consola al probar el boton "Pagar con tarjeta
+  // (Culqi)" -- mismo criterio de "inventariado a mano, no adivinado" que
+  // el resto de este comentario. 'unsafe-inline' en
   // script-src/style-src es necesario porque Next.js en este hosting (Azure
   // Static Web Apps, sin middleware.ts) no puede inyectar un nonce por
   // request -- igual bloquea cargar JS/CSS de un dominio externo no listado,
@@ -34,12 +39,12 @@ module.exports = {
   async headers() {
     const csp = [
       "default-src 'self'",
-      "script-src 'self' 'unsafe-inline' https://www.paypal.com https://www.paypalobjects.com https://cdn.paddle.com",
+      "script-src 'self' 'unsafe-inline' https://www.paypal.com https://www.paypalobjects.com https://cdn.paddle.com https://checkout.culqi.com",
       "style-src 'self' 'unsafe-inline'",
       "img-src 'self' data: https://www.paypalobjects.com",
       "font-src 'self' data:",
       "connect-src 'self' https://*.supabase.co https://api-m.paypal.com https://api-m.sandbox.paypal.com https://www.paypal.com https://www.sandbox.paypal.com https://api.paddle.com https://sandbox-api.paddle.com",
-      "frame-src 'self' https://www.paypal.com https://www.sandbox.paypal.com https://*.paddle.com",
+      "frame-src 'self' https://www.paypal.com https://www.sandbox.paypal.com https://*.paddle.com https://checkoutview.culqi.com",
       "object-src 'none'",
       "base-uri 'self'",
       "form-action 'self'",
