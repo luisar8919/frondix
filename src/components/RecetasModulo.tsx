@@ -43,92 +43,115 @@ export default function RecetasModulo({
     onGuardado(r.body.reglas ?? nuevas);
   }
 
-  return (
-    <div className="tarjeta" style={{ marginBottom: 20 }}>
-      <h3 style={{ margin: "0 0 4px" }}>{nombre}</h3>
-      <p className="suave pequeno" style={{ marginTop: 0 }}>
-        Todas las recetas disponibles -- las que este módulo todavía no puede usar aparecen apagadas, con lo que les falta.
-      </p>
+  // Específicas: solo tiene sentido mostrarlas si de verdad aplican a este
+  // módulo (son docenas en potencia, una por rubro -- listarlas apagadas acá
+  // sería puro ruido, a diferencia de las generales). Separadas en su propia
+  // tarjeta para que no se mezclen visualmente con las generales.
+  const especificasQueAplican = RECETAS.filter((rc) => rc.especifica && rc.aplicaA(columnas, nombre));
+  const generales = RECETAS.filter((rc) => !rc.especifica);
 
-      <div style={{ display: "grid", gap: 14, gridTemplateColumns: "repeat(auto-fill, minmax(270px, 1fr))", marginTop: 14 }}>
-        {RECETAS.map((rc) => {
-          const aplica = rc.aplicaA(columnas, nombre);
-          const existente = aplica ? reglas.find((r) => rc.coincideCon(r, columnas)) : undefined;
-          const activa = !!existente?.activa;
-          const valorActual = borradores[rc.clave] ?? (existente ? rc.extraerValor(existente) : rc.valorPorDefecto);
-          const opciones = rc.opcionesValor?.(columnas) ?? null;
-          const trabajando = ocupada === rc.clave;
+  function tarjetaReceta(rc: Receta) {
+    const aplica = rc.aplicaA(columnas, nombre);
+    const existente = aplica ? reglas.find((r) => rc.coincideCon(r, columnas)) : undefined;
+    const activa = !!existente?.activa;
+    const valorActual = borradores[rc.clave] ?? (existente ? rc.extraerValor(existente) : rc.valorPorDefecto);
+    const opciones = rc.opcionesValor?.(columnas) ?? null;
+    const trabajando = ocupada === rc.clave;
 
-          return (
-            <div
-              key={rc.clave}
-              style={{
-                border: `1px solid ${activa ? "var(--verde-200)" : "var(--linea)"}`,
-                background: activa ? "var(--verde-50)" : "var(--papel)",
-                borderRadius: 10,
-                padding: 16,
-                opacity: aplica ? 1 : 0.55,
-              }}
-            >
-              <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                <span style={{ fontSize: 22, lineHeight: 1 }}>{rc.icono}</span>
-                <strong style={{ flex: 1 }}>{rc.titulo}</strong>
-                {activa && <span className="insignia">Activa</span>}
-              </div>
+    return (
+      <div
+        key={rc.clave}
+        style={{
+          border: `1px solid ${activa ? "var(--verde-200)" : "var(--linea)"}`,
+          background: activa ? "var(--verde-50)" : "var(--papel)",
+          borderRadius: 10,
+          padding: 16,
+          opacity: aplica ? 1 : 0.55,
+        }}
+      >
+        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+          <span style={{ fontSize: 22, lineHeight: 1 }}>{rc.icono}</span>
+          <strong style={{ flex: 1 }}>{rc.titulo}</strong>
+          {activa && <span className="insignia">Activa</span>}
+        </div>
 
-              <p className="suave pequeno" style={{ margin: "8px 0 10px" }}>{rc.descripcion(valorActual || rc.valorPorDefecto)}</p>
+        <p className="suave pequeno" style={{ margin: "8px 0 10px" }}>{rc.descripcion(valorActual || rc.valorPorDefecto)}</p>
 
-              {!aplica ? (
-                <p className="suave pequeno" style={{ fontStyle: "italic", margin: "0 0 10px" }}>No disponible: {rc.requisito}</p>
+        {!aplica ? (
+          <p className="suave pequeno" style={{ fontStyle: "italic", margin: "0 0 10px" }}>No disponible: {rc.requisito}</p>
+        ) : (
+          <>
+            {rc.tipoValor !== "ninguno" && (
+              opciones?.length ? (
+                <select
+                  aria-label={rc.titulo}
+                  value={valorActual}
+                  onChange={(e) => setBorradores((b) => ({ ...b, [rc.clave]: e.target.value }))}
+                  style={{ width: "100%", marginBottom: 10 }}
+                >
+                  {opciones.map((o) => <option key={o} value={o}>{o}</option>)}
+                </select>
               ) : (
+                <input
+                  aria-label={rc.titulo}
+                  type={rc.tipoValor === "numero" ? "number" : "text"}
+                  value={valorActual}
+                  onChange={(e) => setBorradores((b) => ({ ...b, [rc.clave]: e.target.value }))}
+                  style={{ width: "100%", marginBottom: 10 }}
+                />
+              )
+            )}
+
+            <div style={{ display: "flex", gap: 8 }}>
+              {activa ? (
                 <>
                   {rc.tipoValor !== "ninguno" && (
-                    opciones?.length ? (
-                      <select
-                        aria-label={rc.titulo}
-                        value={valorActual}
-                        onChange={(e) => setBorradores((b) => ({ ...b, [rc.clave]: e.target.value }))}
-                        style={{ width: "100%", marginBottom: 10 }}
-                      >
-                        {opciones.map((o) => <option key={o} value={o}>{o}</option>)}
-                      </select>
-                    ) : (
-                      <input
-                        aria-label={rc.titulo}
-                        type={rc.tipoValor === "numero" ? "number" : "text"}
-                        value={valorActual}
-                        onChange={(e) => setBorradores((b) => ({ ...b, [rc.clave]: e.target.value }))}
-                        style={{ width: "100%", marginBottom: 10 }}
-                      />
-                    )
+                    <button type="button" className="btn btn-secundario" disabled={trabajando} onClick={() => aplicar(rc, true)}>
+                      Actualizar
+                    </button>
                   )}
-
-                  <div style={{ display: "flex", gap: 8 }}>
-                    {activa ? (
-                      <>
-                        {rc.tipoValor !== "ninguno" && (
-                          <button type="button" className="btn btn-secundario" disabled={trabajando} onClick={() => aplicar(rc, true)}>
-                            Actualizar
-                          </button>
-                        )}
-                        <button type="button" className="btn btn-fantasma" disabled={trabajando} onClick={() => aplicar(rc, false)}>
-                          Desactivar
-                        </button>
-                      </>
-                    ) : (
-                      <button type="button" className="btn btn-primario" disabled={trabajando} onClick={() => aplicar(rc, true)}>
-                        {trabajando ? "Activando..." : "Activar"}
-                      </button>
-                    )}
-                  </div>
+                  <button type="button" className="btn btn-fantasma" disabled={trabajando} onClick={() => aplicar(rc, false)}>
+                    Desactivar
+                  </button>
                 </>
+              ) : (
+                <button type="button" className="btn btn-primario" disabled={trabajando} onClick={() => aplicar(rc, true)}>
+                  {trabajando ? "Activando..." : "Activar"}
+                </button>
               )}
             </div>
-          );
-        })}
+          </>
+        )}
       </div>
+    );
+  }
 
-      {mensaje && <p className={`alerta ${mensaje.tipo === "ok" ? "alerta-ok" : "alerta-error"}`} role="status" style={{ marginTop: 14 }}>{mensaje.texto}</p>}
-    </div>
+  return (
+    <>
+      {especificasQueAplican.length > 0 && (
+        <div className="tarjeta" style={{ marginBottom: 20 }}>
+          <h3 style={{ margin: "0 0 4px" }}>Específicas de tu rubro</h3>
+          <p className="suave pequeno" style={{ marginTop: 0 }}>
+            Detectadas según la estructura de este módulo -- separadas de las generales de abajo.
+          </p>
+          <div style={{ display: "grid", gap: 14, gridTemplateColumns: "repeat(auto-fill, minmax(270px, 1fr))", marginTop: 14 }}>
+            {especificasQueAplican.map(tarjetaReceta)}
+          </div>
+        </div>
+      )}
+
+      <div className="tarjeta" style={{ marginBottom: 20 }}>
+        <h3 style={{ margin: "0 0 4px" }}>{nombre}</h3>
+        <p className="suave pequeno" style={{ marginTop: 0 }}>
+          Recetas generales -- las que este módulo todavía no puede usar aparecen apagadas, con lo que les falta.
+        </p>
+
+        <div style={{ display: "grid", gap: 14, gridTemplateColumns: "repeat(auto-fill, minmax(270px, 1fr))", marginTop: 14 }}>
+          {generales.map(tarjetaReceta)}
+        </div>
+
+        {mensaje && <p className={`alerta ${mensaje.tipo === "ok" ? "alerta-ok" : "alerta-error"}`} role="status" style={{ marginTop: 14 }}>{mensaje.texto}</p>}
+      </div>
+    </>
   );
 }

@@ -28,6 +28,12 @@ export interface Receta {
   tipoValor: "numero" | "texto" | "ninguno";
   valorPorDefecto: string;
   descripcion: (valor: string) => string;
+  // true = solo tiene sentido para un rubro puntual (detectado por estructura:
+  // la columna exacta de esa plantilla + un valor de Estado que solo esa
+  // plantilla trae de fábrica -- nunca por el nombre del módulo). Se muestran
+  // en su propia sección de la galería, separadas de las generales (ver
+  // RecetasModulo.tsx), y solo si de verdad aplican (nunca se listan apagadas).
+  especifica: boolean;
   aplicaA: (columnas: Columna[], nombre: string) => boolean;
   // Qué le falta al módulo para poder usarla -- se muestra en la tarjeta
   // deshabilitada cuando `aplicaA` da false (ver comentario de la galería
@@ -47,6 +53,7 @@ const valorCondicionCampo = (r: Regla) => (r.condicion.tipo === "campo" ? r.cond
 export const RECETAS: Receta[] = [
   {
     clave: "ajustar_stock",
+    especifica: false,
     icono: "📦",
     titulo: "Ajustar Stock automáticamente",
     tipoValor: "ninguno",
@@ -75,6 +82,7 @@ export const RECETAS: Receta[] = [
   },
   {
     clave: "aviso_registro_grande",
+    especifica: false,
     icono: "🔔",
     titulo: "Avisarme en registros grandes",
     tipoValor: "numero",
@@ -102,6 +110,7 @@ export const RECETAS: Receta[] = [
   },
   {
     clave: "notificacion_personalizada",
+    especifica: false,
     icono: "📣",
     titulo: "Enviarme una notificación personalizada",
     tipoValor: "texto",
@@ -122,6 +131,7 @@ export const RECETAS: Receta[] = [
   },
   {
     clave: "notificar_cliente_correo",
+    especifica: false,
     icono: "📧",
     titulo: "Enviarle un correo al cliente",
     tipoValor: "texto",
@@ -142,6 +152,7 @@ export const RECETAS: Receta[] = [
   },
   {
     clave: "aviso_eliminacion",
+    especifica: false,
     icono: "🗑️",
     titulo: "Avisarme si se elimina un registro",
     tipoValor: "ninguno",
@@ -161,6 +172,7 @@ export const RECETAS: Receta[] = [
   },
   {
     clave: "excluir_cancelados",
+    especifica: false,
     icono: "🚫",
     titulo: "No contar los cancelados en Reportes",
     tipoValor: "texto",
@@ -186,6 +198,7 @@ export const RECETAS: Receta[] = [
   },
   {
     clave: "cliente_por_defecto",
+    especifica: false,
     icono: "🔄",
     titulo: "Completar Cliente si queda vacío",
     tipoValor: "texto",
@@ -210,6 +223,7 @@ export const RECETAS: Receta[] = [
   },
   {
     clave: "seguimiento_automatico",
+    especifica: false,
     icono: "👀",
     titulo: "Activar Seguimiento de clientes solo",
     tipoValor: "ninguno",
@@ -223,6 +237,7 @@ export const RECETAS: Receta[] = [
   },
   {
     clave: "stock_bajo",
+    especifica: false,
     icono: "⚠️",
     titulo: "Avisarme cuando el Stock esté por agotarse",
     tipoValor: "ninguno",
@@ -247,6 +262,7 @@ export const RECETAS: Receta[] = [
   },
   {
     clave: "descontar_insumos_por_venta",
+    especifica: false,
     icono: "🥘",
     titulo: "Descontar insumos de una receta por cada venta",
     tipoValor: "texto",
@@ -267,6 +283,7 @@ export const RECETAS: Receta[] = [
   },
   {
     clave: "eliminar_si_negativo",
+    especifica: false,
     icono: "🧹",
     titulo: "Borrar producto si su Cantidad queda negativa",
     tipoValor: "ninguno",
@@ -280,6 +297,154 @@ export const RECETAS: Receta[] = [
       accion: { tipo: "eliminar_registro" },
     }),
     coincideCon: (r) => r.accion.tipo === "eliminar_registro" && r.condicion.tipo === "campo" && r.condicion.columnaKey === "cantidad" && r.condicion.operador === "menor" && r.condicion.valor === "0",
+    extraerValor: () => "",
+  },
+
+  // Recetas ESPECÍFICAS por rubro (a partir de acá): a diferencia de las de
+  // arriba (que aplican a cualquier módulo con cierto rol de columna), estas
+  // además exigen la CLAVE exacta de columna que solo trae esa plantilla de
+  // fábrica (ej. "pedido" en Delivery, "trabajo" en Órdenes de servicio) --
+  // así "aplicaA" nunca da falso positivo en otro rubro que casualmente tenga
+  // Teléfono + Estado, y se mantienen separadas de las generales en la UI
+  // (ver la sección propia en RecetasModulo.tsx).
+  {
+    clave: "avisar_pedido_en_camino",
+    especifica: true,
+    icono: "🛵",
+    titulo: "Avisarle al cliente que su pedido salió",
+    tipoValor: "texto",
+    valorPorDefecto: "Tu pedido ya salió, en un momento te lo entregamos.",
+    descripcion: (v) => `Cuando el Estado pase a "En camino", le llega este WhatsApp al cliente: "${v}".`,
+    requisito: "Este módulo debe ser de Delivery (plantilla), con Teléfono y un Estado que incluya \"En camino\".",
+    aplicaA: (columnas) => {
+      const cEstado = col(columnas, "estado");
+      return !!col(columnas, "telefono") && columnas.some((c) => c.key === "pedido" && c.rol === "producto") && !!cEstado?.opcionesFijas?.includes("En camino");
+    },
+    construir: (columnas, valor) => {
+      const cEstado = col(columnas, "estado");
+      if (!cEstado) return null;
+      return {
+        activa: true, origen: "manual",
+        condicion: { tipo: "campo", columnaKey: cEstado.key, operador: "es", valor: "En camino" },
+        accion: { tipo: "enviar_whatsapp", mensaje: valor || "Tu pedido ya salió, en un momento te lo entregamos." },
+      };
+    },
+    coincideCon: (r, columnas) => {
+      const cEstado = col(columnas, "estado");
+      return !!cEstado && r.accion.tipo === "enviar_whatsapp" && r.condicion.tipo === "campo" && r.condicion.columnaKey === cEstado.key && r.condicion.valor === "En camino";
+    },
+    extraerValor: (r) => (r.accion.tipo === "enviar_whatsapp" ? r.accion.mensaje : ""),
+  },
+  {
+    clave: "avisar_trabajo_listo",
+    especifica: true,
+    icono: "🔧",
+    titulo: "Avisarle al cliente que su trabajo está listo",
+    tipoValor: "texto",
+    valorPorDefecto: "Tu equipo ya está listo, puedes pasar a recogerlo.",
+    descripcion: (v) => `Cuando el Estado pase a "Entregado", le llega este WhatsApp al cliente: "${v}".`,
+    requisito: "Este módulo debe ser de Órdenes de servicio (plantilla), con Teléfono y un Estado que incluya \"Entregado\".",
+    aplicaA: (columnas) => {
+      const cEstado = col(columnas, "estado");
+      return !!col(columnas, "telefono") && columnas.some((c) => c.key === "trabajo" && c.rol === "producto") && !!cEstado?.opcionesFijas?.includes("Entregado");
+    },
+    construir: (columnas, valor) => {
+      const cEstado = col(columnas, "estado");
+      if (!cEstado) return null;
+      return {
+        activa: true, origen: "manual",
+        condicion: { tipo: "campo", columnaKey: cEstado.key, operador: "es", valor: "Entregado" },
+        accion: { tipo: "enviar_whatsapp", mensaje: valor || "Tu equipo ya está listo, puedes pasar a recogerlo." },
+      };
+    },
+    coincideCon: (r, columnas) => {
+      const cEstado = col(columnas, "estado");
+      return !!cEstado && r.accion.tipo === "enviar_whatsapp" && r.condicion.tipo === "campo" && r.condicion.columnaKey === cEstado.key && r.condicion.valor === "Entregado";
+    },
+    extraerValor: (r) => (r.accion.tipo === "enviar_whatsapp" ? r.accion.mensaje : ""),
+  },
+  {
+    clave: "confirmar_reserva_cliente",
+    especifica: true,
+    icono: "💇",
+    titulo: "Confirmarle al cliente su reserva",
+    tipoValor: "texto",
+    valorPorDefecto: "Tu reserva quedó confirmada. ¡Te esperamos!",
+    descripcion: (v) => `Cuando el Estado pase a "Confirmada", le llega este WhatsApp al cliente: "${v}".`,
+    requisito: "Este módulo debe ser de Reservas / citas (plantilla), con Teléfono y un Estado que incluya \"Confirmada\".",
+    aplicaA: (columnas) => {
+      const cEstado = col(columnas, "estado");
+      return !!col(columnas, "telefono") && columnas.some((c) => c.key === "servicio" && c.rol === "producto") && !!cEstado?.opcionesFijas?.includes("Confirmada");
+    },
+    construir: (columnas, valor) => {
+      const cEstado = col(columnas, "estado");
+      if (!cEstado) return null;
+      return {
+        activa: true, origen: "manual",
+        condicion: { tipo: "campo", columnaKey: cEstado.key, operador: "es", valor: "Confirmada" },
+        accion: { tipo: "enviar_whatsapp", mensaje: valor || "Tu reserva quedó confirmada. ¡Te esperamos!" },
+      };
+    },
+    coincideCon: (r, columnas) => {
+      const cEstado = col(columnas, "estado");
+      return !!cEstado && r.accion.tipo === "enviar_whatsapp" && r.condicion.tipo === "campo" && r.condicion.columnaKey === cEstado.key && r.condicion.valor === "Confirmada";
+    },
+    extraerValor: (r) => (r.accion.tipo === "enviar_whatsapp" ? r.accion.mensaje : ""),
+  },
+  {
+    clave: "confirmar_evento_cliente",
+    especifica: true,
+    icono: "🎉",
+    titulo: "Confirmarle al cliente su evento",
+    tipoValor: "texto",
+    valorPorDefecto: "Tu evento quedó confirmado. ¡Nos vemos pronto!",
+    descripcion: (v) => `Cuando el Estado pase a "Confirmado", le llega este WhatsApp al cliente: "${v}".`,
+    requisito: "Este módulo debe ser de Eventos (plantilla), con Teléfono y un Estado que incluya \"Confirmado\".",
+    aplicaA: (columnas) => {
+      const cEstado = col(columnas, "estado");
+      return !!col(columnas, "telefono") && columnas.some((c) => c.key === "tipo_evento" && c.rol === "producto") && !!cEstado?.opcionesFijas?.includes("Confirmado");
+    },
+    construir: (columnas, valor) => {
+      const cEstado = col(columnas, "estado");
+      if (!cEstado) return null;
+      return {
+        activa: true, origen: "manual",
+        condicion: { tipo: "campo", columnaKey: cEstado.key, operador: "es", valor: "Confirmado" },
+        accion: { tipo: "enviar_whatsapp", mensaje: valor || "Tu evento quedó confirmado. ¡Nos vemos pronto!" },
+      };
+    },
+    coincideCon: (r, columnas) => {
+      const cEstado = col(columnas, "estado");
+      return !!cEstado && r.accion.tipo === "enviar_whatsapp" && r.condicion.tipo === "campo" && r.condicion.columnaKey === cEstado.key && r.condicion.valor === "Confirmado";
+    },
+    extraerValor: (r) => (r.accion.tipo === "enviar_whatsapp" ? r.accion.mensaje : ""),
+  },
+  {
+    clave: "avisar_obra_finalizada",
+    especifica: true,
+    icono: "🏗️",
+    titulo: "Avisarme cuando una obra se marque Finalizada",
+    tipoValor: "ninguno",
+    valorPorDefecto: "",
+    descripcion: () => "Te llega una notificación apenas el Estado de un proyecto pase a \"Finalizada\".",
+    requisito: "Este módulo debe ser de Obras / proyectos (plantilla), con un Estado que incluya \"Finalizada\".",
+    aplicaA: (columnas) => {
+      const cEstado = col(columnas, "estado");
+      return columnas.some((c) => c.key === "proyecto" && c.rol === "producto") && !!cEstado?.opcionesFijas?.includes("Finalizada");
+    },
+    construir: (columnas) => {
+      const cEstado = col(columnas, "estado");
+      if (!cEstado) return null;
+      return {
+        activa: true, origen: "manual",
+        condicion: { tipo: "campo", columnaKey: cEstado.key, operador: "es", valor: "Finalizada" },
+        accion: { tipo: "notificacion_push", titulo: "Obra finalizada", mensaje: "Un proyecto se marcó como Finalizada" },
+      };
+    },
+    coincideCon: (r, columnas) => {
+      const cEstado = col(columnas, "estado");
+      return !!cEstado && r.accion.tipo === "notificacion_push" && r.accion.titulo === "Obra finalizada" && r.condicion.tipo === "campo" && r.condicion.columnaKey === cEstado.key && r.condicion.valor === "Finalizada";
+    },
     extraerValor: () => "",
   },
 ];

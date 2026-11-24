@@ -93,7 +93,12 @@ export function plantillaCuentasPorPagar(): Columna[] {
     { key: "concepto", label: "Concepto", tipo: "texto", rol: "producto", sospechosa: false },
     { key: "monto", label: "Monto total", tipo: "numero", rol: "monto", sospechosa: false },
     { key: "saldo_pendiente", label: "Saldo pendiente", tipo: "numero", rol: "saldo_pendiente", sospechosa: false },
-    { key: "fecha_vencimiento", label: "Fecha de vencimiento", tipo: "fecha", rol: null, sospechosa: false },
+    // rol "fecha_vencimiento" (no null): engancha gratis con el cron de
+    // vencimientos ya existente (api/cron/vencimientos-push), que ya avisa
+    // por push y correo unos días antes para cualquier módulo con "producto" +
+    // "fecha_vencimiento" -- acá "concepto" ya tiene rol "producto", así que
+    // solo faltaba este rol para avisar de facturas por vencer.
+    { key: "fecha_vencimiento", label: "Fecha de vencimiento", tipo: "fecha", rol: "fecha_vencimiento", sospechosa: false },
   ];
 }
 
@@ -155,7 +160,7 @@ export function plantillaReservas(): Columna[] {
     { key: "fecha", label: "Fecha", tipo: "fecha", rol: "fecha", sospechosa: false },
     { key: "hora", label: "Hora", tipo: "texto", rol: null, sospechosa: false },
     { key: "cliente", label: "Cliente", tipo: "texto", rol: null, sospechosa: false },
-    { key: "telefono", label: "Teléfono", tipo: "texto", rol: null, sospechosa: false },
+    { key: "telefono", label: "Teléfono", tipo: "texto", rol: "telefono", sospechosa: false },
     { key: "servicio", label: "Servicio", tipo: "texto", rol: "producto", sospechosa: false },
     { key: "estado", label: "Estado", tipo: "texto", rol: "estado", sospechosa: false, opcionesFijas: ["Confirmada", "Atendida", "Cancelada", "No asistió"] },
   ];
@@ -283,7 +288,10 @@ export function plantillaAlquilerEquipos(): Columna[] {
     { key: "telefono", label: "Teléfono", tipo: "texto", rol: "telefono", sospechosa: false },
     { key: "equipo", label: "Equipo", tipo: "texto", rol: "producto", sospechosa: false },
     { key: "monto", label: "Monto", tipo: "numero", rol: "monto", sospechosa: false },
-    { key: "fecha_devolucion", label: "Fecha de devolución", tipo: "fecha", rol: null, sospechosa: false },
+    // rol "fecha_vencimiento" (no null): mismo motivo que Cuentas por pagar --
+    // engancha gratis con el cron de vencimientos (producto + fecha_vencimiento),
+    // avisando cuando un equipo prestado no se devolvió a tiempo.
+    { key: "fecha_devolucion", label: "Fecha de devolución", tipo: "fecha", rol: "fecha_vencimiento", sospechosa: false },
     { key: "estado", label: "Estado", tipo: "texto", rol: "estado", sospechosa: false, opcionesFijas: ["Prestado", "Devuelto", "Cancelado"] },
   ];
 }
