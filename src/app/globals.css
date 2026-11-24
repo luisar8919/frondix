@@ -143,7 +143,7 @@ th.num, td.num { text-align: right; font-variant-numeric: tabular-nums; }
 .cabecera { position: sticky; top: 0; z-index: 10; background: rgba(250, 248, 243, 0.92); backdrop-filter: blur(8px); border-bottom: 1px solid var(--linea); }
 .cabecera-fila { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 64px; }
 .logo { display: inline-flex; align-items: center; gap: 10px; text-decoration: none; color: var(--verde-900); font-weight: 800; font-size: 20px; letter-spacing: -0.02em; }
-.acciones { display: flex; align-items: center; gap: 8px; }
+.acciones { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 
 /* ----- Portada ----- */
 .hero { display: grid; grid-template-columns: 1.15fr 0.85fr; gap: 48px; align-items: center; padding-block: 64px 48px; }
@@ -234,6 +234,16 @@ th.num, td.num { text-align: right; font-variant-numeric: tabular-nums; }
 .nav-link:hover { background: var(--verde-50); color: var(--verde-800); }
 .nav-link[aria-current="page"] { background: var(--verde-100); color: var(--verde-800); }
 .menu-cuenta { position: relative; flex: none; }
+/* El botón ☰ de celular vive siempre en el DOM (mismo componente que arma el
+   escritorio) pero oculto hasta el breakpoint de abajo, donde reemplaza al
+   .nav-panel horizontal -- ver el comentario de MenuMovil en BarraPanel.tsx. */
+.menu-movil { position: relative; flex: none; display: none; }
+.boton-menu-movil { display: none; }
+/* .menu-cuenta-lista por defecto ancla a la derecha (right:0), pensado para
+   .menu-cuenta que vive en la punta derecha del header -- .menu-movil vive
+   cerca de la punta IZQUIERDA (justo después del logo), así que con right:0
+   el desplegable se iba fuera de la pantalla hacia la izquierda. */
+.menu-movil .menu-cuenta-lista { left: 0; right: auto; }
 .menu-cuenta-boton { display: flex; align-items: center; gap: 6px; padding: 7px 12px; border-radius: 999px; font-size: 14px; font-weight: 600; color: var(--tinta); background: transparent; border: 1px solid var(--linea-fuerte); cursor: pointer; white-space: nowrap; }
 .menu-cuenta-boton:hover { background: var(--verde-50); border-color: var(--verde-500); }
 .menu-cuenta-lista { position: absolute; top: calc(100% + 8px); right: 0; min-width: 190px; background: var(--papel); border: 1px solid var(--linea); border-radius: var(--radio-sm); box-shadow: var(--sombra); padding: 6px; z-index: 20; }
@@ -294,6 +304,14 @@ th.num, td.num { text-align: right; font-variant-numeric: tabular-nums; }
 @media (max-width: 560px) {
   .barra-fila { gap: 8px; }
   .barra-fila .logo-texto { display: none; }
+  /* Encontrado al revisar el dashboard a 375px: el .nav-panel horizontal
+     recortaba casi todos los links sin ninguna pista de que había más para
+     el costado -- "Atención" quedaba partido a la mitad y Módulos/Resumen/
+     Seguimiento/Reglas/Subir Excel directamente no se veían. Se reemplaza
+     por un ☰ que agrupa todo en una lista vertical (MenuMovil). */
+  .nav-panel { display: none; }
+  .menu-movil { display: block; }
+  .boton-menu-movil { display: inline-flex; }
   .cabecera .btn { padding: 0 14px; font-size: 14px; }
   .cabecera .acciones { gap: 2px; }
   .fila-columna { grid-template-columns: 1fr; }

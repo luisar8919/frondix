@@ -102,6 +102,100 @@ function BotonSubmenu({
   );
 }
 
+// En celular, el .nav-panel horizontal (overflow-x:auto, ver globals.css) se
+// queda recortando casi todos los links sin ninguna pista visual de que hay
+// más para el costado -- encontrado al revisar la app a 375px de ancho.
+// Este botón ☰ (solo visible en ese mismo breakpoint, ver .boton-menu-movil)
+// agrupa TODO lo mismo que ya arma el nav de escritorio en una sola lista
+// vertical, reusando el mismo patrón visual de .menu-cuenta-lista.
+function MenuMovil({
+  enlacesVisibles,
+  modulosSubmenu,
+  hayAlgo,
+  esVendedor,
+}: {
+  enlacesVisibles: { href: string; texto: string }[];
+  modulosSubmenu: { href: string; texto: string }[];
+  hayAlgo: boolean;
+  esVendedor: boolean;
+}) {
+  const [abierto, setAbierto] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function alTocarFuera(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setAbierto(false);
+    }
+    document.addEventListener("mousedown", alTocarFuera);
+    return () => document.removeEventListener("mousedown", alTocarFuera);
+  }, []);
+
+  function Separador({ texto }: { texto: string }) {
+    return <p className="suave pequeno" style={{ margin: "10px 10px 2px", fontWeight: 700 }}>{texto}</p>;
+  }
+
+  return (
+    <div className="menu-movil" ref={ref}>
+      <button
+        type="button"
+        className="menu-cuenta-boton boton-menu-movil"
+        aria-haspopup="menu"
+        aria-expanded={abierto}
+        aria-label="Abrir menú"
+        onClick={() => setAbierto((v) => !v)}
+      >
+        ☰ Menú
+      </button>
+      {abierto && (
+        <div className="menu-cuenta-lista" role="menu" style={{ maxHeight: "75vh", overflowY: "auto", width: 230 }}>
+          {enlacesVisibles.map((e) => (
+            <Link key={e.href} href={e.href} className="menu-cuenta-item" role="menuitem" onClick={() => setAbierto(false)}>
+              {e.texto}
+            </Link>
+          ))}
+          {!esVendedor && hayAlgo && (
+            <>
+              <Separador texto="Módulos" />
+              {modulosSubmenu.map((s) => (
+                <Link key={s.href} href={s.href} className="menu-cuenta-item" role="menuitem" onClick={() => setAbierto(false)}>
+                  {s.texto}
+                </Link>
+              ))}
+            </>
+          )}
+          {!esVendedor && (
+            <>
+              <Separador texto="Resumen" />
+              {resumenSubmenu.map((s) => (
+                <Link key={s.href} href={s.href} className="menu-cuenta-item" role="menuitem" onClick={() => setAbierto(false)}>
+                  {s.texto}
+                </Link>
+              ))}
+              <Separador texto="Seguimiento" />
+              {seguimientoSubmenu.map((s) => (
+                <Link key={s.href} href={s.href} className="menu-cuenta-item" role="menuitem" onClick={() => setAbierto(false)}>
+                  {s.texto}
+                </Link>
+              ))}
+              <Separador texto="Reglas" />
+              {reglasSubmenu.map((s) => (
+                <Link key={s.href} href={s.href} className="menu-cuenta-item" role="menuitem" onClick={() => setAbierto(false)}>
+                  {s.texto}
+                </Link>
+              ))}
+            </>
+          )}
+          {esVendedor && (
+            <Link href="/dashboard/calendario" className="menu-cuenta-item" role="menuitem" onClick={() => setAbierto(false)}>
+              Calendario
+            </Link>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function BarraPanel({
   rol,
   modulos,
@@ -185,6 +279,12 @@ export default function BarraPanel({
             </Link>
           )}
         </nav>
+        <MenuMovil
+          enlacesVisibles={enlaces.filter((e) => !esVendedor || e.href !== "/dashboard/upload")}
+          modulosSubmenu={modulosSubmenu}
+          hayAlgo={hayAlgo}
+          esVendedor={esVendedor}
+        />
         <div className="menu-cuenta" ref={menuRef}>
           <button
             type="button"
