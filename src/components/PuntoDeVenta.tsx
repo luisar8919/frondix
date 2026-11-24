@@ -7,9 +7,14 @@ import { Capacitor } from "@capacitor/core";
 import { BarcodeScanner } from "@capacitor-mlkit/barcode-scanning";
 
 interface LineaCarrito {
+  id: string;
   producto: string;
   cantidad: number;
   precioUnitario: number;
+  // Nota de texto libre de ESTA línea (ej. "sin cebolla") -- no es una columna
+  // nueva en la base: se concatena al nombre del producto recién al cobrar
+  // (ver cobrar()), así no hace falta tocar el schema de Ventas para esto.
+  nota?: string;
 }
 
 interface PreciosProducto { general?: number; mayorista?: number; minorista?: number }
@@ -65,6 +70,28 @@ export default function PuntoDeVenta() {
   // escribir el nombre (window.prompt() no es confiable en el WebView nativo
   // de Capacitor, así que esto va inline en vez de un prompt del navegador).
   const [nuevoAmbiente, setNuevoAmbiente] = useState<string | null>(null);
+  // Lista de precios a usar para los PRÓXIMOS productos que se agreguen al
+  // carrito (no reprecia lo que ya está adentro -- cambiarla a mitad de venta
+  // es un caso raro, simple y predecible: afecta solo de acá en adelante).
+  const [listaPrecio, setListaPrecio] = useState<keyof PreciosProducto>("general");
+  // Descuento global del pedido (no por línea) -- "%" sobre el total bruto, o
+  // "monto" en soles fijos. Se reparte proporcionalmente sobre cada línea
+  // recién al cobrar (ver cobrar()), así el Monto que queda en Ventas/Reportes
+  // es el que de verdad se cobró, no el de lista.
+  const [descuentoTipo, setDescuentoTipo] = useState<"%" | "monto">("%");
+  const [descuentoValor, setDescuentoValor] = useState(0);
+  // id de la línea cuyo input de nota está abierto (null = ninguna).
+  const [notaAbierta, setNotaAbierta] = useState<string | null>(null);
+  const [extraAbierto, setExtraAbierto] = useState(false);
+  const [extraNombre, setExtraNombre] = useState("");
+  const [extraPrecio, setExtraPrecio] = useState("");
+  // Unir mesas: la mesa ORIGEN queda marcada "unida" a la mesa DESTINO (no se
+  // borra, para poder deshacerlo) -- tocarla salta directo al carrito de la
+  // destino. Mover: simplemente traslada el carrito/cliente a otra mesa VACÍA
+  // y deja la original libre, sin dejar ningún vínculo.
+  const [mesasUnidas, setMesasUnidas] = useState<Record<string, string>>({});
+  const [accionMesas, setAccionMesas] = useState<"unir" | "mover" | null>(null);
+  const [mesaDestino, setMesaDestino] = useState("");
   // Comanda (para cocina, sin precios) / Pre-cuenta (para el cliente, con
   // precios) -- mismo mecanismo que "Exportar a PDF" en Reportes: imprimir
   // de verdad con window.print(), solo que acá el ticket que se imprime es
@@ -96,6 +123,16 @@ export default function PuntoDeVenta() {
     setAmbientePorMesa({});
     setDividirEntre(1);
     setNuevoAmbiente(null);
+    setListaPrecio("general");
+    setDescuentoTipo("%");
+    setDescuentoValor(0);
+    setNotaAbierta(null);
+    setExtraAbierto(false);
+    setExtraNombre("");
+    setExtraPrecio("");
+    setMesasUnidas({});
+    setAccionMesas(null);
+    setMesaDestino("");
     (async () => {
       // Mismo truco que la Papelera: pedir 1 registro trae igual `dataset.columnas` completo.
       const res = await fetch(`/api/records/${ventasDatasetId}?limite=1`);
@@ -128,7 +165,7 @@ export default function PuntoDeVenta() {
 
   function precioDe(producto: string): number {
     const p = precios[producto];
-    return p?.general ?? p?.mayorista ?? p?.minorista ?? 0;
+    return p?.[listaPrecio] ?? p?.general ?? p?.mayorista ?? p?.minorista ?? 0;
   }
 
   const carrito = carritoPorMesa[mesaActual] ?? [];
@@ -147,6 +184,39 @@ export default function PuntoDeVenta() {
     setMesaActual(nombre);
   }
 
+  // Junta el carrito de la mesa ACTUAL en el de `destino` y la marca "unida"
+  // (no se borra: tocarla después salta directo al carrito de destino, y se
+  // puede deshacer -- ver quitarUnion). Pensado para cuando 2 mesas se juntan
+  // en el local y conviene cobrar todo junto.
+  function unirMesa(destino: string) {
+    setCarritoPorMesa((cs) => ({
+      ...cs,
+      [destino]: [...(cs[destino] ?? []), ...(cs[mesaActual] ?? [])],
+      [mesaActual]: [],
+    }));
+    setMesasUnidas((u) => ({ ...u, [mesaActual]: destino }));
+    setMesaActual(destino);
+    setAccionMesas(null);
+    setMesaDestino("");
+  }
+
+  function quitarUnion(origen: string) {
+    setMesasUnidas((u) => {
+      const { [origen]: _quitada, ...resto } = u;
+      return resto;
+    });
+  }
+
+  // Mueve el carrito/cliente de la mesa actual a otra (vacía) y deja la
+  // original libre -- para cuando el cliente se cambia de mesa físicamente.
+  function moverMesa(destino: string) {
+    setCarritoPorMesa((cs) => ({ ...cs, [destino]: cs[mesaActual] ?? [], [mesaActual]: [] }));
+    setClientePorMesa((cs) => ({ ...cs, [destino]: cs[mesaActual] ?? "" }));
+    setMesaActual(destino);
+    setAccionMesas(null);
+    setMesaDestino("");
+  }
+
   function confirmarAmbiente() {
     const nombre = nuevoAmbiente?.trim();
     setNuevoAmbiente(null);
@@ -157,21 +227,56 @@ export default function PuntoDeVenta() {
 
   function agregarAlCarrito(producto: string) {
     actualizarCarritoActual((c) => {
-      const existente = c.find((l) => l.producto === producto);
-      if (existente) return c.map((l) => (l.producto === producto ? { ...l, cantidad: l.cantidad + 1 } : l));
-      return [...c, { producto, cantidad: 1, precioUnitario: precioDe(producto) }];
+      // Dedup solo con líneas SIN nota (un toque rápido en la grilla suma
+      // cantidad a lo ya cargado) -- una línea con nota propia (ej. "sin
+      // cebolla") nunca se mezcla con otra del mismo producto.
+      const existente = c.find((l) => l.producto === producto && !l.nota);
+      if (existente) return c.map((l) => (l.id === existente.id ? { ...l, cantidad: l.cantidad + 1 } : l));
+      return [...c, { id: crypto.randomUUID(), producto, cantidad: 1, precioUnitario: precioDe(producto) }];
     });
   }
 
-  function cambiarCantidad(producto: string, cantidad: number) {
-    actualizarCarritoActual((c) => (cantidad <= 0 ? c.filter((l) => l.producto !== producto) : c.map((l) => (l.producto === producto ? { ...l, cantidad } : l))));
+  function cambiarCantidad(id: string, cantidad: number) {
+    actualizarCarritoActual((c) => (cantidad <= 0 ? c.filter((l) => l.id !== id) : c.map((l) => (l.id === id ? { ...l, cantidad } : l))));
   }
 
-  function cambiarPrecio(producto: string, precioUnitario: number) {
-    actualizarCarritoActual((c) => c.map((l) => (l.producto === producto ? { ...l, precioUnitario } : l)));
+  function cambiarPrecio(id: string, precioUnitario: number) {
+    actualizarCarritoActual((c) => c.map((l) => (l.id === id ? { ...l, precioUnitario } : l)));
   }
 
-  const total = carrito.reduce((s, l) => s + l.cantidad * l.precioUnitario, 0);
+  function cambiarNota(id: string, nota: string) {
+    actualizarCarritoActual((c) => c.map((l) => (l.id === id ? { ...l, nota } : l)));
+  }
+
+  function eliminarLinea(id: string) {
+    actualizarCarritoActual((c) => c.filter((l) => l.id !== id));
+  }
+
+  // "Adicionales" con precio propio (ej. Huevo +S/2) sin necesidad de un
+  // catálogo armado de antemano -- se agregan como una línea más del carrito,
+  // igual que cualquier producto, solo que con nombre/precio libres.
+  function agregarExtra() {
+    const nombre = extraNombre.trim();
+    const precio = Number(extraPrecio);
+    if (!nombre || !Number.isFinite(precio) || precio < 0) return;
+    actualizarCarritoActual((c) => [...c, { id: crypto.randomUUID(), producto: nombre, cantidad: 1, precioUnitario: precio }]);
+    setExtraNombre("");
+    setExtraPrecio("");
+    setExtraAbierto(false);
+  }
+
+  const totalBruto = carrito.reduce((s, l) => s + l.cantidad * l.precioUnitario, 0);
+  // Factor único aplicado a cada línea al cobrar/mostrar -- nunca negativo ni
+  // mayor a 1 (un descuento mayor al total simplemente deja todo en 0, no
+  // "regala" de más).
+  const factorDescuento =
+    totalBruto <= 0
+      ? 1
+      : descuentoTipo === "%"
+      ? Math.max(0, 1 - Math.min(100, descuentoValor) / 100)
+      : Math.max(0, (totalBruto - descuentoValor) / totalBruto);
+  const total = totalBruto * factorDescuento;
+  const descuentoMonto = totalBruto - total;
 
   // Escanea un código de barras (requiere que Stock tenga una columna con rol
   // "codigo", ver el mapa `codigos` armado en /api/records/[datasetId]/valores)
@@ -213,8 +318,8 @@ export default function PuntoDeVenta() {
     while (pendientes.length > 0) {
       const linea = pendientes[0];
       const datos: Record<string, unknown> = {
-        [cProductoCol.key]: linea.producto,
-        [cMonto.key]: linea.cantidad * linea.precioUnitario,
+        [cProductoCol.key]: linea.nota ? `${linea.producto} (${linea.nota})` : linea.producto,
+        [cMonto.key]: linea.cantidad * linea.precioUnitario * factorDescuento,
       };
       if (cCliente) datos[cCliente.key] = cliente.trim() || "Cliente mostrador";
       if (cCantidad) datos[cCantidad.key] = linea.cantidad;
@@ -283,6 +388,14 @@ export default function PuntoDeVenta() {
               {modulosVentas.map((m) => <option key={m.id} value={m.id}>{m.nombre}</option>)}
             </select>
           )}
+          <label className="pequeno" style={{ display: "flex", alignItems: "center", gap: 4 }}>
+            Lista de precios
+            <select value={listaPrecio} onChange={(e) => setListaPrecio(e.target.value as keyof PreciosProducto)}>
+              <option value="general">General</option>
+              <option value="mayorista">Mayorista</option>
+              <option value="minorista">Minorista</option>
+            </select>
+          </label>
           {Capacitor.isNativePlatform() && Object.keys(codigos).length > 0 && (
             <button type="button" className="btn btn-secundario" onClick={escanear} disabled={escaneando}>
               {escaneando ? "Abriendo cámara..." : "📷 Escanear código"}
@@ -299,16 +412,18 @@ export default function PuntoDeVenta() {
               <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
                 {mesas.filter((m) => m !== MESA_UNICA && (ambientePorMesa[m] ?? "General") === amb).map((m) => {
                   const ocupada = (carritoPorMesa[m]?.length ?? 0) > 0;
+                  const unidaA = mesasUnidas[m];
                   return (
                     <button
                       key={m}
                       type="button"
-                      onClick={() => setMesaActual(m)}
-                      className={`btn ${m === mesaActual ? "btn-primario" : "btn-secundario"}`}
-                      style={{ position: "relative" }}
+                      onClick={() => setMesaActual(unidaA ?? m)}
+                      className={`btn ${(unidaA ?? m) === mesaActual ? "btn-primario" : "btn-secundario"}`}
+                      style={{ position: "relative", background: unidaA ? "var(--dorado-200, #e8c547)" : undefined }}
+                      title={unidaA ? `Unida a ${unidaA}` : undefined}
                     >
-                      {m}
-                      {ocupada && m !== mesaActual && <span style={{ marginLeft: 6 }}>●</span>}
+                      {m}{unidaA ? ` → ${unidaA}` : ""}
+                      {ocupada && m !== mesaActual && !unidaA && <span style={{ marginLeft: 6 }}>●</span>}
                     </button>
                   );
                 })}
@@ -339,6 +454,45 @@ export default function PuntoDeVenta() {
               </>
             )}
           </div>
+
+          {mesaActual !== MESA_UNICA && (
+            <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 8, alignItems: "center" }}>
+              {/* Las mesas "unidas" saltan directo al carrito de destino al tocarlas
+                  (ver el onClick de arriba), así que mesaActual nunca ES el origen --
+                  hay que buscar, al revés, qué mesas apuntan a ESTA como destino. */}
+              {Object.entries(mesasUnidas).filter(([, destino]) => destino === mesaActual).map(([origen]) => (
+                <button key={origen} type="button" className="btn btn-fantasma" onClick={() => quitarUnion(origen)}>
+                  Deshacer unión con {origen}
+                </button>
+              ))}
+              {accionMesas === null ? (
+                <>
+                  <button type="button" className="btn btn-fantasma" onClick={() => setAccionMesas("unir")}>Unir con...</button>
+                  <button type="button" className="btn btn-fantasma" onClick={() => setAccionMesas("mover")}>Mover a...</button>
+                </>
+              ) : (
+                <>
+                  <select value={mesaDestino} onChange={(e) => setMesaDestino(e.target.value)}>
+                    <option value="">
+                      {accionMesas === "unir" ? "Elige la mesa destino..." : "Elige la mesa vacía..."}
+                    </option>
+                    {mesas
+                      .filter((m) => m !== MESA_UNICA && m !== mesaActual && (accionMesas === "unir" || (carritoPorMesa[m]?.length ?? 0) === 0))
+                      .map((m) => <option key={m} value={m}>{m}</option>)}
+                  </select>
+                  <button
+                    type="button"
+                    className="btn btn-primario"
+                    disabled={!mesaDestino}
+                    onClick={() => (accionMesas === "unir" ? unirMesa(mesaDestino) : moverMesa(mesaDestino))}
+                  >
+                    Confirmar
+                  </button>
+                  <button type="button" className="btn btn-fantasma" onClick={() => { setAccionMesas(null); setMesaDestino(""); }}>Cancelar</button>
+                </>
+              )}
+            </div>
+          )}
         </div>
       )}
 
@@ -385,27 +539,52 @@ export default function PuntoDeVenta() {
             {carrito.length === 0 && <p className="suave pequeno" style={{ marginTop: 14 }}>Todavía no agregaste nada.</p>}
 
             {carrito.map((l) => (
-              <div key={l.producto} style={{ display: "flex", gap: 6, alignItems: "center", marginTop: 10, flexWrap: "wrap" }}>
-                <span className="pequeno" style={{ flex: 1, minWidth: 90 }}>{l.producto}</span>
-                <input
-                  type="number"
-                  min={0}
-                  value={l.cantidad}
-                  onChange={(e) => cambiarCantidad(l.producto, Number(e.target.value) || 0)}
-                  style={{ width: 55 }}
-                  aria-label={`Cantidad de ${l.producto}`}
-                />
-                <span className="suave pequeno">x</span>
-                <input
-                  type="number"
-                  min={0}
-                  value={l.precioUnitario}
-                  onChange={(e) => cambiarPrecio(l.producto, Number(e.target.value) || 0)}
-                  style={{ width: 70 }}
-                  aria-label={`Precio de ${l.producto}`}
-                />
-                <strong style={{ width: 70, textAlign: "right" }}>{formatearMonto(l.cantidad * l.precioUnitario, "PEN")}</strong>
+              <div key={l.id} style={{ marginTop: 10 }}>
+                <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
+                  <span className="pequeno" style={{ flex: 1, minWidth: 90 }}>{l.producto}{l.nota ? ` (${l.nota})` : ""}</span>
+                  <input
+                    type="number"
+                    min={0}
+                    value={l.cantidad}
+                    onChange={(e) => cambiarCantidad(l.id, Number(e.target.value) || 0)}
+                    style={{ width: 55 }}
+                    aria-label={`Cantidad de ${l.producto}`}
+                  />
+                  <span className="suave pequeno">x</span>
+                  <input
+                    type="number"
+                    min={0}
+                    value={l.precioUnitario}
+                    onChange={(e) => cambiarPrecio(l.id, Number(e.target.value) || 0)}
+                    style={{ width: 70 }}
+                    aria-label={`Precio de ${l.producto}`}
+                  />
+                  <strong style={{ width: 70, textAlign: "right" }}>{formatearMonto(l.cantidad * l.precioUnitario, "PEN")}</strong>
+                  <button type="button" className="btn btn-fantasma" style={{ padding: "4px 8px" }} title="Nota" onClick={() => setNotaAbierta(notaAbierta === l.id ? null : l.id)}>📝</button>
+                  <button type="button" className="btn btn-fantasma" style={{ padding: "4px 8px" }} title="Quitar" onClick={() => eliminarLinea(l.id)}>🗑️</button>
+                </div>
+                {notaAbierta === l.id && (
+                  <input
+                    autoFocus
+                    value={l.nota ?? ""}
+                    onChange={(e) => cambiarNota(l.id, e.target.value)}
+                    placeholder="Ej. sin cebolla, bien cocido..."
+                    style={{ width: "100%", marginTop: 4 }}
+                    aria-label={`Nota de ${l.producto}`}
+                  />
+                )}
               </div>
+            ))}
+
+            {carrito.length > 0 && (extraAbierto ? (
+              <div style={{ display: "flex", gap: 6, marginTop: 10, flexWrap: "wrap" }}>
+                <input value={extraNombre} onChange={(e) => setExtraNombre(e.target.value)} placeholder="Ej. Huevo" style={{ flex: 1, minWidth: 90 }} />
+                <input type="number" min={0} value={extraPrecio} onChange={(e) => setExtraPrecio(e.target.value)} placeholder="Precio" style={{ width: 70 }} />
+                <button type="button" className="btn btn-primario" onClick={agregarExtra}>Agregar</button>
+                <button type="button" className="btn btn-fantasma" onClick={() => { setExtraAbierto(false); setExtraNombre(""); setExtraPrecio(""); }}>Cancelar</button>
+              </div>
+            ) : (
+              <button type="button" className="btn btn-fantasma" style={{ marginTop: 10 }} onClick={() => setExtraAbierto(true)}>+ Agregar extra (ej. adicional con precio propio)</button>
             ))}
 
             {carrito.length > 0 && (
@@ -425,6 +604,28 @@ export default function PuntoDeVenta() {
                 {dividirEntre > 1 && (
                   <p className="suave pequeno" style={{ textAlign: "right", margin: "4px 0 0" }}>
                     {formatearMonto(total / dividirEntre, "PEN")} c/u
+                  </p>
+                )}
+
+                <div className="campo" style={{ marginTop: 10, display: "flex", gap: 6, alignItems: "center" }}>
+                  <label className="pequeno">Descuento</label>
+                  <select value={descuentoTipo} onChange={(e) => setDescuentoTipo(e.target.value as "%" | "monto")} style={{ width: 70 }}>
+                    <option value="%">%</option>
+                    <option value="monto">S/</option>
+                  </select>
+                  <input
+                    type="number"
+                    min={0}
+                    value={descuentoValor}
+                    onChange={(e) => setDescuentoValor(Math.max(0, Number(e.target.value) || 0))}
+                    style={{ width: 70 }}
+                    aria-label="Valor del descuento"
+                  />
+                </div>
+
+                {descuentoMonto > 0 && (
+                  <p className="suave pequeno" style={{ textAlign: "right", margin: "4px 0 0" }}>
+                    Subtotal {formatearMonto(totalBruto, "PEN")} - Descuento {formatearMonto(descuentoMonto, "PEN")}
                   </p>
                 )}
                 <p style={{ marginTop: 10, fontSize: 18, fontWeight: 700, textAlign: "right" }}>
@@ -458,7 +659,7 @@ export default function PuntoDeVenta() {
         <p>{new Date().toLocaleString("es-PE")}</p>
         <hr />
         {carrito.map((l) => (
-          <div key={l.producto} className="linea"><span>{l.cantidad}x {l.producto}</span></div>
+          <div key={l.id} className="linea"><span>{l.cantidad}x {l.producto}{l.nota ? ` (${l.nota})` : ""}</span></div>
         ))}
       </div>
 
@@ -467,12 +668,18 @@ export default function PuntoDeVenta() {
         <p>No es un comprobante de pago</p>
         <hr />
         {carrito.map((l) => (
-          <div key={l.producto} className="linea">
-            <span>{l.cantidad}x {l.producto}</span>
+          <div key={l.id} className="linea">
+            <span>{l.cantidad}x {l.producto}{l.nota ? ` (${l.nota})` : ""}</span>
             <span>{formatearMonto(l.cantidad * l.precioUnitario, "PEN")}</span>
           </div>
         ))}
         <hr />
+        {descuentoMonto > 0 && (
+          <>
+            <div className="linea"><span>Subtotal</span><span>{formatearMonto(totalBruto, "PEN")}</span></div>
+            <div className="linea"><span>Descuento</span><span>-{formatearMonto(descuentoMonto, "PEN")}</span></div>
+          </>
+        )}
         <div className="linea"><strong>Total</strong><strong>{formatearMonto(total, "PEN")}</strong></div>
         {dividirEntre > 1 && (
           <div className="linea"><span>Entre {dividirEntre} personas</span><span>{formatearMonto(total / dividirEntre, "PEN")} c/u</span></div>
