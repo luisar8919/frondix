@@ -290,3 +290,21 @@ th.num, td.num { text-align: right; font-variant-numeric: tabular-nums; }
   .barra-panel, .no-imprimir { display: none !important; }
   body { background: #fff; }
 }
+
+/* Comanda/Pre-cuenta del Punto de Venta: ticket angosto (ancho de impresora
+   térmica), oculto siempre salvo que esté activo Y se esté imprimiendo de
+   verdad -- así conviven en el DOM los dos tickets posibles sin pisarse. */
+.ticket-comanda { display: none; }
+@media print {
+  .ticket-comanda.ticket-activo {
+    display: block !important;
+    font-family: monospace;
+    width: 280px;
+    margin: 0 auto;
+    color: #000;
+  }
+  .ticket-comanda.ticket-activo h3 { text-align: center; font-size: 16px; margin: 0 0 4px; }
+  .ticket-comanda.ticket-activo p { text-align: center; font-size: 12px; margin: 0 0 8px; }
+  .ticket-comanda.ticket-activo hr { border: none; border-top: 1px dashed #000; margin: 8px 0; }
+  .ticket-comanda.ticket-activo .linea { display: flex; justify-content: space-between; font-size: 13px; margin: 2px 0; }
+}

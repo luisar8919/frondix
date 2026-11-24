@@ -54,6 +54,23 @@ export default function PuntoDeVenta() {
   const [clientePorMesa, setClientePorMesa] = useState<Record<string, string>>({});
   const [cobrando, setCobrando] = useState(false);
   const [mensaje, setMensaje] = useState<{ tipo: "ok" | "error"; texto: string } | null>(null);
+  // Ambientes: agrupa visualmente las mesas (Salón, Terraza, Barra...) -- solo
+  // organiza, no es una entidad en la base, se pierde igual que las mesas al
+  // cambiar de módulo o recargar.
+  const [ambientes, setAmbientes] = useState<string[]>(["General"]);
+  const [ambienteActual, setAmbienteActual] = useState("General");
+  const [ambientePorMesa, setAmbientePorMesa] = useState<Record<string, string>>({});
+  const [dividirEntre, setDividirEntre] = useState(1);
+  // null = botón "+ Nuevo ambiente" normal; string = mostrando el input para
+  // escribir el nombre (window.prompt() no es confiable en el WebView nativo
+  // de Capacitor, así que esto va inline en vez de un prompt del navegador).
+  const [nuevoAmbiente, setNuevoAmbiente] = useState<string | null>(null);
+  // Comanda (para cocina, sin precios) / Pre-cuenta (para el cliente, con
+  // precios) -- mismo mecanismo que "Exportar a PDF" en Reportes: imprimir
+  // de verdad con window.print(), solo que acá el ticket que se imprime es
+  // un nodo aparte que normalmente está oculto (ver .ticket-comanda en
+  // globals.css) y el resto de la pantalla se marca "no-imprimir".
+  const [ticketActivo, setTicketActivo] = useState<"comanda" | "precuenta" | null>(null);
 
   useEffect(() => {
     fetch("/api/datasets?tipo=ventas")
@@ -74,6 +91,11 @@ export default function PuntoDeVenta() {
     setClientePorMesa({});
     setMesas([MESA_UNICA]);
     setMesaActual(MESA_UNICA);
+    setAmbientes(["General"]);
+    setAmbienteActual("General");
+    setAmbientePorMesa({});
+    setDividirEntre(1);
+    setNuevoAmbiente(null);
     (async () => {
       // Mismo truco que la Papelera: pedir 1 registro trae igual `dataset.columnas` completo.
       const res = await fetch(`/api/records/${ventasDatasetId}?limite=1`);
@@ -110,7 +132,7 @@ export default function PuntoDeVenta() {
   }
 
   const carrito = carritoPorMesa[mesaActual] ?? [];
-  const cliente = clientePorMesa[mesaActual] ?? (usarMesas ? mesaActual : "Cliente mostrador");
+  const cliente = clientePorMesa[mesaActual] ?? (usarMesas && mesaActual !== MESA_UNICA ? mesaActual : "Cliente mostrador");
   function setCliente(valor: string) {
     setClientePorMesa((cs) => ({ ...cs, [mesaActual]: valor }));
   }
@@ -121,7 +143,16 @@ export default function PuntoDeVenta() {
   function agregarMesa() {
     const nombre = `Mesa ${mesas.length}`;
     setMesas((m) => [...m, nombre]);
+    setAmbientePorMesa((a) => ({ ...a, [nombre]: ambienteActual }));
     setMesaActual(nombre);
+  }
+
+  function confirmarAmbiente() {
+    const nombre = nuevoAmbiente?.trim();
+    setNuevoAmbiente(null);
+    if (!nombre) return;
+    setAmbientes((a) => (a.includes(nombre) ? a : [...a, nombre]));
+    setAmbienteActual(nombre);
   }
 
   function agregarAlCarrito(producto: string) {
@@ -208,6 +239,14 @@ export default function PuntoDeVenta() {
     actualizarCarritoActual(() => []);
   }
 
+  useEffect(() => {
+    if (!ticketActivo) return;
+    const t = setTimeout(() => window.print(), 50);
+    const volver = () => setTicketActivo(null);
+    window.addEventListener("afterprint", volver);
+    return () => { clearTimeout(t); window.removeEventListener("afterprint", volver); };
+  }, [ticketActivo]);
+
   if (modulosVentas === null) return <p className="suave">Cargando...</p>;
 
   if (modulosVentas.length === 0) {
@@ -221,7 +260,7 @@ export default function PuntoDeVenta() {
 
   return (
     <>
-      <div className="panel-cabecera">
+      <div className="panel-cabecera no-imprimir">
         <div>
           <h1>Punto de Venta</h1>
           <p className="suave">Tocá un producto para sumarlo, ajustá cantidad o precio si hace falta, y cobrá.</p>
@@ -253,23 +292,53 @@ export default function PuntoDeVenta() {
       </div>
 
       {usarMesas && (
-        <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 14 }}>
-          {mesas.filter((m) => m !== MESA_UNICA).map((m) => {
-            const ocupada = (carritoPorMesa[m]?.length ?? 0) > 0;
-            return (
-              <button
-                key={m}
-                type="button"
-                onClick={() => setMesaActual(m)}
-                className={`btn ${m === mesaActual ? "btn-primario" : "btn-secundario"}`}
-                style={{ position: "relative" }}
-              >
-                {m}
-                {ocupada && m !== mesaActual && <span style={{ marginLeft: 6 }}>●</span>}
-              </button>
-            );
-          })}
-          <button type="button" className="btn btn-fantasma" onClick={agregarMesa}>+ Nueva mesa</button>
+        <div className="no-imprimir" style={{ marginBottom: 14 }}>
+          {ambientes.map((amb) => (
+            <div key={amb} style={{ marginBottom: 8 }}>
+              <p className="suave pequeno" style={{ margin: "0 0 4px" }}>{amb}</p>
+              <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                {mesas.filter((m) => m !== MESA_UNICA && (ambientePorMesa[m] ?? "General") === amb).map((m) => {
+                  const ocupada = (carritoPorMesa[m]?.length ?? 0) > 0;
+                  return (
+                    <button
+                      key={m}
+                      type="button"
+                      onClick={() => setMesaActual(m)}
+                      className={`btn ${m === mesaActual ? "btn-primario" : "btn-secundario"}`}
+                      style={{ position: "relative" }}
+                    >
+                      {m}
+                      {ocupada && m !== mesaActual && <span style={{ marginLeft: 6 }}>●</span>}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
+          <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+            {ambientes.length > 1 && (
+              <select value={ambienteActual} onChange={(e) => setAmbienteActual(e.target.value)}>
+                {ambientes.map((a) => <option key={a} value={a}>{a}</option>)}
+              </select>
+            )}
+            <button type="button" className="btn btn-fantasma" onClick={agregarMesa}>+ Nueva mesa ({ambienteActual})</button>
+            {nuevoAmbiente === null ? (
+              <button type="button" className="btn btn-fantasma" onClick={() => setNuevoAmbiente("")}>+ Nuevo ambiente</button>
+            ) : (
+              <>
+                <input
+                  autoFocus
+                  value={nuevoAmbiente}
+                  onChange={(e) => setNuevoAmbiente(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && confirmarAmbiente()}
+                  placeholder="Ej. Salón, Terraza, Barra"
+                  style={{ width: 160 }}
+                />
+                <button type="button" className="btn btn-primario" onClick={confirmarAmbiente}>Agregar</button>
+                <button type="button" className="btn btn-fantasma" onClick={() => setNuevoAmbiente(null)}>Cancelar</button>
+              </>
+            )}
+          </div>
         </div>
       )}
 
@@ -277,7 +346,7 @@ export default function PuntoDeVenta() {
       {cargando && <p className="suave">Cargando productos...</p>}
 
       {!cargando && !error && ventasDatasetId && (
-        <div style={{ display: "flex", gap: 20, flexWrap: "wrap", alignItems: "flex-start" }}>
+        <div className="no-imprimir" style={{ display: "flex", gap: 20, flexWrap: "wrap", alignItems: "flex-start" }}>
           <div style={{ flex: "2 1 400px", display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(110px, 1fr))", gap: 10 }}>
             {productos.length === 0 && <p className="suave">El Stock enlazado todavía no tiene productos cargados.</p>}
             {productos.map((p) => (
@@ -341,10 +410,35 @@ export default function PuntoDeVenta() {
 
             {carrito.length > 0 && (
               <>
-                <p style={{ marginTop: 16, fontSize: 18, fontWeight: 700, textAlign: "right" }}>
+                <div className="campo" style={{ marginTop: 10, display: "flex", gap: 6, alignItems: "center" }}>
+                  <label className="pequeno">Dividir entre</label>
+                  <input
+                    type="number"
+                    min={1}
+                    value={dividirEntre}
+                    onChange={(e) => setDividirEntre(Math.max(1, Number(e.target.value) || 1))}
+                    style={{ width: 55 }}
+                    aria-label="Dividir cuenta entre"
+                  />
+                  <span className="pequeno">personas</span>
+                </div>
+                {dividirEntre > 1 && (
+                  <p className="suave pequeno" style={{ textAlign: "right", margin: "4px 0 0" }}>
+                    {formatearMonto(total / dividirEntre, "PEN")} c/u
+                  </p>
+                )}
+                <p style={{ marginTop: 10, fontSize: 18, fontWeight: 700, textAlign: "right" }}>
                   Total: {formatearMonto(total, "PEN")}
                 </p>
-                <button type="button" className="btn btn-primario" style={{ width: "100%" }} disabled={cobrando} onClick={cobrar}>
+                <div style={{ display: "flex", gap: 6 }}>
+                  <button type="button" className="btn btn-secundario" style={{ flex: 1 }} onClick={() => setTicketActivo("comanda")}>
+                    🖨️ Comanda
+                  </button>
+                  <button type="button" className="btn btn-secundario" style={{ flex: 1 }} onClick={() => setTicketActivo("precuenta")}>
+                    🧾 Pre-cuenta
+                  </button>
+                </div>
+                <button type="button" className="btn btn-primario" style={{ width: "100%", marginTop: 6 }} disabled={cobrando} onClick={cobrar}>
                   {cobrando ? "Cobrando..." : "Cobrar"}
                 </button>
               </>
@@ -358,6 +452,32 @@ export default function PuntoDeVenta() {
           </div>
         </div>
       )}
+
+      <div className={`ticket-comanda ${ticketActivo === "comanda" ? "ticket-activo" : ""}`}>
+        <h3>COMANDA{usarMesas && mesaActual !== MESA_UNICA ? ` - ${mesaActual}` : ""}</h3>
+        <p>{new Date().toLocaleString("es-PE")}</p>
+        <hr />
+        {carrito.map((l) => (
+          <div key={l.producto} className="linea"><span>{l.cantidad}x {l.producto}</span></div>
+        ))}
+      </div>
+
+      <div className={`ticket-comanda ${ticketActivo === "precuenta" ? "ticket-activo" : ""}`}>
+        <h3>PRE-CUENTA{usarMesas && mesaActual !== MESA_UNICA ? ` - ${mesaActual}` : ""}</h3>
+        <p>No es un comprobante de pago</p>
+        <hr />
+        {carrito.map((l) => (
+          <div key={l.producto} className="linea">
+            <span>{l.cantidad}x {l.producto}</span>
+            <span>{formatearMonto(l.cantidad * l.precioUnitario, "PEN")}</span>
+          </div>
+        ))}
+        <hr />
+        <div className="linea"><strong>Total</strong><strong>{formatearMonto(total, "PEN")}</strong></div>
+        {dividirEntre > 1 && (
+          <div className="linea"><span>Entre {dividirEntre} personas</span><span>{formatearMonto(total / dividirEntre, "PEN")} c/u</span></div>
+        )}
+      </div>
     </>
   );
 }
