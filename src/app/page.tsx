@@ -274,6 +274,11 @@ export default function Portada() {
           <Logo />
           <span>Cultiva tu cartera de clientes.</span>
         </div>
+        <div className="contenedor" style={{ display: "flex", gap: 16, flexWrap: "wrap", paddingBottom: 20 }}>
+          <Link href="/terminos" className="suave pequeno">Términos y condiciones</Link>
+          <Link href="/politica-cambios" className="suave pequeno">Política de cambios y devoluciones</Link>
+          <Link href="/libro-reclamaciones" className="suave pequeno">Libro de Reclamaciones</Link>
+        </div>
       </footer>
     </>
   );
