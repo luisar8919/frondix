@@ -41,6 +41,9 @@ export default function EmpresaPage() {
   const [pasandoProduccion, setPasandoProduccion] = useState(false);
   const [mensajeFactpro, setMensajeFactpro] = useState<{ tipo: "ok" | "error"; texto: string } | null>(null);
 
+  const [telegramChatId, setTelegramChatId] = useState<string | null>(null);
+  const [desconectandoTelegram, setDesconectandoTelegram] = useState(false);
+
   const [smtpHost, setSmtpHost] = useState("");
   const [smtpPort, setSmtpPort] = useState("587");
   const [smtpUsuario, setSmtpUsuario] = useState("");
@@ -68,7 +71,7 @@ export default function EmpresaPage() {
 
     const { data: empresa } = await supabase
       .from("empresas")
-      .select("nombre, telefono, ruc, factpro_token, factpro_entorno")
+      .select("nombre, telefono, ruc, factpro_token, factpro_entorno, telegram_chat_id")
       .eq("id", sesion.empresaId)
       .single();
     if (empresa) {
@@ -77,6 +80,7 @@ export default function EmpresaPage() {
       setFactproRuc(empresa.ruc ?? "");
       setFactproToken(empresa.factpro_token ?? null);
       setFactproEntorno(empresa.factpro_entorno ?? "demo");
+      setTelegramChatId(empresa.telegram_chat_id ?? null);
     }
 
     const miRolActual = sesion.empresas.find((e) => e.empresaId === sesion.empresaId)?.rol;
@@ -412,6 +416,41 @@ export default function EmpresaPage() {
 
               {mensajeFactpro && <p className={`alerta alerta-${mensajeFactpro.tipo}`} role="status" style={{ marginTop: 10 }}>{mensajeFactpro.texto}</p>}
             </>
+          )}
+        </div>
+      )}
+
+      {puedeEditar && (
+        <div className="tarjeta" style={{ maxWidth: 460, marginBottom: 20 }}>
+          <h3 style={{ marginTop: 0 }}>Notificaciones por Telegram</h3>
+          {telegramChatId ? (
+            <>
+              <p className="alerta alerta-ok">Conectado. Acá te vamos a avisar de clientes inactivos y otras alertas.</p>
+              <button type="button" className="btn btn-secundario" disabled={desconectandoTelegram} onClick={async () => {
+                setDesconectandoTelegram(true);
+                const res = await fetch("/api/telegram/desconectar", { method: "POST" });
+                setDesconectandoTelegram(false);
+                if (res.ok) setTelegramChatId(null);
+              }}>
+                {desconectandoTelegram ? "Desconectando..." : "Desconectar"}
+              </button>
+            </>
+          ) : process.env.NEXT_PUBLIC_TELEGRAM_BOT_USERNAME ? (
+            <>
+              <p className="suave pequeno" style={{ marginBottom: 14 }}>
+                Recibe las mismas alertas que por WhatsApp (clientes inactivos, etc.) directo en Telegram.
+              </p>
+              <a
+                href={`https://t.me/${process.env.NEXT_PUBLIC_TELEGRAM_BOT_USERNAME}?start=${empresaId}`}
+                target="_blank"
+                rel="noreferrer"
+                className="btn btn-primario"
+              >
+                Conectar con Telegram
+              </a>
+            </>
+          ) : (
+            <p className="suave pequeno">Todavía no está disponible.</p>
           )}
         </div>
       )}

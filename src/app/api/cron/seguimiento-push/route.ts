@@ -3,6 +3,7 @@ import { crearClienteAdmin } from "@/lib/supabase/admin";
 import { agruparClientes, diasDesde, normalizarTelefonoPE, type FilaCruda } from "@/lib/seguimiento";
 import { enviarPush } from "@/lib/push";
 import { enviarPlantilla } from "@/lib/whatsapp";
+import { enviarTelegram } from "@/lib/telegram";
 import type { Columna } from "@/lib/excel-parser";
 
 // Revisa los clientes con seguimiento activado (checkbox en la pantalla de
@@ -112,7 +113,7 @@ export async function GET(req: NextRequest) {
     try {
       const { data: miembros } = await supabase.from("miembros").select("user_id").eq("empresa_id", empresaId);
       const userIds = (miembros ?? []).map((m) => m.user_id);
-      const { data: empresa } = await supabase.from("empresas").select("nombre, telefono").eq("id", empresaId).single();
+      const { data: empresa } = await supabase.from("empresas").select("nombre, telefono, telegram_chat_id").eq("id", empresaId).single();
       const titulo = nombres.length === 1 ? "Un cliente no volvió" : `${nombres.length} clientes no volvieron`;
       const cuerpo = nombres.length <= 3
         ? `${nombres.join(", ")} llevan ${UMBRAL_DIAS}+ días sin comprar en ${empresa?.nombre ?? "tu negocio"}.`
@@ -127,6 +128,15 @@ export async function GET(req: NextRequest) {
           await enviarPlantilla(telefonoWhatsapp, "aviso_clientes_inactivos", [empresa?.nombre ?? "tu negocio", String(UMBRAL_DIAS)]);
         } catch (e) {
           console.error(`seguimiento-push: fallo el WhatsApp a la empresa ${empresaId}:`, e instanceof Error ? e.message : e);
+        }
+      }
+
+      // Mismo "mejor esfuerzo", independiente de WhatsApp.
+      if (empresa?.telegram_chat_id) {
+        try {
+          await enviarTelegram(empresa.telegram_chat_id, `${titulo}\n\n${cuerpo}`);
+        } catch (e) {
+          console.error(`seguimiento-push: fallo el Telegram a la empresa ${empresaId}:`, e instanceof Error ? e.message : e);
         }
       }
     } catch (e) {
