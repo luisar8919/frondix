@@ -267,6 +267,29 @@ th.num, td.num { text-align: right; font-variant-numeric: tabular-nums; }
   .precios, .precios-3 { grid-template-columns: 1fr; }
   .seccion { padding-block: 40px; }
   .banda-cta { padding: 36px 20px; }
+
+  /* Carrusel: listas de 3+ tarjetas completas (no 2, no tiras de numeros
+     cortos) que, apiladas en 1 columna, hacian un scroll vertical larguisimo
+     en el celular. En vez de eso, fila horizontal con scroll-snap NATIVO
+     (sin JS/libreria -- mas liviano y accesible que armar un carrusel a
+     mano) -- "se mueve sola" en el sentido de que el usuario desliza, no en
+     el de autoplay (eso distrae y es peor para accesibilidad/lectura). El
+     "peek" del 85% de ancho (se asoma la siguiente tarjeta) es la pista
+     visual de que hay mas para el costado.
+     Desktop (fuera de este @media) no se toca: ahi ya entran en fila sin
+     apilarse, no hace falta ningun carrusel. */
+  .carrusel {
+    display: flex;
+    grid-template-columns: unset;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    margin: 0 -20px;
+    padding: 4px 20px 14px;
+  }
+  .carrusel::-webkit-scrollbar { display: none; }
+  .carrusel > * { flex: 0 0 85%; scroll-snap-align: start; }
 }
 @media (max-width: 560px) {
   .barra-fila { gap: 8px; }

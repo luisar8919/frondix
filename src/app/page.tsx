@@ -96,7 +96,7 @@ export default function Portada() {
             <h2>Tu Excel funciona perfecto, hasta el día que…</h2>
             <p>Si alguna de estas te suena, esto es para ti.</p>
           </div>
-          <div className="grilla-4">
+          <div className="grilla-4 carrusel">
             {dolores.map((d) => (
               <div key={d.titulo} className="tarjeta dolor">
                 <h3>{d.titulo}</h3>
@@ -123,7 +123,7 @@ export default function Portada() {
             <h2>De tu Excel a tus módulos en pocos minutos</h2>
             <p>Sin cursos, sin instalar nada y sin cambiar tu forma de trabajar.</p>
           </div>
-          <div className="grilla-3">
+          <div className="grilla-3 carrusel">
             {pasos.map((p, i) => (
               <div key={p.titulo} className="tarjeta">
                 <span className="paso-num">{i + 1}</span>
@@ -140,7 +140,7 @@ export default function Portada() {
             <h2>Tú no estructuras nada. Nosotros sí.</h2>
             <p>Ningún otro sistema arma tus módulos solo a partir de tu Excel desordenado. Esto es lo que ganas apenas lo subes.</p>
           </div>
-          <div className="grilla-3">
+          <div className="grilla-3 carrusel">
             {diferenciadores.map((d) => (
               <div key={d.titulo} className="tarjeta">
                 <span aria-hidden="true" style={{ fontSize: 28, display: "block", marginBottom: 10 }}>{d.icono}</span>
@@ -203,7 +203,7 @@ export default function Portada() {
                 contrato ni permanencia.
               </p>
             </div>
-            <div className="precios precios-3">
+            <div className="precios precios-3 carrusel">
               <div className="tarjeta precio">
                 <h3>Gratis</h3>
                 <div className="precio-monto">S/ 0</div>
