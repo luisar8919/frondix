@@ -33,7 +33,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Yape: cargo único de este mes; no queda suscripción recurrente automática.
-    await crearCargoYape(user.email, token, montoCentimos ?? 3500 * 100);
+    await crearCargoYape(user.email, token, montoCentimos ?? 5000 * 100);
     const { error } = await admin.from("suscripciones").upsert({
       empresa_id: empresaId,
       estado: "activa",

@@ -2,9 +2,9 @@
 
 import { useState } from "react";
 
-// Mismo precio que la sección de Precios (S/ 30/mes, plan Completo) -- si ese
+// Mismo precio que la sección de Precios (S/ 50/mes, plan Mensual) -- si ese
 // precio cambia, cambiarlo también acá.
-const PRECIO_FRONDIX = 30;
+const PRECIO_FRONDIX = 50;
 
 // Cada tarea mapea a una función real de Frondix (no son categorías inventadas):
 // "ventas" -> carga/orden de ventas y compras (el Excel); "stock" -> stock.ts +

@@ -21,7 +21,7 @@ const PADDLE_PRICE_ID_MENSUAL = process.env.NEXT_PUBLIC_PADDLE_PRICE_ID;
 const PADDLE_PRICE_ID_ANUAL = process.env.NEXT_PUBLIC_PADDLE_PRICE_ID_ANUAL;
 
 type Ciclo = "mensual" | "anual";
-const PRECIO_POR_CICLO: Record<Ciclo, string> = { mensual: "S/ 30 /mes", anual: "S/ 300 /año (2 meses gratis)" };
+const PRECIO_POR_CICLO: Record<Ciclo, string> = { mensual: "S/ 50 /mes", anual: "S/ 500 /año (2 meses gratis)" };
 
 export default function BillingPage() {
   const [mensaje, setMensaje] = useState<string | null>(null);

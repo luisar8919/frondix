@@ -37,6 +37,12 @@ export async function crearSuscripcionConTarjeta(email: string, tokenTarjeta: st
   return { customerId: customer.id, cardId: card.id, subscriptionId: subscription.id };
 }
 
+// Cargo único genérico (tarjeta o Yape -- Culqi no distingue, source_id ya trae
+// el tipo). Usado para compras puntuales como un paquete extra de facturas.
+export async function crearCargo(email: string, sourceId: string, montoCentimos: number) {
+  return crearCargoYape(email, sourceId, montoCentimos);
+}
+
 // Yape: cargo único (Culqi no soporta recurrencia automática con Yape todavía).
 // Se genera un cobro por mes; el cliente debe aprobarlo en su app cada vez.
 export async function crearCargoYape(email: string, tokenYape: string, montoCentimos: number) {

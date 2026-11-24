@@ -218,7 +218,7 @@ export default function Portada() {
               </div>
               <div className="tarjeta precio precio-destacado">
                 <h3>Mensual <span className="insignia" style={{ marginLeft: 6 }}>Recomendado</span></h3>
-                <div className="precio-monto">S/ 30<small> /mes</small></div>
+                <div className="precio-monto">S/ 50<small> /mes</small></div>
                 <p className="suave pequeno">Para trabajar en equipo. Equivalente en tu moneda.</p>
                 <p className="pequeno" style={{ fontWeight: 700, color: "var(--verde-700)", margin: "2px 0 0" }}>
                   Primer mes gratis. No pedimos tarjeta.
@@ -226,6 +226,7 @@ export default function Portada() {
                 <ul>
                   <li>Todo lo del plan gratis</li>
                   <li>Invita a tu equipo con accesos por rol</li>
+                  <li>Factura electrónica real ante SUNAT: 200 comprobantes/mes incluidos</li>
                   <li>
                     Seguimiento de clientes por WhatsApp: te avisamos a quién escribirle y el mensaje sale listo <span className="insignia insignia-sol">Envío automático: próximamente</span>
                   </li>
@@ -234,10 +235,10 @@ export default function Portada() {
               </div>
               <div className="tarjeta precio">
                 <h3>Anual</h3>
-                <div className="precio-monto">S/ 300<small> /año</small></div>
+                <div className="precio-monto">S/ 500<small> /año</small></div>
                 <p className="suave pequeno">Lo mismo que el plan mensual, pagando una vez al año.</p>
                 <p className="pequeno" style={{ fontWeight: 700, color: "var(--verde-700)", margin: "2px 0 0" }}>
-                  Ahorras S/ 60 al año (2 meses gratis).
+                  Ahorras S/ 100 al año (2 meses gratis).
                 </p>
                 <ul>
                   <li>Todo lo del plan mensual</li>
