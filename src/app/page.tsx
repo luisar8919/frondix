@@ -226,7 +226,7 @@ export default function Portada() {
                 <ul>
                   <li>Todo lo del plan gratis</li>
                   <li>Invita a tu equipo con accesos por rol</li>
-                  <li>Factura electrónica real ante SUNAT: 200 comprobantes/mes incluidos</li>
+                  <li>Factura electrónica real ante SUNAT: 300 comprobantes/mes incluidos</li>
                   <li>
                     Seguimiento de clientes por WhatsApp: te avisamos a quién escribirle y el mensaje sale listo <span className="insignia insignia-sol">Envío automático: próximamente</span>
                   </li>

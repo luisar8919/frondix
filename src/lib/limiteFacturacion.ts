@@ -1,6 +1,8 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-// Paquetes extra comprables cuando una empresa llega a su tope mensual.
+// Paquetes extra comprables cuando una empresa llega a su tope mensual
+// (el tope base real es factpro_limite_base en la tabla empresas, 300 por
+// defecto -- esto es solo para comprar MÁS cuando ya se llegó a ese tope).
 // Precio con margen real sobre el costo de FactPro (S/0.02-0.04/doc según tramo):
 // 50 docs cuestan ~S/2 real, 200 cuestan ~S/8 real.
 export const PAQUETES_FACTURACION = {
