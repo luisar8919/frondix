@@ -4,8 +4,7 @@ import { marcarLogro } from "@/lib/logros";
 
 // Solo para los logros que no dejan rastro propio en la base (ver
 // MARCABLES_A_MANO en src/lib/logros.ts): "exportaste_reporte" lo llama el
-// botón de exportar directo desde el navegador; "whatsapp_enviado" lo llama
-// /api/whatsapp/send después de un envío exitoso. marcarLogro ya filtra
+// botón de exportar directo desde el navegador. marcarLogro ya filtra
 // cualquier clave que no esté en esa lista, así que no hace falta validar acá
 // cuáles son válidas -- un POST con una clave random simplemente no hace nada.
 export async function POST(req: NextRequest) {

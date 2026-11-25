@@ -1,17 +1,9 @@
 const GRAPH_API = "https://graph.facebook.com/v20.0";
 
-// Manda un mensaje de texto libre. Solo funciona si el destinatario te escribió
-// en las últimas 24hs; fuera de esa ventana hay que usar una plantilla aprobada
-// por Meta (enviarPlantilla). Para el recordatorio/resumen semanal, usar plantilla.
-export async function enviarTexto(telefono: string, mensaje: string) {
-  return llamarGraph({
-    messaging_product: "whatsapp",
-    to: telefono,
-    type: "text",
-    text: { body: mensaje },
-  });
-}
-
+// Plantilla aprobada por Meta -- el único envío real que queda (notifica al
+// DUEÑO de la empresa, nunca a su cliente final, ver cron de seguimiento).
+// Un texto libre (enviarTexto) exigiría que el destinatario te haya escrito
+// primero en las últimas 24hs, y ya no hay ningún caso de uso para eso acá.
 export async function enviarPlantilla(
   telefono: string,
   nombrePlantilla: string,

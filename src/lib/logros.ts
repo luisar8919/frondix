@@ -20,7 +20,7 @@ export interface LogroEstado extends LogroDef {
 
 // Catálogo completo: 20 del plan gratis (uno por cada rincón importante de la
 // app, a propósito -- la idea es que revisarlos empuje a probar cada
-// funcionalidad) + 6 del plan pago (atadas a las features que ya están
+// funcionalidad) + 5 del plan pago (atadas a las features que ya están
 // gateadas por tieneSuscripcionActiva). El orden es el que se muestra.
 export const LOGROS: LogroDef[] = [
   { clave: "primer_modulo", titulo: "Primer módulo creado", descripcion: "Creaste tu primera tabla de datos en Frondix.", pago: false },
@@ -46,7 +46,6 @@ export const LOGROS: LogroDef[] = [
   { clave: "ia_sugerencia_excel", titulo: "IA para ordenar un Excel", descripcion: "Usaste la sugerencia por IA para entender un Excel desordenado.", pago: true },
   { clave: "ia_asistente_sin_excel", titulo: "IA sin Excel", descripcion: "Usaste el asistente de IA para armar tablas sin subir ningún archivo.", pago: true },
   { clave: "resumen_ia", titulo: "Resumen con IA", descripcion: "Generaste tu primer resumen con highlights de IA.", pago: true },
-  { clave: "whatsapp_enviado", titulo: "WhatsApp enviado", descripcion: "Enviaste tu primer recordatorio automático por WhatsApp.", pago: true },
   { clave: "equipo_invitado", titulo: "Equipo armado", descripcion: "Invitaste a tu primer miembro de equipo.", pago: true },
   { clave: "empresa_adicional", titulo: "Segundo negocio", descripcion: "Creaste una empresa adicional en tu cuenta.", pago: true },
 ];
@@ -56,7 +55,7 @@ const CLAVES_VALIDAS = new Set(LOGROS.map((l) => l.clave));
 // Las que no dejan ningún rastro propio en la base (una descarga, un envío que
 // no se guarda) se marcan a mano desde donde ocurre la acción, en vez de
 // intentar detectarlas escaneando datos -- ver /api/logros/marcar.
-const MARCABLES_A_MANO = new Set(["exportaste_reporte", "whatsapp_enviado"]);
+const MARCABLES_A_MANO = new Set(["exportaste_reporte"]);
 
 interface DatasetLigero {
   id: string;
@@ -238,7 +237,7 @@ async function detectarLogrosCumplidos(supabase: SupabaseClient, empresaId: stri
         cumple = !!h;
         break;
       }
-      // whatsapp_enviado y exportaste_reporte: MARCABLES_A_MANO, no se detectan acá.
+      // exportaste_reporte: MARCABLES_A_MANO, no se detecta acá.
     }
     if (cumple) detectadas.push(clave);
   }
