@@ -31,16 +31,6 @@ const MESA_UNICA = "__unica__";
 // /api/records/[ventasDatasetId] por línea del carrito, el mismo endpoint que
 // ya usa el formulario manual -- así las Reglas/Recetas (ajuste de Stock,
 // avisos, etc.) se disparan exactamente igual, sin reimplementar nada de eso.
-//
-// Sin fotos de producto (Frondix no tiene carga de imágenes todavía): cada
-// cuadrado se pinta con un color generado a partir del nombre, para que la
-// grilla sea reconocible de un vistazo igual que con fotos reales.
-function colorDe(texto: string): string {
-  let hash = 0;
-  for (let i = 0; i < texto.length; i++) hash = texto.charCodeAt(i) + ((hash << 5) - hash);
-  const hue = Math.abs(hash) % 360;
-  return `hsl(${hue}, 55%, 45%)`;
-}
 
 export default function PuntoDeVenta() {
   const [modulosVentas, setModulosVentas] = useState<{ id: string; nombre: string }[] | null>(null);
@@ -49,6 +39,9 @@ export default function PuntoDeVenta() {
   const [productos, setProductos] = useState<string[]>([]);
   const [precios, setPrecios] = useState<Record<string, PreciosProducto>>({});
   const [codigos, setCodigos] = useState<Record<string, string>>({});
+  // Vacío = el Stock enlazado no tiene columna "cantidad" (o no es un Stock de
+  // verdad) -- en ese caso nunca se desactiva nada, igual que antes.
+  const [cantidades, setCantidades] = useState<Record<string, number>>({});
   const [cargando, setCargando] = useState(false);
   const [escaneando, setEscaneando] = useState(false);
   const [error, setError] = useState("");
@@ -153,6 +146,7 @@ export default function PuntoDeVenta() {
       setProductos(bodyValores.valores ?? []);
       setPrecios(bodyValores.precios ?? {});
       setCodigos(bodyValores.codigos ?? {});
+      setCantidades(bodyValores.cantidades ?? {});
       setCargando(false);
     })();
   }, [ventasDatasetId]);
@@ -225,7 +219,16 @@ export default function PuntoDeVenta() {
     setAmbienteActual(nombre);
   }
 
+  // Solo se considera "sin stock" si el producto realmente tiene un número de
+  // cantidad registrado (ver cantidades, arriba) y ese número es <= 0 -- un
+  // producto sin dato de cantidad (Stock sin esa columna, o dataset que no es
+  // Stock) nunca se desactiva.
+  function sinStock(producto: string): boolean {
+    return (cantidades[producto] ?? Infinity) <= 0;
+  }
+
   function agregarAlCarrito(producto: string) {
+    if (sinStock(producto)) return;
     actualizarCarritoActual((c) => {
       // Dedup solo con líneas SIN nota (un toque rápido en la grilla suma
       // cantidad a lo ya cargado) -- una línea con nota propia (ej. "sin
@@ -503,30 +506,38 @@ export default function PuntoDeVenta() {
         <div className="no-imprimir" style={{ display: "flex", gap: 20, flexWrap: "wrap", alignItems: "flex-start" }}>
           <div style={{ flex: "2 1 400px", display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(110px, 1fr))", gap: 10 }}>
             {productos.length === 0 && <p className="suave">El Stock enlazado todavía no tiene productos cargados.</p>}
-            {productos.map((p) => (
-              <button
-                key={p}
-                type="button"
-                onClick={() => agregarAlCarrito(p)}
-                style={{
-                  background: colorDe(p),
-                  color: "#fff",
-                  border: "none",
-                  borderRadius: 10,
-                  padding: "16px 8px",
-                  minHeight: 90,
-                  display: "flex",
-                  flexDirection: "column",
-                  justifyContent: "space-between",
-                  cursor: "pointer",
-                  fontWeight: 700,
-                  textAlign: "left",
-                }}
-              >
-                <span style={{ fontSize: 14, lineHeight: 1.25 }}>{p}</span>
-                {precioDe(p) > 0 && <span style={{ fontSize: 13, opacity: 0.9 }}>{formatearMonto(precioDe(p), "PEN")}</span>}
-              </button>
-            ))}
+            {productos.map((p) => {
+              const agotado = sinStock(p);
+              return (
+                <button
+                  key={p}
+                  type="button"
+                  disabled={agotado}
+                  onClick={() => agregarAlCarrito(p)}
+                  title={agotado ? "Sin stock" : undefined}
+                  style={{
+                    background: agotado ? "var(--fondo-200, #e5e5e5)" : "var(--verde-600)",
+                    color: agotado ? "var(--texto-suave, #888)" : "#fff",
+                    border: "none",
+                    borderRadius: 10,
+                    padding: "16px 8px",
+                    minHeight: 90,
+                    display: "flex",
+                    flexDirection: "column",
+                    justifyContent: "space-between",
+                    cursor: agotado ? "not-allowed" : "pointer",
+                    opacity: agotado ? 0.6 : 1,
+                    fontWeight: 700,
+                    textAlign: "left",
+                  }}
+                >
+                  <span style={{ fontSize: 14, lineHeight: 1.25 }}>{p}</span>
+                  <span style={{ fontSize: 13, opacity: 0.9 }}>
+                    {agotado ? "Sin stock" : precioDe(p) > 0 ? formatearMonto(precioDe(p), "PEN") : ""}
+                  </span>
+                </button>
+              );
+            })}
           </div>
 
           <div className="tarjeta" style={{ flex: "1 1 280px", position: "sticky", top: 20 }}>
@@ -539,29 +550,30 @@ export default function PuntoDeVenta() {
             {carrito.length === 0 && <p className="suave pequeno" style={{ marginTop: 14 }}>Todavía no agregaste nada.</p>}
 
             {carrito.map((l) => (
-              <div key={l.id} style={{ marginTop: 10 }}>
-                <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
-                  <span className="pequeno" style={{ flex: 1, minWidth: 90 }}>{l.producto}{l.nota ? ` (${l.nota})` : ""}</span>
+              <div key={l.id} style={{ borderBottom: "1px solid var(--linea)", padding: "8px 0" }}>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 52px 68px 72px auto", gap: 6, alignItems: "center" }}>
+                  <span className="pequeno" style={{ gridColumn: "1 / -1" }}>{l.producto}{l.nota ? ` (${l.nota})` : ""}</span>
                   <input
                     type="number"
                     min={0}
                     value={l.cantidad}
                     onChange={(e) => cambiarCantidad(l.id, Number(e.target.value) || 0)}
-                    style={{ width: 55 }}
+                    style={{ width: "100%" }}
                     aria-label={`Cantidad de ${l.producto}`}
                   />
-                  <span className="suave pequeno">x</span>
                   <input
                     type="number"
                     min={0}
                     value={l.precioUnitario}
                     onChange={(e) => cambiarPrecio(l.id, Number(e.target.value) || 0)}
-                    style={{ width: 70 }}
+                    style={{ width: "100%" }}
                     aria-label={`Precio de ${l.producto}`}
                   />
-                  <strong style={{ width: 70, textAlign: "right" }}>{formatearMonto(l.cantidad * l.precioUnitario, "PEN")}</strong>
-                  <button type="button" className="btn btn-fantasma" style={{ padding: "4px 8px" }} title="Nota" onClick={() => setNotaAbierta(notaAbierta === l.id ? null : l.id)}>📝</button>
-                  <button type="button" className="btn btn-fantasma" style={{ padding: "4px 8px" }} title="Quitar" onClick={() => eliminarLinea(l.id)}>🗑️</button>
+                  <strong style={{ textAlign: "right", fontSize: 14 }}>{formatearMonto(l.cantidad * l.precioUnitario, "PEN")}</strong>
+                  <div style={{ display: "flex" }}>
+                    <button type="button" className="btn btn-fantasma" style={{ padding: "4px 6px" }} title="Nota" onClick={() => setNotaAbierta(notaAbierta === l.id ? null : l.id)}>📝</button>
+                    <button type="button" className="btn btn-fantasma" style={{ padding: "4px 6px" }} title="Quitar" onClick={() => eliminarLinea(l.id)}>🗑️</button>
+                  </div>
                 </div>
                 {notaAbierta === l.id && (
                   <input
