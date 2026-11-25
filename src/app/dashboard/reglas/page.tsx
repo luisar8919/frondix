@@ -28,7 +28,6 @@ interface ModuloConReglas {
   columnas: Columna[];
   reglas: Regla[];
   ajustarStockInfo: AjustarStockInfo | null;
-  hayTelefono: boolean;
   hayCorreo: boolean;
   hayCliente: boolean;
   candidatosSumarCampo: CandidatoSumarCampo[];
@@ -87,7 +86,6 @@ export default function ReglasPage() {
           columnas={m.columnas}
           reglas={m.reglas}
           ajustarStockInfo={m.ajustarStockInfo}
-          hayTelefono={m.hayTelefono}
           hayCorreo={m.hayCorreo}
           hayCliente={m.hayCliente}
           candidatosSumarCampo={m.candidatosSumarCampo}

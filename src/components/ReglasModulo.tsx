@@ -31,7 +31,7 @@ interface CandidatoSumarCampo {
   opcionesObjetivo: string[] | null;
 }
 
-type TipoAccion = "excluir_de_reportes" | "cambiar_estado" | "ajustar_stock" | "enviar_whatsapp" | "enviar_correo_cliente" | "agregar_seguimiento" | "notificacion_push" | "sumar_campo_enlazado" | "descontar_insumos" | "eliminar_registro";
+type TipoAccion = "excluir_de_reportes" | "cambiar_estado" | "ajustar_stock" | "enviar_correo_cliente" | "agregar_seguimiento" | "notificacion_push" | "sumar_campo_enlazado" | "descontar_insumos" | "eliminar_registro";
 
 export default function ReglasModulo({
   datasetId,
@@ -39,7 +39,6 @@ export default function ReglasModulo({
   columnas,
   reglas,
   ajustarStockInfo,
-  hayTelefono,
   hayCorreo,
   hayCliente,
   candidatosSumarCampo,
@@ -56,9 +55,7 @@ export default function ReglasModulo({
   // real (tipo, a qué Stock, con qué columna) se usa para mostrarla armada
   // con su propia estructura "Si... entonces...", no solo un título.
   ajustarStockInfo: AjustarStockInfo | null;
-  // "Enviar WhatsApp" necesita un campo rol "telefono" en ESTE módulo (a quién
-  // escribirle); "Agregar a Seguimiento" necesita un campo rol "cliente".
-  hayTelefono: boolean;
+  // "Agregar a Seguimiento" necesita un campo rol "cliente".
   hayCorreo: boolean;
   hayCliente: boolean;
   // "Sumar un campo enlazado": un campo numérico candidato por cada columna de
@@ -122,7 +119,6 @@ export default function ReglasModulo({
     excluir_de_reportes: "🚫",
     cambiar_estado: "🔄",
     ajustar_stock: "📦",
-    enviar_whatsapp: "💬",
     enviar_correo_cliente: "📧",
     descontar_insumos: "🥘",
     agregar_seguimiento: "👀",
@@ -162,7 +158,6 @@ export default function ReglasModulo({
       const cant = ajustarStockInfo.cantidadLabel ? `"${ajustarStockInfo.cantidadLabel}"` : "1";
       return `${ajustarStockInfo.tipoModulo === "ventas" ? "Restar" : "Sumar"} ${cant} de Cantidad en "${ajustarStockInfo.stockNombre}"`;
     }
-    if (a.tipo === "enviar_whatsapp") return `Enviar WhatsApp${a.mensaje ? `: "${a.mensaje.slice(0, 40)}${a.mensaje.length > 40 ? "..." : ""}"` : ""}`;
     if (a.tipo === "enviar_correo_cliente") return `Enviar correo al cliente${a.mensaje ? `: "${a.mensaje.slice(0, 40)}${a.mensaje.length > 40 ? "..." : ""}"` : ""}`;
     if (a.tipo === "descontar_insumos") return `Descontar insumos de la receta${a.receta ? `: "${a.receta.slice(0, 40)}${a.receta.length > 40 ? "..." : ""}"` : ""}`;
     if (a.tipo === "notificacion_push") return `Notificar${a.titulo ? `: "${a.titulo}"` : ""}`;
@@ -233,7 +228,7 @@ export default function ReglasModulo({
       cambiarRegla(i, { condicion, accion: { tipo } });
       return;
     }
-    if (tipo === "enviar_whatsapp" || tipo === "enviar_correo_cliente") {
+    if (tipo === "enviar_correo_cliente") {
       cambiarRegla(i, { condicion, accion: { tipo, mensaje: "" } });
       return;
     }
@@ -375,7 +370,6 @@ export default function ReglasModulo({
                 {columnasDestino.length > 0 && <option value="cambiar_estado">Cambiar un campo a...</option>}
                 {puedeAjustarStock && !otraYaTieneAjustarStock && <option value="ajustar_stock">Ajustar Stock automáticamente</option>}
                 {puedeAjustarStock && <option value="descontar_insumos">Descontar insumos de una receta</option>}
-                {hayTelefono && <option value="enviar_whatsapp">Enviar WhatsApp</option>}
                 {hayCorreo && <option value="enviar_correo_cliente">Enviar correo al cliente</option>}
                 {hayCliente && <option value="agregar_seguimiento">Agregar a Seguimiento</option>}
                 <option value="notificacion_push">Notificación push</option>
@@ -394,16 +388,6 @@ export default function ReglasModulo({
                   </select>
                   {valorInput(r.accion.columnaKey, r.accion.valor, (v) => cambiarRegla(i, { accion: { tipo: "cambiar_estado", columnaKey: (r.accion as { columnaKey: string }).columnaKey, valor: v } }), "Nuevo valor")}
                 </>
-              )}
-
-              {r.accion.tipo === "enviar_whatsapp" && (
-                <input
-                  aria-label="Mensaje de WhatsApp"
-                  placeholder="Mensaje a enviar (texto fijo, sin {nombre} ni variables)"
-                  value={r.accion.mensaje}
-                  onChange={(e) => cambiarRegla(i, { accion: { tipo: "enviar_whatsapp", mensaje: e.target.value } })}
-                  style={{ minWidth: 260, flex: 1 }}
-                />
               )}
 
               {r.accion.tipo === "descontar_insumos" && (

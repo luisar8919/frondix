@@ -58,12 +58,6 @@ export type Accion =
   | { tipo: "excluir_de_reportes" }
   | { tipo: "cambiar_estado"; columnaKey: string; valor: string }
   | { tipo: "ajustar_stock" } // reusa stock.ts tal cual -- ver comentario en reglasAplicar.ts
-  // Manda el mensaje tal cual (sin plantillas {nombre}/etc -- eso es de
-  // Seguimiento) al campo con rol "telefono" de ESTE registro. Mejor esfuerzo:
-  // la API de WhatsApp solo entrega texto libre si el cliente te escribió en
-  // las últimas 24h (ver enviarTexto en whatsapp.ts); fuera de esa ventana
-  // simplemente no se manda, sin romper el resto de la regla.
-  | { tipo: "enviar_whatsapp"; mensaje: string }
   // Activa el seguimiento (misma tabla y mecanismo que el checkbox manual de
   // /dashboard/seguimiento) para el cliente del campo rol "cliente" de este
   // registro -- el cron ya existente (api/cron/seguimiento-push) se encarga
@@ -73,10 +67,9 @@ export type Accion =
   // usa el cron de seguimiento).
   | { tipo: "notificacion_push"; titulo: string; mensaje: string }
   // A diferencia de notificacion_push (al DUEÑO, por Firebase), esto manda un
-  // correo real al CLIENTE del negocio -- al campo con rol "telefono" le
-  // corresponde enviar_whatsapp, a este le corresponde el campo rol "correo"
-  // de ESE registro. El asunto se arma solo con el nombre de la empresa al
-  // momento de enviar (ver reglasAplicar.ts), no se guarda acá.
+  // correo real al CLIENTE del negocio, al campo con rol "correo" de ESE
+  // registro. El asunto se arma solo con el nombre de la empresa al momento
+  // de enviar (ver reglasAplicar.ts), no se guarda acá.
   | { tipo: "enviar_correo_cliente"; mensaje: string }
   // Para Ventas de un PRODUCTO TERMINADO (ej. "Lomo saltado") que en realidad
   // consume varios insumos del mismo Stock enlazado (carne, papa, cebolla) --

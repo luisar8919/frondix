@@ -2,8 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Columna } from "./excel-parser.ts";
 import { ajustarStockDesdeRegistro, revertirStockDesdeRegistro } from "./stock.ts";
 import { claveValida } from "./enlaces.ts";
-import { normalizarTexto, normalizarTelefonoPE } from "./seguimiento.ts";
-import { enviarTexto } from "./whatsapp.ts";
+import { normalizarTexto } from "./seguimiento.ts";
 import { enviarPush } from "./push.ts";
 import { enviarCorreoAlCliente, type SmtpPropio } from "./email.ts";
 import { descifrar } from "./cifrado.ts";
@@ -281,14 +280,6 @@ export async function aplicarReglasDesdeRegistro(
         if (!datosFinal) datosFinal = { ...datosNuevos };
         datosFinal[regla.accion.columnaKey] = regla.accion.valor;
         huboMutacion = true;
-      }
-    } else if (regla.accion.tipo === "enviar_whatsapp") {
-      try {
-        const cTelefono = columnas.find((c) => c.rol === "telefono");
-        const telefono = cTelefono ? normalizarTelefonoPE(datosEval[cTelefono.key]) : null;
-        if (telefono) await enviarTexto(telefono, regla.accion.mensaje);
-      } catch {
-        // ver comentario de arriba -- ej. fuera de la ventana de 24h de WhatsApp
       }
     } else if (regla.accion.tipo === "enviar_correo_cliente") {
       try {

@@ -87,7 +87,6 @@ export async function GET() {
       columnas: d.columnas as Columna[],
       reglas: (d.reglas as Regla[]) ?? [],
       ajustarStockInfo: infoAjustarStock(d.columnas as Columna[], d.nombre as string),
-      hayTelefono: (d.columnas as Columna[]).some((c) => c.rol === "telefono"),
       hayCorreo: (d.columnas as Columna[]).some((c) => c.rol === "correo"),
       hayCliente: (d.columnas as Columna[]).some((c) => c.rol === "cliente"),
       candidatosSumarCampo: candidatosSumarCampo(d.columnas as Columna[]),
