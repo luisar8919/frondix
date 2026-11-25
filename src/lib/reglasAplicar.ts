@@ -4,10 +4,11 @@ import { ajustarStockDesdeRegistro, revertirStockDesdeRegistro } from "./stock.t
 import { claveValida } from "./enlaces.ts";
 import { normalizarTexto } from "./seguimiento.ts";
 import { enviarPush } from "./push.ts";
-import { enviarCorreoAlCliente, type SmtpPropio } from "./email.ts";
+import { enviarCorreo, enviarCorreoAlCliente, type SmtpPropio } from "./email.ts";
+import { enviarTelegram } from "./telegram.ts";
 import { descifrar } from "./cifrado.ts";
 import { crearClienteAdmin } from "./supabase/admin.ts";
-import { condicionCumple, type Accion, type Evento, type Regla } from "./reglas.ts";
+import { condicionCumple, type Accion, type Canal, type Evento, type Regla } from "./reglas.ts";
 
 // Lógica de EJECUCIÓN de reglas (servidor, nunca desde un componente cliente
 // -- ver el comentario en reglas.ts sobre por qué esto está separado: acá se
@@ -182,15 +183,16 @@ export async function aplicarReglasDesdeRegistro(
 ): Promise<void> {
   let datosFinal: Record<string, unknown> | undefined;
   let huboMutacion = false;
-  // Nombre + SMTP propio de la empresa, pedidos como mucho una vez por
-  // llamada (no por regla) -- solo los necesita "enviar_correo_cliente".
-  let empresaInfoCache: { nombre: string; smtp: SmtpPropio | null } | undefined;
-  async function empresaInfo(): Promise<{ nombre: string; smtp: SmtpPropio | null }> {
+  // Nombre + SMTP propio + chat de Telegram de la empresa, pedidos como mucho
+  // una vez por llamada (no por regla) -- lo necesitan "enviar_correo_cliente"
+  // y, ahora, los canales correo/telegram de "notificacion_push".
+  let empresaInfoCache: { nombre: string; smtp: SmtpPropio | null; telegramChatId: string | null } | undefined;
+  async function empresaInfo(): Promise<{ nombre: string; smtp: SmtpPropio | null; telegramChatId: string | null }> {
     if (empresaInfoCache === undefined) {
       const admin = crearClienteAdmin();
       const { data } = await admin
         .from("empresas")
-        .select("nombre, smtp_activo, smtp_host, smtp_port, smtp_usuario, smtp_password_cifrado, smtp_from")
+        .select("nombre, smtp_activo, smtp_host, smtp_port, smtp_usuario, smtp_password_cifrado, smtp_from, telegram_chat_id")
         .eq("id", empresaId)
         .single();
       const nombre = data?.nombre ?? "tu negocio";
@@ -202,7 +204,7 @@ export async function aplicarReglasDesdeRegistro(
           smtp = null; // clave de cifrado mal configurada o dato corrupto -- cae al de Frondix
         }
       }
-      empresaInfoCache = { nombre, smtp };
+      empresaInfoCache = { nombre, smtp, telegramChatId: data?.telegram_chat_id ?? null };
     }
     return empresaInfoCache;
   }
@@ -308,17 +310,30 @@ export async function aplicarReglasDesdeRegistro(
         // ver comentario de arriba
       }
     } else if (regla.accion.tipo === "notificacion_push") {
-      try {
-        // push_tokens solo se puede leer con el propio user_id (RLS) -- para
-        // avisarle a TODOS los miembros de la empresa (no solo a quien
-        // disparó la regla) hace falta el cliente admin, igual que el cron
-        // de seguimiento (api/cron/seguimiento-push).
-        const admin = crearClienteAdmin();
-        const { data: miembros } = await admin.from("miembros").select("user_id").eq("empresa_id", empresaId);
-        const userIds = (miembros ?? []).map((m) => m.user_id as string);
-        await enviarPush(admin, userIds, regla.accion.titulo, regla.accion.mensaje);
-      } catch {
-        // ver comentario de arriba -- ej. Firebase mal configurado en el entorno
+      // Legado (canales ausente/vacío) = solo push, el único canal que
+      // existía antes de poder elegir -- ver Canal en reglas.ts.
+      const canales: Canal[] = regla.accion.canales?.length ? regla.accion.canales : ["push"];
+      // push_tokens solo se puede leer con el propio user_id (RLS) -- para
+      // avisarle a TODOS los miembros de la empresa (no solo a quien
+      // disparó la regla) hace falta el cliente admin, igual que el cron
+      // de seguimiento (api/cron/seguimiento-push).
+      const admin = crearClienteAdmin();
+      const { data: miembros } = await admin.from("miembros").select("user_id").eq("empresa_id", empresaId);
+      const userIds = (miembros ?? []).map((m) => m.user_id as string);
+      // Cada canal con su propio try/catch, mismo criterio que el resto del
+      // archivo: que uno falle (ej. Firebase mal configurado) no debe
+      // saltearse los demás.
+      if (canales.includes("push")) {
+        try { await enviarPush(admin, userIds, regla.accion.titulo, regla.accion.mensaje); } catch { /* ver comentario de arriba */ }
+      }
+      if (canales.includes("correo")) {
+        try { await enviarCorreo(admin, userIds, regla.accion.titulo, `<p>${regla.accion.mensaje}</p>`); } catch { /* ver comentario de arriba -- ej. RESEND_API_KEY sin configurar */ }
+      }
+      if (canales.includes("telegram")) {
+        try {
+          const info = await empresaInfo();
+          if (info.telegramChatId) await enviarTelegram(info.telegramChatId, `${regla.accion.titulo}\n\n${regla.accion.mensaje}`);
+        } catch { /* ver comentario de arriba -- ej. empresa sin Telegram conectado */ }
       }
     }
   }

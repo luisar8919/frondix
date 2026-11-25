@@ -45,6 +45,21 @@ export const EVENTOS: { valor: Evento; etiqueta: string }[] = [
   { valor: "eliminacion", etiqueta: "Eliminación" },
 ];
 
+// Canal de un aviso al DUEÑO/usuario de Frondix (no al cliente final, eso es
+// enviar_correo_cliente). WhatsApp queda afuera a propósito: Meta solo deja
+// mandar texto libre si le escribiste primero en las últimas 24h (fuera de
+// esa ventana hace falta una plantilla pre-aprobada de estructura fija), y
+// acá el titulo/mensaje son texto libre que el usuario escribe en la Regla --
+// nunca puede ir por WhatsApp sin romper esa regla de Meta. Los 2 avisos de
+// sistema con copy fija (clientes inactivos, vencimientos) sí usan WhatsApp,
+// pero eso vive en los cron de api/cron/*, no acá.
+export type Canal = "push" | "correo" | "telegram";
+export const CANALES_AVISO: { valor: Canal; etiqueta: string }[] = [
+  { valor: "push", etiqueta: "App (push)" },
+  { valor: "correo", etiqueta: "Correo" },
+  { valor: "telegram", etiqueta: "Telegram" },
+];
+
 export type Condicion =
   | { tipo: "siempre" }
   // `compararColumnaKey`, si está presente, ignora `valor` (literal) y compara
@@ -63,9 +78,10 @@ export type Accion =
   // registro -- el cron ya existente (api/cron/seguimiento-push) se encarga
   // de avisar si se queda callado, no hace falta nada más acá.
   | { tipo: "agregar_seguimiento" }
-  // Push a todos los miembros de la empresa (Firebase, misma función que ya
-  // usa el cron de seguimiento).
-  | { tipo: "notificacion_push"; titulo: string; mensaje: string }
+  // Avisa a todos los miembros de la empresa, por los canales elegidos
+  // (ver Canal arriba). `canales` ausente/vacío = legado, equivale a
+  // `["push"]` (el único canal que existía antes de agregar `canales`).
+  | { tipo: "notificacion_push"; titulo: string; mensaje: string; canales?: Canal[] }
   // A diferencia de notificacion_push (al DUEÑO, por Firebase), esto manda un
   // correo real al CLIENTE del negocio, al campo con rol "correo" de ESE
   // registro. El asunto se arma solo con el nombre de la empresa al momento

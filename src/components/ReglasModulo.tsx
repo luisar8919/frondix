@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import type { Columna } from "@/lib/excel-parser";
-import { OPERADORES_NUMERO, OPERADORES_TEXTO, EVENTOS, type Regla, type Operador, type Evento } from "@/lib/reglas";
+import { OPERADORES_NUMERO, OPERADORES_TEXTO, EVENTOS, CANALES_AVISO, type Regla, type Operador, type Evento, type Canal } from "@/lib/reglas";
 import { enviarConfirmando } from "@/lib/confirmar";
 
 // Las reglas (condición -> acción) de UN módulo, como su propia tarjeta --
@@ -410,24 +410,52 @@ export default function ReglasModulo({
                 />
               )}
 
-              {r.accion.tipo === "notificacion_push" && (
-                <>
-                  <input
-                    aria-label="Título de la notificación"
-                    placeholder="Título"
-                    value={r.accion.titulo}
-                    onChange={(e) => cambiarRegla(i, { accion: { tipo: "notificacion_push", titulo: e.target.value, mensaje: (r.accion as { mensaje: string }).mensaje } })}
-                    style={{ width: 160 }}
-                  />
-                  <input
-                    aria-label="Mensaje de la notificación"
-                    placeholder="Mensaje"
-                    value={r.accion.mensaje}
-                    onChange={(e) => cambiarRegla(i, { accion: { tipo: "notificacion_push", titulo: (r.accion as { titulo: string }).titulo, mensaje: e.target.value } })}
-                    style={{ minWidth: 200, flex: 1 }}
-                  />
-                </>
-              )}
+              {(() => {
+                if (r.accion.tipo !== "notificacion_push") return null;
+                const accionPush = r.accion;
+                const activos = accionPush.canales ?? ["push"];
+                return (
+                  <>
+                    <input
+                      aria-label="Título de la notificación"
+                      placeholder="Título"
+                      value={accionPush.titulo}
+                      onChange={(e) => cambiarRegla(i, { accion: { ...accionPush, titulo: e.target.value } })}
+                      style={{ width: 160 }}
+                    />
+                    <input
+                      aria-label="Mensaje de la notificación"
+                      placeholder="Mensaje"
+                      value={accionPush.mensaje}
+                      onChange={(e) => cambiarRegla(i, { accion: { ...accionPush, mensaje: e.target.value } })}
+                      style={{ minWidth: 200, flex: 1 }}
+                    />
+                    <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap", width: "100%" }}>
+                      <span className="suave pequeno">Avisar por:</span>
+                      {CANALES_AVISO.map((c) => {
+                        const marcado = activos.includes(c.valor);
+                        return (
+                          <label key={c.valor} className="pequeno" style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                            <input
+                              type="checkbox"
+                              checked={marcado}
+                              onChange={(e) => {
+                                const nuevos: Canal[] = e.target.checked ? [...activos, c.valor] : activos.filter((x) => x !== c.valor);
+                                cambiarRegla(i, { accion: { ...accionPush, canales: nuevos.length ? nuevos : ["push"] } });
+                              }}
+                            />
+                            {c.etiqueta}
+                          </label>
+                        );
+                      })}
+                      <span className="suave pequeno" style={{ width: "100%" }}>
+                        WhatsApp no está disponible acá: ese canal solo admite mensajes con plantilla fija aprobada por
+                        Meta (y tiene costo por mensaje), no texto libre como este.
+                      </span>
+                    </div>
+                  </>
+                );
+              })()}
 
               {r.accion.tipo === "agregar_seguimiento" && (
                 <p className="ayuda" style={{ margin: 0 }}>
