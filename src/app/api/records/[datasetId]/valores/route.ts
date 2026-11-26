@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { crearClienteServidor } from "@/lib/supabase/server";
+import { empresaDelUsuarioServidor } from "@/lib/sesionServidor";
+import { esVendedor, rolEnEmpresa } from "@/lib/permisos";
 import { claveValida } from "@/lib/enlaces";
+import { tipoModulo } from "@/lib/roles";
 import type { Columna } from "@/lib/excel-parser";
 import { esStock } from "@/lib/stock";
 import { leerTodasLasFilas } from "@/lib/paginacion";
@@ -14,15 +17,22 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ data
   if (!claveValida(columna)) return NextResponse.json({ error: "Columna inválida" }, { status: 400 });
 
   const supabase = await crearClienteServidor();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ error: "No autenticado" }, { status: 401 });
+  const sesion = await empresaDelUsuarioServidor(supabase);
+  if (!sesion.ok) return NextResponse.json({ error: sesion.error }, { status: 401 });
 
   // Si este dataset (típicamente un Stock) tiene columnas de precio, se
   // devuelven junto a los valores -- así DynamicForm puede autocompletar el
   // Monto al elegir un producto existente (ver componente), sin otro viaje
   // al servidor por cada selección.
-  const { data: ds } = await supabase.from("datasets").select("columnas").eq("id", datasetId).single();
+  const { data: ds } = await supabase.from("datasets").select("columnas, nombre, empresa_id").eq("id", datasetId).single();
   const dsColumnas = (ds?.columnas as Columna[] | undefined) ?? [];
+  // Segunda capa de defensa (la primera es que /api/datasets ya no le
+  // muestra el id de Compras a un vendedor): este endpoint no distinguía
+  // rol, así que un vendedor que de algún otro modo tuviera el datasetId de
+  // Compras podía pedir acá el "monto" (costo real) de cada producto.
+  if (ds && esVendedor(rolEnEmpresa(sesion.empresas, ds.empresa_id)) && tipoModulo(dsColumnas.map((c) => c.rol), ds.nombre) === "compras") {
+    return NextResponse.json({ error: "Tu rol no tiene acceso a esto" }, { status: 403 });
+  }
   const cGeneral = dsColumnas.find((c) => c.rol === "monto");
   const cMayorista = dsColumnas.find((c) => c.rol === "precio_mayorista");
   const cMinorista = dsColumnas.find((c) => c.rol === "precio_minorista");
