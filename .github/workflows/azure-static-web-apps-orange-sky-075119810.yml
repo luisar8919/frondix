@@ -19,6 +19,19 @@ jobs:
         with:
           submodules: true
           lfs: false
+      # Antes de desplegar: tipos reales (nada atrapaba esto antes -- se
+      # corria a mano) y los tests de funciones puras de src/lib (ver
+      # package.json "test"). Si cualquiera falla, el deploy de abajo ni
+      # arranca.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+      - name: Instalar dependencias
+        run: npm install
+      - name: Verificar tipos
+        run: npx tsc --noEmit
+      - name: Correr tests
+        run: npm test
       - name: Build And Deploy
         id: builddeploy
         uses: Azure/static-web-apps-deploy@v1
