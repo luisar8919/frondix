@@ -205,31 +205,58 @@ export default function DynamicTable({
                     >
                       {editandoEstaCelda ? (
                         <>
-                          <input
-                            autoFocus
-                            type={c.tipo === "numero" ? "number" : c.tipo === "fecha" ? "date" : "text"}
-                            step={c.tipo === "numero" ? "any" : undefined}
-                            value={valorCelda}
-                            disabled={guardandoCelda}
-                            onChange={(e) => setValorCelda(e.target.value)}
-                            onBlur={() => guardarCelda(r, c)}
-                            onKeyDown={(e) => {
-                              if (e.key === "Enter") { e.preventDefault(); guardarCelda(r, c); }
-                              if (e.key === "Escape") setCelda(null);
-                            }}
-                            style={{ width: "100%", minWidth: 80 }}
-                          />
+                          {c.opcionesFijas?.length ? (
+                            <select
+                              autoFocus
+                              value={valorCelda}
+                              disabled={guardandoCelda}
+                              onChange={(e) => setValorCelda(e.target.value)}
+                              onBlur={() => guardarCelda(r, c)}
+                              onKeyDown={(e) => { if (e.key === "Escape") setCelda(null); }}
+                              style={{ width: "100%", minWidth: 80 }}
+                            >
+                              <option value="">(vacío)</option>
+                              {c.opcionesFijas.map((op) => <option key={op} value={op}>{op}</option>)}
+                            </select>
+                          ) : (
+                            <input
+                              autoFocus
+                              type={c.tipo === "numero" ? "number" : c.tipo === "fecha" ? "date" : "text"}
+                              step={c.tipo === "numero" ? "any" : undefined}
+                              value={valorCelda}
+                              disabled={guardandoCelda}
+                              onChange={(e) => setValorCelda(e.target.value)}
+                              onBlur={() => guardarCelda(r, c)}
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter") { e.preventDefault(); guardarCelda(r, c); }
+                                if (e.key === "Escape") setCelda(null);
+                              }}
+                              style={{ width: "100%", minWidth: 80 }}
+                            />
+                          )}
                           {errorCelda && <span className="alerta alerta-error" style={{ display: "block", fontSize: 11, padding: "2px 6px" }}>{errorCelda}</span>}
                         </>
                       ) : modoTabla && onGuardarFila && !c.enlace ? (
-                        <input
-                          type={c.tipo === "numero" ? "number" : c.tipo === "fecha" ? "date" : "text"}
-                          step={c.tipo === "numero" ? "any" : undefined}
-                          disabled={guardandoTabla}
-                          value={edicionesTabla[r.id]?.[c.key] ?? texto}
-                          onChange={(e) => cambiarCeldaTabla(r.id, c.key, e.target.value)}
-                          style={{ width: "100%", minWidth: 80 }}
-                        />
+                        c.opcionesFijas?.length ? (
+                          <select
+                            disabled={guardandoTabla}
+                            value={edicionesTabla[r.id]?.[c.key] ?? texto}
+                            onChange={(e) => cambiarCeldaTabla(r.id, c.key, e.target.value)}
+                            style={{ width: "100%", minWidth: 80 }}
+                          >
+                            <option value="">(vacío)</option>
+                            {c.opcionesFijas.map((op) => <option key={op} value={op}>{op}</option>)}
+                          </select>
+                        ) : (
+                          <input
+                            type={c.tipo === "numero" ? "number" : c.tipo === "fecha" ? "date" : "text"}
+                            step={c.tipo === "numero" ? "any" : undefined}
+                            disabled={guardandoTabla}
+                            value={edicionesTabla[r.id]?.[c.key] ?? texto}
+                            onChange={(e) => cambiarCeldaTabla(r.id, c.key, e.target.value)}
+                            style={{ width: "100%", minWidth: 80 }}
+                          />
+                        )
                       ) : c.enlace && texto ? (
                         <Link href={urlFiltrada(c.enlace.datasetId, c.enlace.columnaKey, valor)}>{texto}</Link>
                       ) : estiloStock(c, r) ? (
