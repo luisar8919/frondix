@@ -1,6 +1,7 @@
 // node scripts/test-estructura.mjs  (importa el codigo real .ts)
 import assert from "node:assert";
 import { nuevaClave, planificarCambios, planEliminarTabla } from "../src/lib/estructura.ts";
+import { empiezaConPrefijoReservado } from "../src/lib/enlaces.ts";
 
 const col = (key, label, extra = {}) => ({ key, label, tipo: "texto", rol: null, sospechosa: false, ...extra });
 const ventas = [col("cliente", "Cliente", { rol: "cliente", enlace: { datasetId: "cli", columnaKey: "nombre" } }), col("monto", "Monto", { tipo: "numero", rol: "monto" })];
@@ -11,6 +12,12 @@ const otras = [{ id: "ven", nombre: "Ventas", columnas: ventas }];
 assert.strictEqual(nuevaClave("Teléfono móvil", new Set()), "telefono_movil");
 assert.strictEqual(nuevaClave("Monto", new Set(["monto"])), "monto_2");
 assert.strictEqual(nuevaClave("???", new Set()), "campo");
+
+// Invariante de las claves "mágicas" (_excluido_reportes, ver enlaces.ts):
+// ningún label de usuario puede producir una key con el prefijo reservado,
+// ni siquiera escribiendo guiones bajos a mano.
+assert.strictEqual(empiezaConPrefijoReservado(nuevaClave("_excluido_reportes", new Set())), false, "los guiones bajos de punta se recortan");
+assert.strictEqual(empiezaConPrefijoReservado(nuevaClave("___", new Set())), false, "solo guiones bajos -> cae al fallback \"campo\"");
 
 // renombrar + cambiar rol conserva la clave y el tipo; agregar crea clave nueva
 let p = planificarCambios(clientes, [

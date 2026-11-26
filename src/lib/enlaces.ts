@@ -14,6 +14,18 @@ export function claveValida(clave: unknown): clave is string {
   return typeof clave === "string" && clave.length > 0 && clave.length <= 80 && CLAVE_VALIDA.test(clave);
 }
 
+// Invariante de la que dependen las claves "mágicas" inyectadas en `data`
+// fuera de las columnas reales del usuario (ej. `_excluido_reportes` en
+// reglasAplicar.ts/datosReportes.ts): NINGÚN campo creado por un usuario
+// puede empezar con "_" -- lo garantizan `aKey()` (excel-parser.ts) y
+// `nuevaClave()` (estructura.ts), que siempre recortan guiones bajos de
+// punta/cola. Esta función no se usa para generar claves (eso sigue en esos
+// 2 lugares) -- es la que usan sus tests para dejar el invariante explícito,
+// en vez de que dependa en silencio de que ninguna de las 2 regex cambie.
+export function empiezaConPrefijoReservado(clave: string): boolean {
+  return clave.startsWith("_");
+}
+
 export interface OpcionEnlace {
   valor: string; // "<datasetId>|<columnaKey>"
   etiqueta: string; // "Clientes > Nombre"

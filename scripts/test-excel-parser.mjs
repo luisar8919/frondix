@@ -2,7 +2,8 @@
 // Importa el parser real (.ts), sin copiar la lógica.
 import assert from "node:assert";
 import * as XLSX from "xlsx";
-import { parsearExcel } from "../src/lib/excel-parser.ts";
+import { parsearExcel, aKey } from "../src/lib/excel-parser.ts";
+import { empiezaConPrefijoReservado } from "../src/lib/enlaces.ts";
 
 function libro(filas) {
   const wb = XLSX.utils.book_new();
@@ -54,6 +55,12 @@ const r5 = parsearExcel(libro([
 assert.strictEqual(r5.filas.length, 2, "la fila en blanco no se carga como dato");
 assert.strictEqual(r5.filasVaciasDescartadas, 1);
 assert.strictEqual(parsearExcel(libro([["Cliente"], ["Ana"]])).filasVaciasDescartadas, 0, "sin filas vacías, queda en 0");
+
+// --- 5b. invariante de las claves "mágicas" (_excluido_reportes, ver
+// enlaces.ts): ninguna columna de un Excel real puede nacer con el prefijo
+// reservado, aunque el encabezado tenga guiones bajos de punta. ---
+assert.strictEqual(empiezaConPrefijoReservado(aKey("_excluido_reportes", new Set())), false);
+assert.strictEqual(empiezaConPrefijoReservado(aKey("___Columna rara___", new Set())), false);
 
 // --- 6. fechas en formatos mezclados: se detecta igual el rol y se
 // estandariza cada valor interpretable a yyyy-mm-dd, sin tocar el que no

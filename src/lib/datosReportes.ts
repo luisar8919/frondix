@@ -95,7 +95,7 @@ export async function calcularModulosReporte(supabase: SupabaseClient, empresaId
       ...(cProveedor && { pr: cProveedor.key }),
       ...(cGastos && { g: cGastos.key }),
       ...(cCategoria && { cat: cCategoria.key }),
-      excl: "_excluido_reportes",
+      excl: "_excluido_reportes", // clave reservada, ver empiezaConPrefijoReservado en enlaces.ts
     });
     const filas = filasCrudas.filter((f) => f.excl !== "true");
 

@@ -274,6 +274,10 @@ export async function aplicarReglasDesdeRegistro(
     } else if (regla.accion.tipo === "excluir_de_reportes") {
       if (recordId && datosNuevos) {
         if (!datosFinal) datosFinal = { ...datosNuevos };
+        // Clave "mágica" fuera de las columnas reales del usuario -- nunca
+        // puede chocar con una columna de verdad porque ninguna key creada
+        // por un usuario puede empezar con "_" (ver empiezaConPrefijoReservado
+        // en enlaces.ts, y los tests de aKey()/nuevaClave() que lo garantizan).
         datosFinal._excluido_reportes = true;
         huboMutacion = true;
       }
