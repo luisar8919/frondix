@@ -3,6 +3,7 @@ import { crearClienteAdmin } from "@/lib/supabase/admin";
 import { agruparClientes, diasDesde, normalizarTelefonoPE, type FilaCruda } from "@/lib/seguimiento";
 import { enviarPush } from "@/lib/push";
 import { enviarPlantilla } from "@/lib/whatsapp";
+import { registrarEnvioWhatsapp } from "@/lib/whatsappMetricas";
 import { enviarTelegram } from "@/lib/telegram";
 import type { Columna } from "@/lib/excel-parser";
 import { leerTodasLasFilas } from "@/lib/paginacion";
@@ -120,6 +121,9 @@ export async function GET(req: NextRequest) {
       if (telefonoWhatsapp) {
         try {
           await enviarPlantilla(telefonoWhatsapp, "aviso_clientes_inactivos", [empresa?.nombre ?? "tu negocio", String(UMBRAL_DIAS)]);
+          // Mejor esfuerzo aparte: que esto falle nunca debe hacer parecer
+          // que el WhatsApp (ya mandado) falló.
+          try { await registrarEnvioWhatsapp(supabase, empresaId); } catch { /* ver comentario de whatsappMetricas.ts */ }
         } catch (e) {
           console.error(`seguimiento-push: fallo el WhatsApp a la empresa ${empresaId}:`, e instanceof Error ? e.message : e);
         }

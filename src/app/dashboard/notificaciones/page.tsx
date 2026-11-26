@@ -5,11 +5,19 @@ import Link from "next/link";
 import { crearClienteBrowser } from "@/lib/supabase/client";
 import { empresaDelUsuario } from "@/lib/sesion";
 import { CANALES_AVISO, type Regla } from "@/lib/reglas";
+import { enviosWhatsappEsteMes } from "@/lib/whatsappMetricas";
 
 interface ModuloConReglas {
   datasetId: string;
   nombre: string;
   reglas: Regla[];
+}
+
+interface MensajeEntrante {
+  id: string;
+  telefono: string;
+  mensaje: string | null;
+  recibido_en: string;
 }
 
 // Vista de solo-consulta de los 4 canales de notificación de la plataforma
@@ -24,6 +32,8 @@ export default function NotificacionesPage() {
   const [telefono, setTelefono] = useState<string | null>(null);
   const [telegramChatId, setTelegramChatId] = useState<string | null>(null);
   const [modulos, setModulos] = useState<ModuloConReglas[]>([]);
+  const [whatsappEsteMes, setWhatsappEsteMes] = useState<number | null>(null);
+  const [mensajesEntrantes, setMensajesEntrantes] = useState<MensajeEntrante[]>([]);
 
   useEffect(() => {
     (async () => {
@@ -40,6 +50,15 @@ export default function NotificacionesPage() {
         .single();
       setTelefono(empresa?.telefono ?? null);
       setTelegramChatId(empresa?.telegram_chat_id ?? null);
+      setWhatsappEsteMes(await enviosWhatsappEsteMes(supabase, sesion.empresaId));
+
+      const { data: entrantes } = await supabase
+        .from("whatsapp_mensajes_entrantes")
+        .select("id, telefono, mensaje, recibido_en")
+        .eq("empresa_id", sesion.empresaId)
+        .order("recibido_en", { ascending: false })
+        .limit(10);
+      setMensajesEntrantes(entrantes ?? []);
 
       const res = await fetch("/api/reglas");
       const body = await res.json();
@@ -152,7 +171,15 @@ export default function NotificacionesPage() {
           <li style={{ padding: "8px 0", borderBottom: "1px solid var(--linea)" }}>
             <strong>WhatsApp</strong> --{" "}
             {telefono ? (
-              <span className="suave pequeno">conectado al {telefono}.</span>
+              <span className="suave pequeno">
+                conectado al {telefono}.{" "}
+                {whatsappEsteMes !== null && (
+                  <strong>
+                    {whatsappEsteMes} {whatsappEsteMes === 1 ? "mensaje enviado" : "mensajes enviados"} este mes
+                  </strong>
+                )}{" "}
+                -- el único canal con costo real por mensaje.
+              </span>
             ) : (
               <span className="suave pequeno">
                 sin número cargado -- no vas a recibir nada por acá hasta que lo cargues en{" "}
@@ -172,6 +199,23 @@ export default function NotificacionesPage() {
           </li>
         </ul>
       </div>
+
+      {mensajesEntrantes.length > 0 && (
+        <div className="tarjeta" style={{ marginTop: 20 }}>
+          <h3 style={{ marginTop: 0 }}>Mensajes recibidos por WhatsApp</h3>
+          <p className="suave pequeno">
+            Respuestas tuyas al número compartido de la plataforma (nunca de un cliente final, ver más arriba).
+          </p>
+          <ul style={{ listStyle: "none", padding: 0, margin: 0 }}>
+            {mensajesEntrantes.map((m, i) => (
+              <li key={m.id} style={{ padding: "8px 0", borderTop: i > 0 ? "1px solid var(--linea)" : "none" }}>
+                <span className="suave pequeno">{new Date(m.recibido_en).toLocaleString("es-PE")}</span>
+                <p style={{ margin: "2px 0 0" }}>{m.mensaje ?? "(sin texto)"}</p>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
     </>
   );
 }
