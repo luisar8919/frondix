@@ -2,6 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { claveValida } from "./enlaces.ts";
 import type { Columna } from "./excel-parser.ts";
 import { normalizarTexto } from "./seguimiento.ts";
+import { leerTodasLasFilas } from "./paginacion.ts";
 
 export interface MovimientoCliente {
   datasetNombre: string;
@@ -22,8 +23,9 @@ const columnaConRol = (columnas: Columna[], rol: string) => columnas.find((c) =>
 // sin rol a propósito (no son ventas), pero sí queremos su historial acá.
 const columnaClienteAmplia = (columnas: Columna[]) =>
   columnaConRol(columnas, "cliente") ?? columnas.find((c) => c.key === "cliente" && claveValida(c.key));
-const PAGINA = 1000;
-const TOPE_FILAS = 5000; // por módulo: alcanza de sobra para el historial de un solo cliente
+// Tope más chico que el resto (ver paginacion.ts): alcanza de sobra para el
+// historial de un solo cliente en un módulo.
+const TOPE_FILAS_HISTORIAL = 5000;
 
 // Todo lo que compró un cliente, juntando CUALQUIER módulo que tenga columna de
 // Cliente (no solo uno) -- el mismo cliente puede aparecer en varias tablas si el
@@ -52,25 +54,19 @@ export async function historialCliente(supabase: SupabaseClient, empresaId: stri
       cFecha && `fecha:data->>${cFecha.key}`,
     ].filter(Boolean).join(", ");
 
-    for (let desde = 0; desde < TOPE_FILAS; desde += PAGINA) {
-      const { data: records, error: errorRecords } = await supabase
-        .from("records")
-        .select(seleccion)
-        .eq("dataset_id", d.id)
-        .range(desde, desde + PAGINA - 1);
-      if (errorRecords) throw new Error(errorRecords.message);
-      const filas = (records ?? []) as unknown as { cliente: string | null; producto?: string | null; monto?: string | null; fecha?: string | null }[];
-      for (const f of filas) {
-        if (!f.cliente || normalizarTexto(f.cliente) !== clave) continue;
-        const monto = f.monto !== undefined && f.monto !== null ? Number(f.monto) : null;
-        movimientos.push({
-          datasetNombre: d.nombre,
-          fecha: f.fecha ?? null,
-          producto: f.producto ?? null,
-          monto: monto !== null && Number.isFinite(monto) ? monto : null,
-        });
-      }
-      if (filas.length < PAGINA) break;
+    const filasDataset = await leerTodasLasFilas<{ cliente: string | null; producto?: string | null; monto?: string | null; fecha?: string | null }>(
+      (desde, hasta) => supabase.from("records").select(seleccion).eq("dataset_id", d.id).range(desde, hasta),
+      TOPE_FILAS_HISTORIAL
+    );
+    for (const f of filasDataset) {
+      if (!f.cliente || normalizarTexto(f.cliente) !== clave) continue;
+      const monto = f.monto !== undefined && f.monto !== null ? Number(f.monto) : null;
+      movimientos.push({
+        datasetNombre: d.nombre,
+        fecha: f.fecha ?? null,
+        producto: f.producto ?? null,
+        monto: monto !== null && Number.isFinite(monto) ? monto : null,
+      });
     }
   }
 

@@ -2,9 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { claveValida } from "./enlaces.ts";
 import { agruparClientes, normalizarTexto, formatearNombre, type FilaCruda } from "./seguimiento.ts";
 import type { Columna } from "./excel-parser.ts";
-
-const PAGINA = 1000;
-const TOPE_FILAS = 20000;
+import { leerTodasLasFilas } from "./paginacion.ts";
 
 export interface ProveedorLista {
   clave: string;
@@ -23,14 +21,9 @@ const columnaConRol = (columnas: Columna[], rol: string) => columnas.find((c) =>
 
 async function leerFilas(supabase: SupabaseClient, datasetId: string, claves: Record<string, string>) {
   const seleccion = Object.entries(claves).map(([alias, clave]) => `${alias}:data->>${clave}`).join(",");
-  const filas: Record<string, string | null>[] = [];
-  for (let desde = 0; desde < TOPE_FILAS; desde += PAGINA) {
-    const { data, error } = await supabase.from("records").select(seleccion).eq("dataset_id", datasetId).order("id").range(desde, desde + PAGINA - 1);
-    if (error) throw new Error(error.message);
-    filas.push(...(data as unknown as typeof filas));
-    if (data.length < PAGINA) break;
-  }
-  return filas;
+  return leerTodasLasFilas<Record<string, string | null>>((desde, hasta) =>
+    supabase.from("records").select(seleccion).eq("dataset_id", datasetId).order("id").range(desde, hasta)
+  );
 }
 
 // Espejo de listaClientes (src/lib/clientes.ts), pero con rol "proveedor" y
@@ -126,16 +119,13 @@ export async function historialProveedor(supabase: SupabaseClient, empresaId: st
       cFecha && `fecha:data->>${cFecha.key}`,
     ].filter(Boolean).join(", ");
 
-    for (let desde = 0; desde < TOPE_FILAS; desde += PAGINA) {
-      const { data: records, error: errorRecords } = await supabase.from("records").select(seleccion).eq("dataset_id", d.id).range(desde, desde + PAGINA - 1);
-      if (errorRecords) throw new Error(errorRecords.message);
-      const filas = (records ?? []) as unknown as { proveedor: string | null; producto?: string | null; monto?: string | null; fecha?: string | null }[];
-      for (const f of filas) {
-        if (!f.proveedor || normalizarTexto(f.proveedor) !== clave) continue;
-        const monto = f.monto !== undefined && f.monto !== null ? Number(f.monto) : null;
-        movimientos.push({ datasetNombre: d.nombre, fecha: f.fecha ?? null, producto: f.producto ?? null, monto: monto !== null && Number.isFinite(monto) ? monto : null });
-      }
-      if (filas.length < PAGINA) break;
+    const filasDataset = await leerTodasLasFilas<{ proveedor: string | null; producto?: string | null; monto?: string | null; fecha?: string | null }>((desde, hasta) =>
+      supabase.from("records").select(seleccion).eq("dataset_id", d.id).range(desde, hasta)
+    );
+    for (const f of filasDataset) {
+      if (!f.proveedor || normalizarTexto(f.proveedor) !== clave) continue;
+      const monto = f.monto !== undefined && f.monto !== null ? Number(f.monto) : null;
+      movimientos.push({ datasetNombre: d.nombre, fecha: f.fecha ?? null, producto: f.producto ?? null, monto: monto !== null && Number.isFinite(monto) ? monto : null });
     }
   }
 

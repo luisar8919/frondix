@@ -5,6 +5,7 @@ import { enviarPush } from "@/lib/push";
 import { enviarPlantilla } from "@/lib/whatsapp";
 import { enviarTelegram } from "@/lib/telegram";
 import type { Columna } from "@/lib/excel-parser";
+import { leerTodasLasFilas } from "@/lib/paginacion";
 
 // Revisa los clientes con seguimiento activado (checkbox en la pantalla de
 // Seguimiento) y manda UN push por empresa listando a los que recién cruzaron
@@ -15,19 +16,12 @@ import type { Columna } from "@/lib/excel-parser";
 // Actions, ver .github/workflows/seguimiento-push.yml) con el secreto en el
 // header x-cron-secret -- sin él, cualquiera podría gastar las notificaciones.
 const UMBRAL_DIAS = 30;
-const PAGINA = 1000;
-const TOPE_FILAS = 20000;
 
 async function leerFilas(supabase: ReturnType<typeof crearClienteAdmin>, datasetId: string, claveCliente: string, claveFecha: string) {
   const seleccion = `c:data->>${claveCliente},f:data->>${claveFecha}`;
-  const filas: FilaCruda[] = [];
-  for (let desde = 0; desde < TOPE_FILAS; desde += PAGINA) {
-    const { data, error } = await supabase.from("records").select(seleccion).eq("dataset_id", datasetId).order("id").range(desde, desde + PAGINA - 1);
-    if (error) throw new Error(error.message);
-    filas.push(...(data as unknown as FilaCruda[]));
-    if (data.length < PAGINA) break;
-  }
-  return filas;
+  return leerTodasLasFilas<FilaCruda>((desde, hasta) =>
+    supabase.from("records").select(seleccion).eq("dataset_id", datasetId).order("id").range(desde, hasta)
+  );
 }
 
 export async function GET(req: NextRequest) {

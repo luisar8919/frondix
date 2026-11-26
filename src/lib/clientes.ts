@@ -2,9 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { claveValida } from "./enlaces.ts";
 import { agruparClientes, normalizarTexto, formatearNombre, type FilaCruda, type ClienteResumen } from "./seguimiento.ts";
 import type { Columna } from "./excel-parser.ts";
-
-const PAGINA = 1000;
-const TOPE_FILAS = 20000;
+import { leerTodasLasFilas } from "./paginacion.ts";
 
 export interface ClienteLista extends ClienteResumen {
   totalGastado: number;
@@ -22,14 +20,9 @@ const columnaClienteAmplia = (columnas: Columna[]) =>
 
 async function leerFilas(supabase: SupabaseClient, datasetId: string, claves: Partial<Record<"c" | "f" | "t" | "m", string>>) {
   const seleccion = Object.entries(claves).map(([alias, clave]) => `${alias}:data->>${clave}`).join(",");
-  const filas: (FilaCruda & { m?: string | null })[] = [];
-  for (let desde = 0; desde < TOPE_FILAS; desde += PAGINA) {
-    const { data, error } = await supabase.from("records").select(seleccion).eq("dataset_id", datasetId).order("id").range(desde, desde + PAGINA - 1);
-    if (error) throw new Error(error.message);
-    filas.push(...(data as unknown as typeof filas));
-    if (data.length < PAGINA) break;
-  }
-  return filas;
+  return leerTodasLasFilas<FilaCruda & { m?: string | null }>((desde, hasta) =>
+    supabase.from("records").select(seleccion).eq("dataset_id", datasetId).order("id").range(desde, hasta)
+  );
 }
 
 // La ficha de cliente de Frondix: todos los clientes de cualquier módulo de

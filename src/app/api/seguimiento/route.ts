@@ -9,9 +9,8 @@ import {
   type FilaCruda,
 } from "@/lib/seguimiento";
 import type { Columna } from "@/lib/excel-parser";
+import { leerTodasLasFilas } from "@/lib/paginacion";
 
-const PAGINA = 1000; // Supabase corta cada respuesta en 1000 filas
-const TOPE_FILAS = 20000; // por tabla; más que eso hoy no se analiza
 const MUESTRA_GRATIS = 3;
 const MAX_LISTA = 300;
 const DIAS_SIN_INSISTIR = 14; // un cliente contactado hace menos de esto se marca "ya escrito"
@@ -19,19 +18,9 @@ const DIAS_SIN_INSISTIR = 14; // un cliente contactado hace menos de esto se mar
 // Pide solo las columnas necesarias (no toda la fila): así el análisis casi no gasta transferencia.
 async function leerFilas(supabase: SupabaseClient, datasetId: string, claves: Partial<Record<"c" | "f" | "t" | "m", string>>) {
   const seleccion = Object.entries(claves).map(([alias, clave]) => `${alias}:data->>${clave}`).join(",");
-  const filas: FilaCruda[] = [];
-  for (let desde = 0; desde < TOPE_FILAS; desde += PAGINA) {
-    const { data, error } = await supabase
-      .from("records")
-      .select(seleccion)
-      .eq("dataset_id", datasetId)
-      .order("id")
-      .range(desde, desde + PAGINA - 1);
-    if (error) throw new Error(error.message);
-    filas.push(...(data as unknown as FilaCruda[]));
-    if (data.length < PAGINA) break;
-  }
-  return filas;
+  return leerTodasLasFilas<FilaCruda>((desde, hasta) =>
+    supabase.from("records").select(seleccion).eq("dataset_id", datasetId).order("id").range(desde, hasta)
+  );
 }
 
 const columnaConRol = (columnas: Columna[], rol: string) => columnas.find((c) => c.rol === rol && claveValida(c.key));

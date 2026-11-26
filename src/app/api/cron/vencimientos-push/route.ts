@@ -3,6 +3,7 @@ import { crearClienteAdmin } from "@/lib/supabase/admin";
 import { enviarPush } from "@/lib/push";
 import { enviarCorreo } from "@/lib/email";
 import type { Columna } from "@/lib/excel-parser";
+import { leerTodasLasFilas } from "@/lib/paginacion";
 
 // Revisa cualquier módulo con una columna "Fecha de vencimiento" (rol
 // fecha_vencimiento, ver roles.ts) junto a una columna "producto" --
@@ -14,8 +15,6 @@ import type { Columna } from "@/lib/excel-parser";
 // header x-cron-secret, mismo patrón que /api/cron/seguimiento-push.
 const UMBRAL_DIAS_ANTES = 7;
 const TOLERANCIA_DIAS_VENCIDO = 3;
-const PAGINA = 1000;
-const TOPE_FILAS = 20000;
 
 function diasHasta(fechaStr: unknown, ahora: Date): number | null {
   const f = new Date(String(fechaStr));
@@ -50,19 +49,9 @@ export async function GET(req: NextRequest) {
       const cProducto = columnas.find((c) => c.rol === "producto")!;
       const cVencimiento = columnas.find((c) => c.rol === "fecha_vencimiento")!;
 
-      const filas: { id: string; data: Record<string, unknown> }[] = [];
-      for (let desde = 0; desde < TOPE_FILAS; desde += PAGINA) {
-        const { data: lote, error: errorLote } = await supabase
-          .from("records")
-          .select("id, data")
-          .eq("dataset_id", d.id)
-          .is("eliminado_en", null)
-          .order("id")
-          .range(desde, desde + PAGINA - 1);
-        if (errorLote) throw new Error(errorLote.message);
-        filas.push(...lote);
-        if (lote.length < PAGINA) break;
-      }
+      const filas = await leerTodasLasFilas<{ id: string; data: Record<string, unknown> }>((desde, hasta) =>
+        supabase.from("records").select("id, data").eq("dataset_id", d.id).is("eliminado_en", null).order("id").range(desde, hasta)
+      );
 
       const { data: yaAvisados } = await supabase
         .from("vencimientos_avisados")

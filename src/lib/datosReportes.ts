@@ -6,28 +6,16 @@ import { tipoModulo, type TipoModulo } from "./roles.ts";
 import { tieneSuscripcionActiva } from "./suscripcion.ts";
 import { esStock } from "./stock.ts";
 import type { Columna } from "./excel-parser.ts";
-
-const PAGINA = 1000; // Supabase corta cada respuesta en 1000 filas
-const TOPE_FILAS = 20000; // por módulo; más que eso hoy no se analiza
+import { leerTodasLasFilas } from "./paginacion.ts";
 
 // Mismo patrón que /api/seguimiento: pide solo las columnas necesarias, paginado.
 // `claves` es alias -> key de columna; el alias puede ser cualquier string (se usa
 // tanto con los alias fijos f/m/p/c/co como con keys de columnas libres).
 async function leerFilas(supabase: SupabaseClient, datasetId: string, claves: Record<string, string>) {
   const seleccion = Object.entries(claves).map(([alias, clave]) => `${alias}:data->>${clave}`).join(",");
-  const filas: Record<string, string | null>[] = [];
-  for (let desde = 0; desde < TOPE_FILAS; desde += PAGINA) {
-    const { data, error } = await supabase
-      .from("records")
-      .select(seleccion)
-      .eq("dataset_id", datasetId)
-      .order("id")
-      .range(desde, desde + PAGINA - 1);
-    if (error) throw new Error(error.message);
-    filas.push(...(data as unknown as typeof filas));
-    if (data.length < PAGINA) break;
-  }
-  return filas;
+  return leerTodasLasFilas<Record<string, string | null>>((desde, hasta) =>
+    supabase.from("records").select(seleccion).eq("dataset_id", datasetId).order("id").range(desde, hasta)
+  );
 }
 
 const columnaConRol = (columnas: Columna[], rol: string) => columnas.find((c) => c.rol === rol && claveValida(c.key));

@@ -6,9 +6,9 @@ import { esVendedor, rolEnEmpresa } from "@/lib/permisos";
 import { tipoModulo } from "@/lib/roles";
 import { claveValida } from "@/lib/enlaces";
 import type { Columna } from "@/lib/excel-parser";
+import { leerTodasLasFilas } from "@/lib/paginacion";
 
-const PAGINA = 1000;
-const TOPE_FILAS = 20000; // mismo tope que la importación (ver MAX_FILAS_IMPORTACION en insertar.ts)
+// Mismo tope que la importación (ver MAX_FILAS_IMPORTACION en insertar.ts).
 
 const columnaConRol = (columnas: Columna[], rol: string) => columnas.find((c) => c.rol === rol && claveValida(c.key));
 
@@ -51,18 +51,15 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ data
   if (errorDataset || !dataset) return NextResponse.json({ error: "Módulo no encontrado" }, { status: 404 });
 
   const columnas = dataset.columnas as Columna[];
-  const filas: Record<string, unknown>[] = [];
-  for (let desde = 0; desde < TOPE_FILAS; desde += PAGINA) {
-    const { data: records, error } = await supabase
-      .from("records")
-      .select("data")
-      .eq("dataset_id", datasetId)
-      .order("id")
-      .range(desde, desde + PAGINA - 1);
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-    filas.push(...records.map((r) => r.data as Record<string, unknown>));
-    if (records.length < PAGINA) break;
+  let registros: { data: Record<string, unknown> }[];
+  try {
+    registros = await leerTodasLasFilas<{ data: Record<string, unknown> }>((desde, hasta) =>
+      supabase.from("records").select("data").eq("dataset_id", datasetId).order("id").range(desde, hasta)
+    );
+  } catch (e) {
+    return NextResponse.json({ error: e instanceof Error ? e.message : "No se pudo leer el módulo" }, { status: 500 });
   }
+  const filas = registros.map((r) => r.data);
 
   const paraSunat = req.nextUrl.searchParams.get("formato") === "sunat";
   const tipo = paraSunat ? tipoModulo(columnas.map((c) => c.rol), dataset.nombre) : null;

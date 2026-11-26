@@ -5,27 +5,15 @@ import { empresaDelUsuarioServidor } from "@/lib/sesionServidor";
 import { claveValida } from "@/lib/enlaces";
 import { agruparPorDia, type FilaCalendario } from "@/lib/calendario";
 import type { Columna } from "@/lib/excel-parser";
-
-const PAGINA = 1000; // Supabase corta cada respuesta en 1000 filas
-const TOPE_FILAS = 20000; // por módulo; más que eso hoy no se analiza
+import { leerTodasLasFilas } from "@/lib/paginacion";
 
 // Mismo patrón que datosReportes.ts/seguimiento.ts: pide solo las columnas
 // necesarias, paginado.
 async function leerFilas(supabase: SupabaseClient, datasetId: string, claves: Record<string, string>) {
   const seleccion = Object.entries(claves).map(([alias, clave]) => `${alias}:data->>${clave}`).join(",");
-  const filas: Record<string, string | null>[] = [];
-  for (let desde = 0; desde < TOPE_FILAS; desde += PAGINA) {
-    const { data, error } = await supabase
-      .from("records")
-      .select(seleccion)
-      .eq("dataset_id", datasetId)
-      .order("id")
-      .range(desde, desde + PAGINA - 1);
-    if (error) throw new Error(error.message);
-    filas.push(...(data as unknown as typeof filas));
-    if (data.length < PAGINA) break;
-  }
-  return filas;
+  return leerTodasLasFilas<Record<string, string | null>>((desde, hasta) =>
+    supabase.from("records").select(seleccion).eq("dataset_id", datasetId).order("id").range(desde, hasta)
+  );
 }
 
 // Calendario mensual de cualquier módulo con columna Fecha: reservas, citas,
