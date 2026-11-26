@@ -143,7 +143,7 @@ export default function RecetasModulo({
       <div className="tarjeta" style={{ marginBottom: 20 }}>
         <h3 style={{ margin: "0 0 4px" }}>{nombre}</h3>
         <p className="suave pequeno" style={{ marginTop: 0 }}>
-          Recetas generales -- las que este módulo todavía no puede usar aparecen apagadas, con lo que les falta.
+          Automatizaciones generales -- las que este módulo todavía no puede usar aparecen apagadas, con lo que les falta.
         </p>
 
         <div style={{ display: "grid", gap: 14, gridTemplateColumns: "repeat(auto-fill, minmax(270px, 1fr))", marginTop: 14 }}>

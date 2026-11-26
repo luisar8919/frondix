@@ -59,7 +59,7 @@ export default function ReglasPage() {
           <h1>Condicionales</h1>
           <p className="suave">
             Qué debe pasar solo cuando algo cambia en un módulo -- ej. que un pedido "Cancelado" no cuente como ingreso,
-            o que una venta ajuste tu Stock automáticamente. Para lo más simple y directo, mejor entrá a "Recetas".
+            o que una venta ajuste tu Stock automáticamente. Para lo más simple y directo, mejor entrá a "Automatizaciones".
           </p>
         </div>
       </div>

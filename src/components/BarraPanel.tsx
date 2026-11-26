@@ -29,8 +29,9 @@ const seguimientoSubmenu = [
 ];
 
 const reglasSubmenu = [
-  { href: "/dashboard/recetas", texto: "Recetas" },
+  { href: "/dashboard/recetas", texto: "Automatizaciones" },
   { href: "/dashboard/reglas", texto: "Condicionales" },
+  { href: "/dashboard/notificaciones", texto: "Notificaciones" },
   { href: "/dashboard/enlaces", texto: "Enlaces" },
 ];
 
@@ -177,7 +178,7 @@ function MenuMovil({
                   {s.texto}
                 </Link>
               ))}
-              <Separador texto="Reglas" />
+              <Separador texto="Configuración" />
               {reglasSubmenu.map((s) => (
                 <Link key={s.href} href={s.href} className="menu-cuenta-item" role="menuitem" onClick={() => setAbierto(false)}>
                   {s.texto}
@@ -272,7 +273,7 @@ export default function BarraPanel({
           )}
           {!esVendedor && <BotonSubmenu texto="Resumen" items={resumenSubmenu} activo={activoResumen} />}
           {!esVendedor && <BotonSubmenu texto="Seguimiento" items={seguimientoSubmenu} activo={activoSeguimiento} />}
-          {!esVendedor && <BotonSubmenu texto="Reglas" items={reglasSubmenu} activo={activoReglas} />}
+          {!esVendedor && <BotonSubmenu texto="Configuración" items={reglasSubmenu} activo={activoReglas} />}
           {esVendedor && (
             <Link href="/dashboard/calendario" className="nav-link" aria-current={activo("/dashboard/calendario") ? "page" : undefined}>
               Calendario
