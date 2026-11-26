@@ -45,6 +45,18 @@ const CONSEJOS: Consejo[] = [
     titulo: "Un Excel desordenado no es problema",
     texto: "Si tu Excel tiene columnas raras, varias hojas o datos sueltos, súbelo igual: el asistente de carga te va a preguntar qué es cada cosa, y si está muy desordenado puedes pedirle a la IA que te sugiera cómo separarlo.",
   },
+  {
+    titulo: "¿Reservas, delivery o alquileres? Usa Atención",
+    texto: "Si tu negocio no es de stock sino de citas, pedidos o alquileres, entra a \"Atención\" en la barra de arriba: ahí registras uno nuevo y cambias su Estado (Confirmada, Entregado...) con un toque, sin abrir el formulario completo.",
+  },
+  {
+    titulo: "Automatiza lo repetitivo desde Configuración",
+    texto: "En Configuración -> Automatizaciones hay reglas listas para activar en un clic: que te avise en registros grandes, que un Cliente vacío se complete solo, que se note un registro eliminado... Lo más fino, campo por campo, está en \"Condicionales\".",
+  },
+  {
+    titulo: "Elige por dónde te avisamos",
+    texto: "En Configuración -> Notificaciones ves todo junto: qué te avisa Frondix, por qué canal (app, correo, WhatsApp o Telegram), y el estado real de cada uno para tu negocio.",
+  },
 ];
 
 // Carrusel simple de tips para Inicio: flecha derecha avanza, izquierda retrocede
