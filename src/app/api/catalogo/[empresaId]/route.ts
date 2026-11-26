@@ -1,11 +1,15 @@
 import { NextResponse } from "next/server";
 import { crearClienteAdmin } from "@/lib/supabase/admin";
 import { productosCatalogo } from "@/lib/catalogo";
+import { ipDePeticion, limitePorIp } from "@/lib/limiteIp";
 
 // Público, sin sesión: cualquiera con el link puede ver esto. Por eso exige
 // catalogo_publico=true (apagado por defecto, ver /api/catalogo/toggle) y usa
 // el cliente de servicio solo para LEER, nunca para escribir.
-export async function GET(_req: Request, { params }: { params: Promise<{ empresaId: string }> }) {
+export async function GET(req: Request, { params }: { params: Promise<{ empresaId: string }> }) {
+  if (!limitePorIp(ipDePeticion(req), 30)) {
+    return NextResponse.json({ error: "Demasiadas peticiones" }, { status: 429 });
+  }
   const { empresaId } = await params;
   const admin = crearClienteAdmin();
 

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { crearClienteAdmin } from "@/lib/supabase/admin";
 import { enviarCorreoAlCliente } from "@/lib/email";
+import { ipDePeticion, limitePorIp } from "@/lib/limiteIp";
 
 // Publico, sin sesion -- lo llama el formulario de agenda del landing (/, seccion
 // "Agenda una reunion"). Guarda la reserva con el cliente admin (la tabla
@@ -9,6 +10,9 @@ import { enviarCorreoAlCliente } from "@/lib/email";
 // email.ts: si esa variable o RESEND_API_KEY no estan configuradas, la
 // reserva se guarda igual, solo no llega el aviso.
 export async function POST(req: NextRequest) {
+  if (!limitePorIp(ipDePeticion(req), 10)) {
+    return NextResponse.json({ error: "Demasiadas peticiones" }, { status: 429 });
+  }
   const { nombre, correo, rubro, mensaje, fecha, horario } = await req.json().catch(() => ({}));
 
   if (!correo || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(correo))) {

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { crearClienteAdmin } from "@/lib/supabase/admin";
 import { aceptarCotizacion } from "@/lib/cotizaciones";
+import { ipDePeticion, limitePorIp } from "@/lib/limiteIp";
 
 // Sin login: el cliente llega desde el link de WhatsApp con ?token=... (ver
 // enlaceWhatsApp en Cotizaciones.tsx). El token hace de contraseña de un solo
@@ -19,6 +20,11 @@ async function cotizacionConToken(id: string, token: string | null) {
 }
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  // El token es el único secreto que protege esta ruta -- sin límite, alguien
+  // podría intentar adivinarlo a fuerza bruta probando valores seguidos.
+  if (!limitePorIp(ipDePeticion(req), 20)) {
+    return NextResponse.json({ error: "Demasiadas peticiones" }, { status: 429 });
+  }
   const { id } = await params;
   const token = req.nextUrl.searchParams.get("token");
   const encontrada = await cotizacionConToken(id, token);
@@ -30,6 +36,9 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
 }
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  if (!limitePorIp(ipDePeticion(req), 10)) {
+    return NextResponse.json({ error: "Demasiadas peticiones" }, { status: 429 });
+  }
   const { id } = await params;
   const { token, estado } = await req.json().catch(() => ({}));
   if (estado !== "aceptada" && estado !== "rechazada") return NextResponse.json({ error: "Estado inválido" }, { status: 400 });
