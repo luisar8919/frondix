@@ -1,6 +1,6 @@
 import type { Columna } from "./excel-parser.ts";
 import type { Regla } from "./reglas.ts";
-import { recetaPorClave } from "./recetas.ts";
+import { plantillaPorClave } from "./recetas.ts";
 
 // Regla sugerida para las plantillas que SÍ clasifican como "ventas" (ver
 // comentario del segundo lote más abajo): excluye de Reportes cualquier fila
@@ -15,7 +15,7 @@ import { recetaPorClave } from "./recetas.ts";
 // para no tener que reescribir el objeto `{condicion, accion}` acá también.
 function reglaExcluirCancelado(valorCancelado: string): Omit<Regla, "id">[] {
   const columnaEstado: Columna = { key: "estado", label: "Estado", tipo: "texto", rol: "estado", sospechosa: false };
-  const construida = recetaPorClave("excluir_cancelados").construir([columnaEstado], valorCancelado);
+  const construida = plantillaPorClave("excluir_cancelados").construir([columnaEstado], valorCancelado);
   return construida ? [{ ...construida, activa: true, origen: "automatica" }] : [];
 }
 

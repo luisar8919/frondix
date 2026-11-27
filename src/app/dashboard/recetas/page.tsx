@@ -13,7 +13,7 @@ interface ModuloConReglas {
   reglas: Regla[];
 }
 
-// Galería de recetas (nombre visible: "Automatizaciones"): reglas pre-armadas
+// Catálogo de automatizaciones (nombre visible, antes "Recetas"): reglas pre-armadas
 // en lenguaje simple (ícono + frase + a lo sumo un valor), separada del
 // editor técnico ("Condicionales", /dashboard/reglas) y de los Enlaces --
 // opciones del desplegable "Configuración" de la barra. Reusa /api/reglas

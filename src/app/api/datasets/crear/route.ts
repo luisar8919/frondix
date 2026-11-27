@@ -7,7 +7,7 @@ import { plantillaVentas, plantillaCompras, PLANTILLAS_EXTRA } from "@/lib/plant
 import { tipoModulo } from "@/lib/roles";
 import { esStock } from "@/lib/stock";
 import type { Regla } from "@/lib/reglas";
-import { recetaPorClave } from "@/lib/recetas";
+import { plantillaPorClave } from "@/lib/recetas";
 import type { Columna } from "@/lib/excel-parser";
 
 const CLAVES_PLANTILLA_EXTRA = new Set(PLANTILLAS_EXTRA.map((p) => p.clave));
@@ -44,7 +44,7 @@ async function enlazarStockAutomatico(supabase: SupabaseClient, empresaId: strin
       // (y apagar sin romper el enlace) desde "Editar tabla y campos".
       const reglasActuales = (d.reglas as Regla[]) ?? [];
       const yaTiene = reglasActuales.some((r) => r.accion.tipo === "ajustar_stock");
-      const construida = recetaPorClave("ajustar_stock").construir(nuevasColumnas, "");
+      const construida = plantillaPorClave("ajustar_stock").construir(nuevasColumnas, "");
       const nuevasReglas = yaTiene || !construida
         ? reglasActuales
         : [...reglasActuales, { ...construida, id: crypto.randomUUID() } satisfies Regla];

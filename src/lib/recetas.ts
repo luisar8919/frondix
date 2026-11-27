@@ -3,25 +3,27 @@ import type { Regla } from "./reglas.ts";
 import { tipoModulo } from "./roles.ts";
 import { esStock } from "./stock.ts";
 
-// "Recetas" = reglas pre-armadas para quien no quiere ver Campo/Operador/
-// Acción: un ícono, una frase en español llano y A LO SUMO un valor a
-// completar (un número o un texto). El editor técnico (ReglasModulo, "modo
-// avanzado") sigue intacto para lo que no entra en ninguna receta.
+// "Catálogo de automatizaciones" (antes "Recetas" -- renombrado para no
+// chocar con el Menú de restaurante, que sí usa "receta" para la composición
+// de insumos de un plato) = reglas pre-armadas para quien no quiere ver
+// Campo/Operador/Acción: un ícono, una frase en español llano y A LO SUMO un
+// valor a completar (un número o un texto). El editor técnico (ReglasModulo,
+// "modo avanzado") sigue intacto para lo que no entra en ninguna plantilla.
 //
 // CENTRALIZACIÓN (pedido explícito): este archivo es el ÚNICO lugar que arma
-// el objeto `{condicion, accion}` de cada receta -- cualquier otro punto del
-// código que necesite crear una de estas reglas sola (el espejo de
+// el objeto `{condicion, accion}` de cada plantilla -- cualquier otro punto
+// del código que necesite crear una de estas reglas sola (el espejo de
 // "Ajustar Stock" al crear un enlace Producto->Stock, las sugeridas de
 // plantillasModulo.ts al crear un módulo nuevo) llama a `construir()` de acá
 // en vez de repetir el literal. Así, si un día hay que cambiar CÓMO se arma
-// una receta (como se hizo a mano este mismo día, migrando el ajuste de
+// una plantilla (como se hizo a mano este mismo día, migrando el ajuste de
 // Stock de la acción fija a una genérica con cantidad real), se cambia en un
 // solo lugar.
 //
-// `coincideCon` reconoce una receta activa aunque la regla se haya armado a
-// mano desde el editor avanzado (misma forma = misma receta) -- no hace
+// `coincideCon` reconoce una plantilla activa aunque la regla se haya armado
+// a mano desde el editor avanzado (misma forma = misma plantilla) -- no hace
 // falta que haya pasado por `construir()` para contar como "ya activa".
-export interface Receta {
+export interface PlantillaAutomatizacion {
   clave: string;
   icono: string;
   titulo: string;
@@ -50,7 +52,7 @@ export interface Receta {
 const col = (columnas: Columna[], rol: string) => columnas.find((c) => c.rol === rol);
 const valorCondicionCampo = (r: Regla) => (r.condicion.tipo === "campo" ? r.condicion.valor : r.condicion.tipo === "estado" ? r.condicion.valor : "");
 
-export const RECETAS: Receta[] = [
+export const PLANTILLAS_AUTOMATIZACION: PlantillaAutomatizacion[] = [
   {
     clave: "ajustar_stock",
     especifica: false,
@@ -101,7 +103,7 @@ export const RECETAS: Receta[] = [
     },
     // Por ESTRUCTURA (condición Monto > algo + push), no por el título exacto
     // -- reconoce también una regla armada a mano con un mensaje propio
-    // ("Venta grande", "Compra grande"...), no solo la creada por esta receta.
+    // ("Venta grande", "Compra grande"...), no solo la creada por esta plantilla.
     coincideCon: (r, columnas) => {
       const cMonto = col(columnas, "monto");
       return !!cMonto && r.accion.tipo === "notificacion_push" && r.condicion.tipo === "campo" && r.condicion.columnaKey === cMonto.key && r.condicion.operador === "mayor" && !r.condicion.compararColumnaKey;
@@ -124,7 +126,7 @@ export const RECETAS: Receta[] = [
       accion: { tipo: "notificacion_push", titulo: "Aviso personalizado", mensaje: valor || "Se registró un movimiento nuevo en este módulo." },
     }),
     // Por estructura (push + "siempre" + SOLO en creación), no por el mensaje
-    // en sí -- así reconoce la receta activa sin importar qué texto hayas
+    // en sí -- así reconoce la plantilla activa sin importar qué texto hayas
     // puesto, y "Actualizar" la encuentra para editarla en vez de duplicarla.
     coincideCon: (r) => r.accion.tipo === "notificacion_push" && r.accion.titulo === "Aviso personalizado" && r.condicion.tipo === "siempre" && !!r.evento && r.evento.length === 1 && r.evento[0] === "creacion",
     extraerValor: (r) => (r.accion.tipo === "notificacion_push" ? r.accion.mensaje : ""),
@@ -338,26 +340,26 @@ export const RECETAS: Receta[] = [
 ];
 
 // Acceso directo por clave -- lo usan los puntos del código que crean una
-// receta SOLOS, sin pasar por la UI (ver comentario de centralización
+// plantilla SOLA, sin pasar por la UI (ver comentario de centralización
 // arriba): enlazarStockAutomatico (api/datasets/crear, api/upload/auto) y
 // las reglasSugeridas de plantillasModulo.ts.
-export function recetaPorClave(clave: string): Receta {
-  const r = RECETAS.find((x) => x.clave === clave);
-  if (!r) throw new Error(`Receta desconocida: ${clave}`);
+export function plantillaPorClave(clave: string): PlantillaAutomatizacion {
+  const r = PLANTILLAS_AUTOMATIZACION.find((x) => x.clave === clave);
+  if (!r) throw new Error(`PlantillaAutomatizacion desconocida: ${clave}`);
   return r;
 }
 
 // Arma la nueva lista de reglas del módulo tras activar/actualizar/desactivar
-// una receta -- centraliza también ESTA lógica (antes la hubiera repetido
-// cada componente que quisiera aplicar una receta). `activar=false` solo
+// una plantilla -- centraliza también ESTA lógica (antes la hubiera repetido
+// cada componente que quisiera aplicar una plantilla). `activar=false` solo
 // apaga la regla existente (activa:false), no la borra -- coherente con
 // cómo ya funciona el toggle "Activa" del editor avanzado.
-export function aplicarReceta(reglasActuales: Regla[], receta: Receta, columnas: Columna[], valor: string, activar: boolean): Regla[] {
-  const existente = reglasActuales.find((r) => receta.coincideCon(r, columnas));
+export function aplicarPlantilla(reglasActuales: Regla[], plantilla: PlantillaAutomatizacion, columnas: Columna[], valor: string, activar: boolean): Regla[] {
+  const existente = reglasActuales.find((r) => plantilla.coincideCon(r, columnas));
   if (!activar) {
     return existente ? reglasActuales.map((r) => (r.id === existente.id ? { ...r, activa: false } : r)) : reglasActuales;
   }
-  const construida = receta.construir(columnas, valor);
+  const construida = plantilla.construir(columnas, valor);
   if (!construida) return reglasActuales;
   if (existente) {
     return reglasActuales.map((r) => (r.id === existente.id ? { ...construida, id: existente.id } : r));

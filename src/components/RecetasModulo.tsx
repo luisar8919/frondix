@@ -3,13 +3,14 @@
 import { useState } from "react";
 import type { Columna } from "@/lib/excel-parser";
 import type { Regla } from "@/lib/reglas";
-import { RECETAS, aplicarReceta, type Receta } from "@/lib/recetas";
+import { PLANTILLAS_AUTOMATIZACION, aplicarPlantilla, type PlantillaAutomatizacion } from "@/lib/recetas";
 import { enviarConfirmando } from "@/lib/confirmar";
 
-// Galería de "recetas": reglas pre-armadas en lenguaje simple (ícono + frase +
-// a lo sumo un valor), para quien no quiere ver Campo/Operador/Acción -- ver
-// el comentario largo en recetas.ts. Se muestra ARRIBA de ReglasModulo (que
-// queda como "modo avanzado", ya colapsado por defecto) en /dashboard/reglas.
+// Galería del "Catálogo de automatizaciones" (antes "Recetas"): reglas
+// pre-armadas en lenguaje simple (ícono + frase + a lo sumo un valor), para
+// quien no quiere ver Campo/Operador/Acción -- ver el comentario largo en
+// recetas.ts. Se muestra ARRIBA de ReglasModulo (que queda como "modo
+// avanzado", ya colapsado por defecto) en /dashboard/reglas.
 // Guarda con el mismo PUT /api/datasets/[id] que ya usa ReglasModulo; avisa
 // al padre (`onGuardado`) para que ambos componentes del mismo módulo queden
 // sincronizados con la fila real (ver comentario en la page).
@@ -30,12 +31,12 @@ export default function RecetasModulo({
   const [ocupada, setOcupada] = useState<string | null>(null);
   const [mensaje, setMensaje] = useState<{ tipo: "ok" | "error"; texto: string } | null>(null);
 
-  async function aplicar(rc: Receta, activar: boolean) {
+  async function aplicar(rc: PlantillaAutomatizacion, activar: boolean) {
     setOcupada(rc.clave);
     setMensaje(null);
     const existente = reglas.find((r) => rc.coincideCon(r, columnas));
     const valor = borradores[rc.clave] ?? (existente ? rc.extraerValor(existente) : rc.valorPorDefecto);
-    const nuevas = aplicarReceta(reglas, rc, columnas, valor, activar);
+    const nuevas = aplicarPlantilla(reglas, rc, columnas, valor, activar);
     const r = await enviarConfirmando(`/api/datasets/${datasetId}`, "PUT", { reglas: nuevas });
     setOcupada(null);
     if (r.cancelado) return;
@@ -47,10 +48,10 @@ export default function RecetasModulo({
   // módulo (son docenas en potencia, una por rubro -- listarlas apagadas acá
   // sería puro ruido, a diferencia de las generales). Separadas en su propia
   // tarjeta para que no se mezclen visualmente con las generales.
-  const especificasQueAplican = RECETAS.filter((rc) => rc.especifica && rc.aplicaA(columnas, nombre));
-  const generales = RECETAS.filter((rc) => !rc.especifica);
+  const especificasQueAplican = PLANTILLAS_AUTOMATIZACION.filter((rc) => rc.especifica && rc.aplicaA(columnas, nombre));
+  const generales = PLANTILLAS_AUTOMATIZACION.filter((rc) => !rc.especifica);
 
-  function tarjetaReceta(rc: Receta) {
+  function tarjetaReceta(rc: PlantillaAutomatizacion) {
     const aplica = rc.aplicaA(columnas, nombre);
     const existente = aplica ? reglas.find((r) => rc.coincideCon(r, columnas)) : undefined;
     const activa = !!existente?.activa;
