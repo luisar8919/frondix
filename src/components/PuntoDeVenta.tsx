@@ -36,6 +36,7 @@ export default function PuntoDeVenta() {
   const [modulosVentas, setModulosVentas] = useState<{ id: string; nombre: string }[] | null>(null);
   const [ventasDatasetId, setVentasDatasetId] = useState("");
   const [columnas, setColumnas] = useState<Columna[]>([]);
+  const [incluyeIgv, setIncluyeIgv] = useState(false);
   const [productos, setProductos] = useState<string[]>([]);
   const [precios, setPrecios] = useState<Record<string, PreciosProducto>>({});
   const [codigos, setCodigos] = useState<Record<string, string>>({});
@@ -60,6 +61,20 @@ export default function PuntoDeVenta() {
   // dejando el resto del carrito abierto (ver botón "Cobrar seleccionadas").
   const [modoDividir, setModoDividir] = useState(false);
   const [lineasSeleccionadas, setLineasSeleccionadas] = useState<Set<string>>(new Set());
+  // Tipo de comprobante -- "nota_venta" (default, comportamiento de siempre:
+  // nunca llama a SUNAT) vs. Boleta/Factura (real, vía FactPro, ver
+  // /api/facturacion-electronica/emitir). Nunca se guarda como columna del
+  // módulo: viaja como campo reservado "_comprobante_tipo" del registro, igual
+  // que "sustento" o "_excluido_reportes" en otras partes del proyecto.
+  const [tipoComprobante, setTipoComprobante] = useState<"nota_venta" | "boleta" | "factura">("nota_venta");
+  const [clienteDocNumero, setClienteDocNumero] = useState("");
+  const [clienteDocNombre, setClienteDocNombre] = useState("");
+  const [buscandoDocumento, setBuscandoDocumento] = useState(false);
+  const [emitiendoComprobante, setEmitiendoComprobante] = useState(false);
+  // Delivery: clasificación de la venta, independiente del tipo de comprobante
+  // -- solo pide la dirección y lo marca, sin agregar ningún cargo automático.
+  const [esDelivery, setEsDelivery] = useState(false);
+  const [deliveryDireccion, setDeliveryDireccion] = useState("");
   const [cobrando, setCobrando] = useState(false);
   const [mensaje, setMensaje] = useState<{ tipo: "ok" | "error"; texto: string } | null>(null);
   // Ambientes: agrupa visualmente las mesas (Salón, Terraza, Barra...) -- solo
@@ -146,6 +161,11 @@ export default function PuntoDeVenta() {
     setMozoPorMesa({});
     setModoDividir(false);
     setLineasSeleccionadas(new Set());
+    setTipoComprobante("nota_venta");
+    setClienteDocNumero("");
+    setClienteDocNombre("");
+    setEsDelivery(false);
+    setDeliveryDireccion("");
     (async () => {
       // Mismo truco que la Papelera: pedir 1 registro trae igual `dataset.columnas` completo.
       const res = await fetch(`/api/records/${ventasDatasetId}?limite=1`);
@@ -153,6 +173,7 @@ export default function PuntoDeVenta() {
       if (!res.ok) { setError(body.error ?? "No se pudo cargar el módulo"); setCargando(false); return; }
       const cols = (body.dataset?.columnas ?? []) as Columna[];
       setColumnas(cols);
+      setIncluyeIgv(!!body.dataset?.incluye_igv);
 
       const cProducto = cols.find((c) => c.rol === "producto" && c.enlace);
       if (!cProducto?.enlace) {
@@ -399,6 +420,26 @@ export default function PuntoDeVenta() {
     }
   }
 
+  // Autocompleta el nombre del cliente a partir de su DNI/RUC (apis.net.pe,
+  // ver /api/documento/consultar) -- no es obligatorio usarlo, el cajero
+  // puede escribir el nombre a mano si prefiere o si la consulta falla.
+  async function buscarDocumento() {
+    const numero = clienteDocNumero.trim();
+    if (!numero) return;
+    setBuscandoDocumento(true);
+    setMensaje(null);
+    const tipo = numero.length === 11 ? "ruc" : "dni";
+    try {
+      const res = await fetch(`/api/documento/consultar?tipo=${tipo}&numero=${numero}`);
+      const body = await res.json();
+      if (!res.ok) { setMensaje({ tipo: "error", texto: body.error ?? "No se pudo consultar el documento" }); return; }
+      setClienteDocNombre(body.nombre ?? "");
+      setCliente(body.nombre ?? cliente);
+    } finally {
+      setBuscandoDocumento(false);
+    }
+  }
+
   // `subset`: ausente = cobra TODO el carrito (flujo de siempre); presente =
   // "Cobrar seleccionadas" (separación de cuentas), cobra solo esas líneas y
   // deja el resto del carrito abierto en la misma mesa.
@@ -409,6 +450,49 @@ export default function PuntoDeVenta() {
       setMensaje({ tipo: "error", texto: "Con descuento aplicado, hay que escribir el motivo antes de cobrar." });
       return;
     }
+    if (tipoComprobante !== "nota_venta" && (!clienteDocNumero.trim() || !clienteDocNombre.trim())) {
+      setMensaje({ tipo: "error", texto: "Boleta/Factura necesitan el documento y el nombre del cliente." });
+      return;
+    }
+    if (esDelivery && !deliveryDireccion.trim()) {
+      setMensaje({ tipo: "error", texto: "Delivery necesita la dirección de entrega." });
+      return;
+    }
+
+    // Boleta/Factura: UN solo comprobante real ante SUNAT para todo el lote
+    // (nunca uno por línea) -- se emite ANTES de guardar nada en Ventas, así
+    // los registros quedan tageados con el serie/número real. Si falla, se
+    // aborta todo el cobro (el cajero puede reintentar, o pasar a "Nota de
+    // venta" si de verdad no hace falta el comprobante).
+    let comprobanteSerie: string | null = null;
+    let comprobanteNumero: number | string | null = null;
+    if (tipoComprobante !== "nota_venta") {
+      setEmitiendoComprobante(true);
+      setMensaje(null);
+      const resEmitir = await fetch("/api/facturacion-electronica/emitir", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          tipo: tipoComprobante,
+          cliente: { numeroDocumento: clienteDocNumero.trim(), denominacion: clienteDocNombre.trim() },
+          items: base.map((l) => ({
+            descripcion: l.nota ? `${l.producto} (${l.nota})` : l.producto,
+            cantidad: l.cantidad,
+            precio: l.precioUnitario * factorDescuento,
+          })),
+          incluyeTax: incluyeIgv,
+        }),
+      });
+      const bodyEmitir = await resEmitir.json().catch(() => ({}));
+      setEmitiendoComprobante(false);
+      if (!resEmitir.ok) {
+        setMensaje({ tipo: "error", texto: `No se pudo emitir el comprobante: ${bodyEmitir.error ?? "error desconocido"}.` });
+        return;
+      }
+      comprobanteSerie = bodyEmitir.serie ?? null;
+      comprobanteNumero = bodyEmitir.numero ?? null;
+    }
+
     setCobrando(true);
     setMensaje(null);
     const cantidadInicial = base.length;
@@ -426,6 +510,19 @@ export default function PuntoDeVenta() {
       if (cCantidad) datos[cCantidad.key] = linea.cantidad;
       if (cFecha) datos[cFecha.key] = new Date().toISOString();
       if (descuentoMonto > 0) datos.sustento = `Descuento: ${descuentoSustento.trim()}`;
+      // Campos reservados (nunca una columna real del módulo, ver
+      // enlaces.ts/empiezaConPrefijoReservado): documento/delivery de esta venta.
+      datos._comprobante_tipo = tipoComprobante;
+      if (comprobanteSerie) datos._comprobante_serie = comprobanteSerie;
+      if (comprobanteNumero !== null) datos._comprobante_numero = comprobanteNumero;
+      if (tipoComprobante !== "nota_venta") {
+        datos._comprobante_cliente_doc = clienteDocNumero.trim();
+        datos._comprobante_cliente_nombre = clienteDocNombre.trim();
+      }
+      if (esDelivery) {
+        datos._es_delivery = true;
+        datos._delivery_direccion = deliveryDireccion.trim();
+      }
 
       const res = await fetch(`/api/records/${ventasDatasetId}`, {
         method: "POST",
@@ -667,6 +764,53 @@ export default function PuntoDeVenta() {
               <input value={cliente} onChange={(e) => setCliente(e.target.value)} />
             </div>
 
+            <div className="campo" style={{ marginTop: 10, display: "flex", gap: 6, alignItems: "center" }}>
+              <label className="pequeno">Comprobante</label>
+              <select value={tipoComprobante} onChange={(e) => setTipoComprobante(e.target.value as typeof tipoComprobante)}>
+                <option value="nota_venta">Nota de venta</option>
+                <option value="boleta">Boleta</option>
+                <option value="factura">Factura</option>
+              </select>
+            </div>
+
+            {tipoComprobante !== "nota_venta" && (
+              <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 6 }}>
+                <input
+                  value={clienteDocNumero}
+                  onChange={(e) => setClienteDocNumero(e.target.value.replace(/\D/g, ""))}
+                  placeholder="DNI (8) o RUC (11)"
+                  aria-label="Documento del cliente"
+                  style={{ width: 120 }}
+                />
+                <button type="button" className="btn btn-fantasma" disabled={buscandoDocumento || !clienteDocNumero.trim()} onClick={buscarDocumento}>
+                  {buscandoDocumento ? "Buscando..." : "Buscar"}
+                </button>
+                <input
+                  value={clienteDocNombre}
+                  onChange={(e) => setClienteDocNombre(e.target.value)}
+                  placeholder="Nombre / Razón social"
+                  aria-label="Nombre del cliente para el comprobante"
+                  style={{ flex: 1, minWidth: 140 }}
+                />
+              </div>
+            )}
+
+            <div className="campo" style={{ marginTop: 10 }}>
+              <label className="pequeno" style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                <input type="checkbox" checked={esDelivery} onChange={(e) => setEsDelivery(e.target.checked)} />
+                Es delivery
+              </label>
+              {esDelivery && (
+                <input
+                  value={deliveryDireccion}
+                  onChange={(e) => setDeliveryDireccion(e.target.value)}
+                  placeholder="Dirección de entrega"
+                  aria-label="Dirección de entrega"
+                  style={{ width: "100%", marginTop: 4 }}
+                />
+              )}
+            </div>
+
             {carrito.length === 0 && <p className="suave pequeno" style={{ marginTop: 14 }}>Todavía no agregaste nada.</p>}
 
             {carrito.map((l) => (
@@ -739,10 +883,10 @@ export default function PuntoDeVenta() {
                 type="button"
                 className="btn btn-secundario"
                 style={{ width: "100%", marginTop: 6 }}
-                disabled={cobrando || lineasSeleccionadas.size === 0}
+                disabled={cobrando || emitiendoComprobante || lineasSeleccionadas.size === 0}
                 onClick={() => cobrar(carrito.filter((l) => lineasSeleccionadas.has(l.id)))}
               >
-                Cobrar seleccionadas ({lineasSeleccionadas.size}) -- {formatearMonto(totalDe(carrito.filter((l) => lineasSeleccionadas.has(l.id))), "PEN")}
+                {emitiendoComprobante ? "Emitiendo comprobante..." : `Cobrar seleccionadas (${lineasSeleccionadas.size}) -- ${formatearMonto(totalDe(carrito.filter((l) => lineasSeleccionadas.has(l.id))), "PEN")}`}
               </button>
             )}
 
@@ -822,10 +966,10 @@ export default function PuntoDeVenta() {
                   type="button"
                   className="btn btn-primario"
                   style={{ width: "100%", marginTop: 6 }}
-                  disabled={cobrando || (descuentoMonto > 0 && !descuentoSustento.trim())}
+                  disabled={cobrando || emitiendoComprobante || (descuentoMonto > 0 && !descuentoSustento.trim())}
                   onClick={() => cobrar()}
                 >
-                  {cobrando ? "Cobrando..." : "Cobrar"}
+                  {emitiendoComprobante ? "Emitiendo comprobante..." : cobrando ? "Cobrando..." : "Cobrar"}
                 </button>
               </>
             )}
