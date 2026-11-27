@@ -44,6 +44,59 @@ export function esStock(columnas: Columna[]): boolean {
   return tipo === "otro" && columnas.some((c) => c.key === "cantidad") && columnas.some((c) => c.rol === "producto");
 }
 
+// Un dataset "parece" un Menú (restaurante: platos Y bebidas que se venden al
+// cliente final, ver CLAUDE.md de la sesión que pidió esto) si trae Producto +
+// una columna de rol "composicion" -- a diferencia de Stock, un Menú NO lleva
+// su propia "cantidad" (no se cuenta inventario de un plato, se arma al
+// vender). Nunca rol "monto" (eso lo haría clasificar como Ventas, ver
+// tipoModulo): el precio de un ítem del Menú usa el rol "precio" en su lugar.
+export function esMenu(columnas: Columna[]): boolean {
+  return columnas.some((c) => c.rol === "producto") && columnas.some((c) => c.rol === "composicion");
+}
+
+// Mismo mecanismo que datasetStockDe, pero para cuando el Producto de Ventas
+// enlaza a un Menú en vez de a un Stock directo -- ver ajustarStockDesdeRegistro.
+export async function datasetMenuDe(
+  supabase: SupabaseClient,
+  empresaId: string,
+  columnas: Columna[]
+): Promise<{ id: string; claveProducto: string; claveComposicion: string } | null> {
+  const cProducto = columnas.find((c) => c.rol === "producto" && c.enlace && claveValida(c.enlace.columnaKey));
+  if (!cProducto?.enlace) return null;
+
+  const { data: menuDataset } = await supabase
+    .from("datasets")
+    .select("id, columnas")
+    .eq("id", cProducto.enlace.datasetId)
+    .eq("empresa_id", empresaId)
+    .single();
+  const menuColumnas = (menuDataset?.columnas ?? []) as Columna[];
+  if (!menuDataset || !esMenu(menuColumnas)) return null;
+  const cComposicion = menuColumnas.find((c) => c.rol === "composicion");
+  if (!cComposicion) return null;
+
+  return { id: menuDataset.id, claveProducto: cProducto.enlace.columnaKey, claveComposicion: cComposicion.key };
+}
+
+// "Carne:0.2, Papa:0.3, Cebolla:0.1" -> [{nombre:"Carne",cantidad:0.2}, ...].
+// Entradas sin ":" o con cantidad no numérica/≤0 se descartan en silencio
+// (mejor esfuerzo). Vive acá (no en reglasAplicar.ts, que la tenía antes) para
+// que tanto la acción "descontar_insumos" como la composición de un ítem del
+// Menú (ver dispatchDescontarInsumosMenu de abajo) compartan el mismo parser,
+// sin que stock.ts tenga que importar de reglasAplicar.ts (que a su vez
+// importa de acá -- sería circular).
+export function parsearReceta(texto: string): { nombre: string; cantidad: number }[] {
+  return texto
+    .split(",")
+    .map((p) => p.trim())
+    .filter(Boolean)
+    .map((p) => {
+      const [nombre, cant] = p.split(":").map((s) => s.trim());
+      return { nombre: nombre ?? "", cantidad: Number(cant) };
+    })
+    .filter((i) => i.nombre && Number.isFinite(i.cantidad) && i.cantidad > 0);
+}
+
 // Deja registro del movimiento en el Kardex (movimientos_stock) -- "mejor
 // esfuerzo" como el resto de este archivo: si la tabla no existe todavía
 // (falta correr la migración 16) o falla por lo que sea, no debe tumbar el
@@ -158,19 +211,82 @@ export async function ajustarStockDesdeRegistro(
   const producto = datos[cProducto.key]?.toString().trim();
   if (!producto) return;
 
-  const stock = await datasetStockDe(supabase, empresaId, columnas);
-  if (!stock) return;
-
   const cCantidad = columnas.find((c) => c.rol === "cantidad");
   const cantidadCruda = cCantidad ? Number(datos[cCantidad.key]) : NaN;
   const cantidad = Number.isFinite(cantidadCruda) && cantidadCruda > 0 ? cantidadCruda : 1;
 
-  const tipo: TipoMovimientoStock = tipoDelModulo === "compras" ? "compra" : "venta";
-  await ajustarStock(supabase, stock.id, stock.claveProducto, producto, signo * (tipoDelModulo === "compras" ? cantidad : -cantidad), {
-    empresaId,
-    tipo,
-    userId,
-  });
+  const stock = await datasetStockDe(supabase, empresaId, columnas);
+  if (stock) {
+    const tipo: TipoMovimientoStock = tipoDelModulo === "compras" ? "compra" : "venta";
+    await ajustarStock(supabase, stock.id, stock.claveProducto, producto, signo * (tipoDelModulo === "compras" ? cantidad : -cantidad), {
+      empresaId,
+      tipo,
+      userId,
+    });
+    return;
+  }
+
+  // Producto enlazado a un Menú (no a un Stock directo): descuenta CADA
+  // insumo de su composición, multiplicado por la cantidad vendida -- solo
+  // tiene sentido en Ventas (comprar insumos se sigue registrando directo en
+  // Compras -> Stock, nunca "comprando" un ítem del Menú).
+  //
+  // OJO (encontrado probando en vivo): esto solo corre si la regla activa es
+  // literalmente `{accion:{tipo:"ajustar_stock"}}` -- un módulo cuyo "Ajustar
+  // Stock automáticamente" quedó guardado en su forma vieja homologada a mano
+  // (`sumar_campo_enlazado` con columnaObjetivoKey:"cantidad", ver recetas.ts)
+  // NUNCA llega a esta función: ese otro camino (reglasAplicar.ts,
+  // dispatchSumarCampoEnlazado) solo sabe sumar un campo "cantidad" a ciegas,
+  // y como un Menú no tiene ese campo, termina creándolo como basura en la
+  // fila del Menú en vez de tocar el Stock real. Para un módulo así, hay que
+  // Desactivar y volver a Activar "Ajustar Stock automáticamente" en
+  // Automatizaciones -- `aplicarPlantilla` reconstruye la regla en su forma
+  // canónica `ajustar_stock`, que sí pasa por acá.
+  if (tipoDelModulo === "ventas") {
+    await dispatchDescontarInsumosMenu(supabase, empresaId, columnas, producto, signo * cantidad, userId);
+  }
+}
+
+// Busca la fila del Menú para `producto`, lee su columna "composicion" (texto
+// "Insumo:cantidad, ...") y descuenta cada insumo del PRIMER módulo de Stock
+// real de la empresa -- ponytail: un solo almacén real por empresa para esto;
+// si algún día hace falta separar insumos en más de un almacén, acá es donde
+// ampliar (hoy ninguna empresa de prueba lo necesitó).
+async function dispatchDescontarInsumosMenu(
+  supabase: SupabaseClient,
+  empresaId: string,
+  columnasVenta: Columna[],
+  producto: string,
+  unidadesVendidas: number,
+  userId: string | null
+): Promise<void> {
+  const menu = await datasetMenuDe(supabase, empresaId, columnasVenta);
+  if (!menu) return;
+
+  const { data: filaMenu } = await supabase
+    .from("records")
+    .select("data")
+    .eq("dataset_id", menu.id)
+    .eq(`data->>${menu.claveProducto}`, producto)
+    .maybeSingle();
+  const composicionTexto = filaMenu ? String((filaMenu.data as Record<string, unknown>)[menu.claveComposicion] ?? "") : "";
+  const insumos = parsearReceta(composicionTexto);
+  if (insumos.length === 0) return; // ítem del Menú sin composición cargada: no descuenta nada (ver diseño, "opcional por ítem")
+
+  const { data: datasets } = await supabase.from("datasets").select("id, columnas").eq("empresa_id", empresaId);
+  const stockReal = (datasets ?? []).find((d) => esStock(d.columnas as Columna[]));
+  if (!stockReal) return;
+  const cProductoStock = (stockReal.columnas as Columna[]).find((c) => c.rol === "producto");
+  if (!cProductoStock) return;
+
+  for (const insumo of insumos) {
+    await ajustarStock(supabase, stockReal.id, cProductoStock.key, insumo.nombre, -unidadesVendidas * insumo.cantidad, {
+      empresaId,
+      tipo: "venta",
+      userId,
+      motivo: `Insumo de "${producto}" (Menú)`,
+    });
+  }
 }
 
 // Al editar un registro: deshace el efecto que tenía en Stock con los datos

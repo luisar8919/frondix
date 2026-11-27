@@ -57,6 +57,23 @@ export function plantillaStock(): Columna[] {
   ];
 }
 
+// Menú (restaurantes): el maestro de platos Y bebidas que se venden al
+// cliente final -- lo que ve el mozo en la grilla del Punto de Venta, en vez
+// de un Stock real (acá NO se cuenta cantidad, eso sigue viviendo en el
+// módulo de Stock de ingredientes/bebidas, ver esMenu en stock.ts). Rol
+// "precio" (no "monto": eso clasificaría este módulo como Ventas, ver
+// tipoModulo) y "composicion" (texto "Insumo:cantidad, Insumo:cantidad",
+// opcional por fila -- vacío = vender este ítem no descuenta nada de Stock;
+// para una bebida simple basta una sola línea "Ella misma:1").
+export function plantillaMenu(): Columna[] {
+  return [
+    { key: "producto", label: "Plato o bebida", tipo: "texto", rol: "producto", sospechosa: false },
+    { key: "categoria", label: "Categoría", tipo: "texto", rol: "categoria", sospechosa: false },
+    { key: "precio", label: "Precio", tipo: "numero", rol: "precio", sospechosa: false },
+    { key: "composicion", label: "Composición (opcional)", tipo: "texto", rol: "composicion", sospechosa: false },
+  ];
+}
+
 // Plantillas extra (más allá de Ventas/Compras) para negocios que ya pasaron
 // el estadio básico. Regla seguida en TODAS: nunca combinar "producto" con
 // "monto" en el mismo módulo (tipoModulo las clasificaría como "ventas" y
@@ -348,4 +365,5 @@ export const PLANTILLAS_EXTRA = [
   { clave: "obras", nombre: "Obras / proyectos", descripcion: "Construcción o contratistas: presupuesto y avance por proyecto.", categoria: "proyectos", columnas: plantillaObras, reglasSugeridas: () => reglaExcluirCancelado("Cancelada") },
   { clave: "hitos_proyecto", nombre: "Hitos de proyecto", descripcion: "Lista de tareas/hitos por proyecto -- enlázala a tu módulo de Obras para verla junto a cada proyecto.", categoria: "proyectos", columnas: plantillaHitosProyecto, reglasSugeridas: undefined },
   { clave: "eventos", nombre: "Eventos", descripcion: "Fiestas, catering, eventos corporativos: un cobro por cada evento.", categoria: "proyectos", columnas: plantillaEventos, reglasSugeridas: () => reglaExcluirCancelado("Cancelado") },
+  { clave: "menu", nombre: "Menú (restaurante)", descripcion: "Platos y bebidas que vendes, con precio -- enlázalo desde Producto en Ventas para que el Punto de Venta lo use como catálogo.", categoria: "servicios", columnas: plantillaMenu, reglasSugeridas: undefined },
 ] as const;

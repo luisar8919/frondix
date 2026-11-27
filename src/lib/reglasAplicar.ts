@@ -1,6 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Columna } from "./excel-parser.ts";
-import { ajustarStockDesdeRegistro, revertirStockDesdeRegistro } from "./stock.ts";
+import { ajustarStockDesdeRegistro, revertirStockDesdeRegistro, parsearReceta } from "./stock.ts";
 import { claveValida } from "./enlaces.ts";
 import { normalizarTexto } from "./seguimiento.ts";
 import { enviarPush } from "./push.ts";
@@ -99,21 +99,6 @@ async function fijarCampoEnlazado(
   } else {
     await supabase.from("records").insert({ dataset_id: datasetObjetivoId, data: { [claveMatch]: valorMatch, [columnaObjetivoKey]: valor } });
   }
-}
-
-// "Carne:0.2, Papa:0.3, Cebolla:0.1" -> [{nombre:"Carne",cantidad:0.2}, ...].
-// Entradas sin ":" o con cantidad no numérica/≤0 se descartan en silencio
-// (mejor esfuerzo, mismo criterio que el resto de este archivo).
-function parsearReceta(texto: string): { nombre: string; cantidad: number }[] {
-  return texto
-    .split(",")
-    .map((p) => p.trim())
-    .filter(Boolean)
-    .map((p) => {
-      const [nombre, cant] = p.split(":").map((s) => s.trim());
-      return { nombre: nombre ?? "", cantidad: Number(cant) };
-    })
-    .filter((i) => i.nombre && Number.isFinite(i.cantidad) && i.cantidad > 0);
 }
 
 // `signo` 1 = se vendió (resta insumos), -1 = se revierte una venta (repone).

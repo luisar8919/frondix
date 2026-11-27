@@ -33,7 +33,10 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ data
   if (ds && rolRestringido(rolEnEmpresa(sesion.empresas, ds.empresa_id)) && tipoModulo(dsColumnas.map((c) => c.rol), ds.nombre) === "compras") {
     return NextResponse.json({ error: "Tu rol no tiene acceso a esto" }, { status: 403 });
   }
-  const cGeneral = dsColumnas.find((c) => c.rol === "monto");
+  // rol "precio" (Menú de restaurante, ver esMenu en stock.ts) es el mismo
+  // "precio general" que ya cubría "monto" para un Stock real -- un módulo
+  // nunca va a tener los dos roles juntos (monto lo clasificaría como Ventas).
+  const cGeneral = dsColumnas.find((c) => c.rol === "monto" || c.rol === "precio");
   const cMayorista = dsColumnas.find((c) => c.rol === "precio_mayorista");
   const cMinorista = dsColumnas.find((c) => c.rol === "precio_minorista");
   const hayPrecios = !!(cGeneral || cMayorista || cMinorista);

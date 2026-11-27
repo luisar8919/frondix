@@ -1,6 +1,6 @@
 // "Rol" = qué significa una columna para el negocio (no solo su tipo de dato).
 // El asistente lo necesita para saber, por ejemplo, cuál es el monto de una venta.
-export type RolColumna = "monto" | "fecha" | "cliente" | "producto" | "telefono" | "costo" | "proveedor" | "gastos" | "tipo_movimiento" | "stock" | "cantidad" | "stock_minimo" | "documento" | "direccion" | "correo" | "saldo_pendiente" | "codigo" | "categoria" | "unidad_medida" | "precio_mayorista" | "precio_minorista" | "descuento" | "estado" | "fecha_vencimiento";
+export type RolColumna = "monto" | "fecha" | "cliente" | "producto" | "telefono" | "costo" | "proveedor" | "gastos" | "tipo_movimiento" | "stock" | "cantidad" | "stock_minimo" | "documento" | "direccion" | "correo" | "saldo_pendiente" | "codigo" | "categoria" | "unidad_medida" | "precio_mayorista" | "precio_minorista" | "descuento" | "estado" | "fecha_vencimiento" | "precio" | "composicion";
 
 export const ROLES: { valor: RolColumna; etiqueta: string }[] = [
   { valor: "monto", etiqueta: "Monto (importe de la venta o movimiento)" },
@@ -26,6 +26,8 @@ export const ROLES: { valor: RolColumna; etiqueta: string }[] = [
   { valor: "unidad_medida", etiqueta: "Unidad de medida (kg, unidad, caja...)" },
   { valor: "precio_mayorista", etiqueta: "Precio mayorista" },
   { valor: "precio_minorista", etiqueta: "Precio minorista" },
+  { valor: "precio", etiqueta: "Precio (de un plato o producto del Menú, sin ser una venta en sí)" },
+  { valor: "composicion", etiqueta: "Composición (insumos de Stock que descuenta vender este ítem del Menú)" },
   { valor: "descuento", etiqueta: "Descuento aplicado (% o monto fijo)" },
 ];
 
@@ -158,7 +160,7 @@ export function camposObligatorios(tipo: TipoModulo): RolColumna[] {
 // un costo o una cantidad negativa es casi siempre un error de tipeo, no una
 // operación real) -- "stock" queda afuera a propósito: negativo ahí SÍ es válido
 // (se vendió algo antes de registrar que se compró, ver lib/stock.ts).
-const ROLES_SIN_NEGATIVOS = new Set<RolColumna>(["monto", "costo", "gastos", "cantidad", "saldo_pendiente", "precio_mayorista", "precio_minorista", "descuento"]);
+const ROLES_SIN_NEGATIVOS = new Set<RolColumna>(["monto", "costo", "gastos", "cantidad", "saldo_pendiente", "precio_mayorista", "precio_minorista", "precio", "descuento"]);
 
 export function admiteNegativos(rol: RolColumna | null | ""): boolean {
   return !rol || !ROLES_SIN_NEGATIVOS.has(rol);
