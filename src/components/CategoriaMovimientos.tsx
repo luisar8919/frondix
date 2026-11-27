@@ -12,14 +12,18 @@ import { formatearMonto } from "@/lib/moneda";
 import type { Columna } from "@/lib/excel-parser";
 
 interface TotalMes { mes: string; total: number; registros: number }
+interface MesConVariacion extends TotalMes { variacionPct: number | null }
 interface RankingItem { clave: string; total: number; veces: number }
 interface RankingMargen { clave: string; ventas: number; costos: number; margen: number; veces: number }
 interface FlujoCaja { ventas: number; costos: number; igv: number; gananciaBruta: number; gananciaNeta: number }
+interface PromedioDiarioProducto { clave: string; totalUnidades: number; promedioDiario: number }
 interface ModuloReporte {
   datasetId: string;
   nombre: string;
   totalesPorMes: TotalMes[] | null;
+  variacionMensual: MesConVariacion[] | null;
   topProducto: RankingItem[] | null;
+  promedioDiarioProducto: PromedioDiarioProducto[] | null;
   topCliente: RankingItem[] | null;
   topProveedor: RankingItem[] | null;
   sumaTotal: number | null;
@@ -254,6 +258,39 @@ export default function CategoriaMovimientos({ tipo }: { tipo: TipoModulo }) {
                   {mesesRecortados.map((t) => (
                     <Barra key={t.mes} valor={t.total} maximo={maxMes} etiqueta={nombreMes(t.mes)} texto={soles(t.total)} />
                   ))}
+                </div>
+                {(() => {
+                  // Comparativo de ventas: variación del último mes del arreglo
+                  // COMPLETO (no el recortado) contra el inmediato anterior --
+                  // el más reciente siempre queda al final sin importar el recorte.
+                  const ultimo = r?.variacionMensual?.[r.variacionMensual.length - 1];
+                  if (!ultimo || ultimo.variacionPct === null) return null;
+                  const subio = ultimo.variacionPct >= 0;
+                  return (
+                    <p className="suave pequeno" style={{ margin: "10px 0 0" }}>
+                      {nombreMes(ultimo.mes)} vs. el mes anterior:{" "}
+                      <strong style={{ color: subio ? "var(--verde-700)" : "var(--error)" }}>
+                        {subio ? "+" : ""}{ultimo.variacionPct}%
+                      </strong>
+                    </p>
+                  );
+                })()}
+              </div>
+            )}
+
+            {tipo === "ventas" && r?.promedioDiarioProducto && r.promedioDiarioProducto.length > 0 && (
+              <div className="tarjeta" style={{ marginTop: 14, padding: 14 }}>
+                <strong>Promedio de ventas por día</strong>
+                <p className="suave pequeno" style={{ margin: "2px 0 0" }}>
+                  Unidades que vendés en un día típico de este módulo, para saber aprox. cuánto preparar o stockear.
+                </p>
+                <div style={{ marginTop: 10 }}>
+                  {(() => {
+                    const max = Math.max(1, ...r.promedioDiarioProducto!.map((x) => x.promedioDiario));
+                    return r.promedioDiarioProducto!.map((p) => (
+                      <Barra key={p.clave} valor={p.promedioDiario} maximo={max} etiqueta={p.clave.length > 12 ? p.clave.slice(0, 11) + "…" : p.clave} texto={`${p.promedioDiario}/día`} />
+                    ));
+                  })()}
                 </div>
               </div>
             )}

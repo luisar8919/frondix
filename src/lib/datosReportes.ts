@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { claveValida } from "./enlaces.ts";
-import { totalesPorMes, topPor, topPorMargen, sumaMonto, flujoCaja, progresoMetas } from "./reportes.ts";
+import { totalesPorMes, topPor, topPorMargen, sumaMonto, flujoCaja, progresoMetas, promedioDiarioPorProducto, fechasDistintas, variacionMensual } from "./reportes.ts";
 import { tipoModulo, type TipoModulo } from "./roles.ts";
 import { tieneSuscripcionActiva } from "./suscripcion.ts";
 import { esStock } from "./stock.ts";
@@ -26,7 +26,9 @@ export interface ModuloReporte {
   tipo: TipoModulo;
   plantillas: string[];
   totalesPorMes: ReturnType<typeof totalesPorMes> | null;
+  variacionMensual: ReturnType<typeof variacionMensual> | null;
   topProducto: ReturnType<typeof topPor> | null;
+  promedioDiarioProducto: ReturnType<typeof promedioDiarioPorProducto> | null;
   topCliente: ReturnType<typeof topPor> | null;
   topProveedor: ReturnType<typeof topPor> | null;
   porCategoria: ReturnType<typeof topPor> | null;
@@ -60,6 +62,7 @@ export async function calcularModulosReporte(supabase: SupabaseClient, empresaId
     const cMonto = columnaConRol(columnas, "monto");
     const cCosto = columnaConRol(columnas, "costo");
     const cProducto = columnaConRol(columnas, "producto");
+    const cCantidad = columnaConRol(columnas, "cantidad");
     const cCliente = columnaConRol(columnas, "cliente");
     const cProveedor = columnaConRol(columnas, "proveedor");
     const cGastos = columnaConRol(columnas, "gastos");
@@ -70,6 +73,7 @@ export async function calcularModulosReporte(supabase: SupabaseClient, empresaId
 
     const conTotales = !!(cFecha && cMonto);
     const conTopProducto = !!cProducto;
+    const conPromedioDiario = !!(cFecha && cProducto);
     const conTopCliente = !!cCliente;
     const conTopProveedor = !!cProveedor;
     const conCategoria = !!(cCategoria && cMonto);
@@ -91,6 +95,7 @@ export async function calcularModulosReporte(supabase: SupabaseClient, empresaId
       ...(cMonto && { m: cMonto.key }),
       ...(cCosto && { co: cCosto.key }),
       ...(cProducto && { p: cProducto.key }),
+      ...(cCantidad && { cant: cCantidad.key }),
       ...(cCliente && { c: cCliente.key }),
       ...(cProveedor && { pr: cProveedor.key }),
       ...(cGastos && { g: cGastos.key }),
@@ -127,7 +132,11 @@ export async function calcularModulosReporte(supabase: SupabaseClient, empresaId
       tipo: tipoModulo(columnas.map((c) => c.rol), d.nombre),
       plantillas,
       totalesPorMes: conTotales ? totalesPorMes(filas, ahora, 6) : null,
+      variacionMensual: conTotales ? variacionMensual(totalesPorMes(filas, ahora, 6)) : null,
       topProducto: conTopProducto ? topPor(filas.map((f) => ({ clave: f.p, m: f.m })), 5) : null,
+      promedioDiarioProducto: conPromedioDiario
+        ? promedioDiarioPorProducto(filas.map((f) => ({ clave: f.p, cantidad: f.cant })), fechasDistintas(filas), 10)
+        : null,
       topCliente: conTopCliente ? topPor(filas.map((f) => ({ clave: f.c, m: f.m })), 5) : null,
       topProveedor: conTopProveedor ? topPor(filas.map((f) => ({ clave: f.pr, m: f.m })), 5) : null,
       // n=20: a diferencia de un "top 5", acá se quiere la composición completa (pocas

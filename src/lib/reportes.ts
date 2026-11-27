@@ -192,3 +192,65 @@ export function progresoMetas(
     };
   });
 }
+
+export interface PromedioDiarioProducto {
+  clave: string;
+  totalUnidades: number;
+  promedioDiario: number; // totalUnidades / diasConDatos del módulo entero (no solo los días que SE vendió este producto)
+}
+
+// Cuánto vendés de cada producto en un día típico -- `diasConDatos` es la
+// cantidad de fechas CALENDARIO distintas que trae el módulo entero (todos los
+// productos juntos, lo calcula el caller con fechasDistintas() sobre las
+// mismas filas), para que el promedio sea "por día de negocio abierto", no
+// solo por los días en que ESE producto puntual se vendió (eso sobreestimaría
+// productos de baja rotación). Sin columna "Cantidad" marcada, cada fila cuenta
+// como 1 unidad (una venta = un producto).
+export function promedioDiarioPorProducto(
+  filas: { clave?: string | null; cantidad?: string | number | null }[],
+  diasConDatos: number,
+  n = 10
+): PromedioDiarioProducto[] {
+  if (diasConDatos <= 0) return [];
+  const porClave = new Map<string, number>();
+  for (const fila of filas) {
+    const clave = fila.clave?.toString().trim();
+    if (!clave) continue;
+    const unidades = aNumero(fila.cantidad) ?? 1;
+    porClave.set(clave, (porClave.get(clave) ?? 0) + unidades);
+  }
+  const items = [...porClave.entries()].map(([clave, total]) => ({
+    clave,
+    totalUnidades: redondear(total),
+    promedioDiario: redondear(total / diasConDatos),
+  }));
+  items.sort((a, b) => b.totalUnidades - a.totalUnidades);
+  return items.slice(0, n);
+}
+
+// Cuántas fechas CALENDARIO distintas (no cuántas filas) hay en el módulo --
+// denominador de promedioDiarioPorProducto, ver comentario de ahí.
+export function fechasDistintas(filas: { f?: string | null }[]): number {
+  const dias = new Set<number>();
+  for (const fila of filas) {
+    const t = fechaUTC(fila.f);
+    if (t !== null) dias.add(t);
+  }
+  return dias.size;
+}
+
+export interface MesConVariacion extends TotalMes {
+  variacionPct: number | null; // null: el mes anterior no tuvo ventas, no hay con qué comparar
+}
+
+// "Comparativo de ventas": anota cada mes de totalesPorMes() con la variación
+// % contra el mes INMEDIATO anterior del mismo arreglo (que ya viene ordenado
+// del más antiguo al más reciente) -- reusa el mismo total ya calculado, no
+// vuelve a leer nada.
+export function variacionMensual(meses: TotalMes[]): MesConVariacion[] {
+  return meses.map((m, i) => {
+    const anterior = meses[i - 1];
+    const variacionPct = anterior && anterior.total > 0 ? redondear(((m.total - anterior.total) / anterior.total) * 100) : null;
+    return { ...m, variacionPct };
+  });
+}

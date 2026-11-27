@@ -1,6 +1,6 @@
 // node scripts/test-reportes.mjs
 import assert from "node:assert";
-import { totalesPorMes, topPor, sumaMonto, flujoCaja, progresoMetas, recortarMesesSinDatos } from "../src/lib/reportes.ts";
+import { totalesPorMes, topPor, sumaMonto, flujoCaja, progresoMetas, recortarMesesSinDatos, promedioDiarioPorProducto, fechasDistintas, variacionMensual } from "../src/lib/reportes.ts";
 
 const ahora = new Date("2026-09-25T15:00:00Z"); // "hoy" para las pruebas
 
@@ -99,5 +99,32 @@ assert.deepStrictEqual(progreso[2], { producto: "Metroid", objetivo: 3, vendidos
 const superada = progresoMetas([{ clave: "A" }, { clave: "A" }, { clave: "A" }], [{ producto: "A", cantidadObjetivo: 2 }]);
 assert.strictEqual(superada[0].porcentaje, 100);
 assert.strictEqual(superada[0].alcanzada, true);
+
+// --- fechasDistintas / promedioDiarioPorProducto ---
+const ventasConFecha = [
+  { f: "2026-09-01", clave: "Pollo", cantidad: 3 },
+  { f: "2026-09-01", clave: "Gaseosa", cantidad: 2 },
+  { f: "2026-09-02", clave: "Pollo", cantidad: 1 },
+  { f: "2026-09-03", clave: "Pollo", cantidad: 2 }, // sin "cantidad" para Gaseosa este día -> no cuenta
+];
+assert.strictEqual(fechasDistintas(ventasConFecha), 3, "3 fechas de calendario distintas (01, 02, 03)");
+const dias = fechasDistintas(ventasConFecha);
+const promedio = promedioDiarioPorProducto(ventasConFecha, dias);
+assert.deepStrictEqual(promedio[0], { clave: "Pollo", totalUnidades: 6, promedioDiario: 2 }, "6 unidades / 3 dias = 2 por dia");
+assert.strictEqual(promedio[1].clave, "Gaseosa");
+assert.strictEqual(promedio[1].totalUnidades, 2, "2 unidades, solo vendida el dia 1, pero el denominador sigue siendo los 3 dias del modulo entero");
+assert.strictEqual(promedioDiarioPorProducto([], 0).length, 0, "sin dias con datos, no hay division por 0");
+
+// Sin columna "Cantidad" marcada, cada fila cuenta como 1 unidad
+const sinCantidad = promedioDiarioPorProducto([{ f: "2026-09-01", clave: "Mesa 3" }, { f: "2026-09-01", clave: "Mesa 3" }], 1);
+assert.strictEqual(sinCantidad[0].totalUnidades, 2);
+
+// --- variacionMensual ---
+const mesesParaVariacion = totalesPorMes([{ f: "2026-08-01", m: 100 }, { f: "2026-09-01", m: 150 }], ahora, 2);
+const conVariacion = variacionMensual(mesesParaVariacion);
+assert.strictEqual(conVariacion[0].variacionPct, null, "el primer mes del arreglo no tiene mes anterior con que comparar");
+assert.strictEqual(conVariacion[1].variacionPct, 50, "de 100 a 150 es +50%");
+const sinVentasAntes = variacionMensual(totalesPorMes([{ f: "2026-09-01", m: 100 }], ahora, 2));
+assert.strictEqual(sinVentasAntes[1].variacionPct, null, "el mes anterior no tuvo ventas (total 0), no hay con que comparar");
 
 console.log("OK: test-reportes (todas las aserciones pasaron)");
