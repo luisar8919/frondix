@@ -9,6 +9,7 @@ import KardexProducto from "@/components/KardexProducto";
 import CalendarioAgenda from "@/components/CalendarioAgenda";
 import AdjuntosRegistro from "@/components/AdjuntosRegistro";
 import { esAgenda } from "@/lib/agenda";
+import { rolRestringido } from "@/lib/permisos";
 import { enviarConfirmando } from "@/lib/confirmar";
 import type { Columna } from "@/lib/excel-parser";
 import type { Regla } from "@/lib/reglas";
@@ -61,7 +62,7 @@ export default function DatasetPage({
   // Para el botón "Deshacer" de la edición rápida por doble clic (ver guardarCelda):
   // guarda el valor de ANTES del último cambio, para poder volver a escribirlo.
   const [ultimoCambio, setUltimoCambio] = useState<{ registroId: string; columnaKey: string; columnaLabel: string; valorAnterior: unknown } | null>(null);
-  const [esVendedor, setEsVendedor] = useState(false);
+  const [rolBloqueado, setRolBloqueado] = useState(false);
   const [escaneando, setEscaneando] = useState(false);
 
   // Conteo de inventario con la cámara del celular (solo dentro de la app
@@ -89,7 +90,7 @@ export default function DatasetPage({
     (async () => {
       const sesion = await empresaDelUsuario(crearClienteBrowser());
       if (sesion.ok) {
-        setEsVendedor(sesion.empresas.find((e) => e.empresaId === sesion.empresaId)?.rol === "vendedor");
+        setRolBloqueado(rolRestringido(sesion.empresas.find((e) => e.empresaId === sesion.empresaId)?.rol));
         setEmpresaId(sesion.empresaId);
       }
     })();
@@ -326,7 +327,7 @@ export default function DatasetPage({
             {cargando && registros.length < total ? ` (cargando ${registros.length.toLocaleString("es-PE")}...)` : ""}
           </p>
         </div>
-        {!esVendedor && (
+        {!rolBloqueado && (
           <div className="acciones">
             <Link href={`/dashboard/${datasetId}/papelera`} className="btn btn-fantasma">Papelera</Link>
             <a href={`/api/export/${datasetId}`} className="btn btn-secundario">Descargar Excel</a>
@@ -385,7 +386,7 @@ export default function DatasetPage({
         </div>
       )}
 
-      {!esVendedor && (
+      {!rolBloqueado && (
         <>
           <EditarTabla
             key={dataset.columnas.map((c) => c.key + c.label).join("|") + dataset.nombre}

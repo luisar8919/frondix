@@ -3,7 +3,7 @@ import { crearClienteServidor } from "@/lib/supabase/server";
 import { empresaDelUsuarioServidor } from "@/lib/sesionServidor";
 import { tipoModulo, esInterfazAtencion, type TipoModulo } from "@/lib/roles";
 import { esStock } from "@/lib/stock";
-import { esVendedor, rolEnEmpresa } from "@/lib/permisos";
+import { rolRestringido, rolEnEmpresa } from "@/lib/permisos";
 import type { Columna } from "@/lib/excel-parser";
 
 // Para la app nativa: lista los módulos de la empresa, opcionalmente
@@ -26,7 +26,7 @@ export async function GET(req: NextRequest) {
   // navegador) -- faltaba acá: sin este filtro, un vendedor podía pedir
   // ?tipo=compras directo (sin pasar por la UI, que sí lo oculta) y
   // enterarse del id real del módulo de Compras.
-  const vendedor = esVendedor(rolEnEmpresa(sesion.empresas, sesion.empresaId));
+  const vendedor = rolRestringido(rolEnEmpresa(sesion.empresas, sesion.empresaId));
 
   const { data: datasets, error } = await supabase
     .from("datasets")

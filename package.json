@@ -15,6 +15,7 @@
     "test:enlaces": "node scripts/test-enlaces.mjs",
     "test:estructura": "node scripts/test-estructura.mjs",
     "test:pasarelas-pago": "node scripts/test-pasarelas-pago.mjs",
+    "test:permisos": "node scripts/test-permisos.mjs",
     "test:patrones-recomendacion": "node scripts/test-patrones-recomendacion.mjs",
     "test:plantillas-reporte": "node scripts/test-plantillas-reporte.mjs",
     "test:proveedores": "node scripts/test-proveedores.mjs",
@@ -24,7 +25,7 @@
     "test:seguimiento": "node scripts/test-seguimiento.mjs",
     "test:sin-encabezado": "node scripts/test-sin-encabezado.mjs",
     "test:stock": "node scripts/test-stock.mjs",
-    "test": "npm run test:parser && npm run test:agrupar-hojas && npm run test:buscar && npm run test:calendario && npm run test:clientes && npm run test:datos-reportes && npm run test:divisor && npm run test:enlaces && npm run test:estructura && npm run test:pasarelas-pago && npm run test:patrones-recomendacion && npm run test:plantillas-reporte && npm run test:proveedores && npm run test:reglas && npm run test:reportes && npm run test:roles && npm run test:seguimiento && npm run test:sin-encabezado && npm run test:stock",
+    "test": "npm run test:parser && npm run test:agrupar-hojas && npm run test:buscar && npm run test:calendario && npm run test:clientes && npm run test:datos-reportes && npm run test:divisor && npm run test:enlaces && npm run test:estructura && npm run test:pasarelas-pago && npm run test:patrones-recomendacion && npm run test:permisos && npm run test:plantillas-reporte && npm run test:proveedores && npm run test:reglas && npm run test:reportes && npm run test:roles && npm run test:seguimiento && npm run test:sin-encabezado && npm run test:stock",
     "enviar-resumen": "node scripts/enviar-resumen-semanal.mjs"
   },
   "dependencies": {

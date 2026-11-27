@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { crearClienteServidor } from "@/lib/supabase/server";
 import { empresaDelUsuarioServidor } from "@/lib/sesionServidor";
-import { esVendedor, rolEnEmpresa } from "@/lib/permisos";
+import { rolRestringido, rolEnEmpresa } from "@/lib/permisos";
 
 // Órdenes de compra: seguimiento de lo que le pediste a un proveedor, aparte
 // de las compras ya registradas en un módulo (eso es lo que YA compraste;
@@ -12,7 +12,7 @@ export async function GET() {
   const supabase = await crearClienteServidor();
   const sesion = await empresaDelUsuarioServidor(supabase);
   if (!sesion.ok) return NextResponse.json({ error: sesion.error }, { status: 401 });
-  if (esVendedor(rolEnEmpresa(sesion.empresas, sesion.empresaId))) {
+  if (rolRestringido(rolEnEmpresa(sesion.empresas, sesion.empresaId))) {
     return NextResponse.json({ error: "Tu rol no tiene acceso a esto" }, { status: 403 });
   }
 
@@ -35,7 +35,7 @@ export async function POST(req: NextRequest) {
   if (!user) return NextResponse.json({ error: "No autenticado" }, { status: 401 });
   const sesion = await empresaDelUsuarioServidor(supabase);
   if (!sesion.ok) return NextResponse.json({ error: sesion.error }, { status: 401 });
-  if (esVendedor(rolEnEmpresa(sesion.empresas, sesion.empresaId))) {
+  if (rolRestringido(rolEnEmpresa(sesion.empresas, sesion.empresaId))) {
     return NextResponse.json({ error: "Tu rol no tiene acceso a esto" }, { status: 403 });
   }
 

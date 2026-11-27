@@ -6,6 +6,7 @@ import { usePathname, useRouter } from "next/navigation";
 import Logo from "@/components/Logo";
 import { crearClienteBrowser } from "@/lib/supabase/client";
 import { COOKIE_EMPRESA_ACTIVA } from "@/lib/sesion";
+import { esVendedor, rolRestringido } from "@/lib/permisos";
 
 const enlaces = [
   { href: "/dashboard", texto: "Inicio" },
@@ -113,13 +114,20 @@ function MenuMovil({
   modulosSubmenu,
   hayAlgo,
   interfaces,
-  esVendedor,
+  rolBloqueado,
+  mostrarCalendario,
 }: {
   enlacesVisibles: { href: string; texto: string }[];
   modulosSubmenu: { href: string; texto: string }[];
   hayAlgo: boolean;
   interfaces: { href: string; texto: string }[];
-  esVendedor: boolean;
+  // true para vendedor Y mozo: oculta Módulos/Resumen/Seguimiento/Configuración
+  // (ver rolRestringido en permisos.ts) -- mismo criterio que ya usaba este
+  // componente solo para vendedor.
+  rolBloqueado: boolean;
+  // Calendario, en cambio, es SOLO de vendedor (un mozo no agenda citas) --
+  // por eso va aparte en vez de colgar del mismo booleano de arriba.
+  mostrarCalendario: boolean;
 }) {
   const [abierto, setAbierto] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -155,7 +163,7 @@ function MenuMovil({
               {e.texto}
             </Link>
           ))}
-          {!esVendedor && hayAlgo && (
+          {!rolBloqueado && hayAlgo && (
             <>
               <Separador texto="Módulos" />
               {modulosSubmenu.map((s) => (
@@ -175,7 +183,7 @@ function MenuMovil({
               ))}
             </>
           )}
-          {!esVendedor && (
+          {!rolBloqueado && (
             <>
               <Separador texto="Resumen" />
               {resumenSubmenu.map((s) => (
@@ -197,7 +205,7 @@ function MenuMovil({
               ))}
             </>
           )}
-          {esVendedor && (
+          {mostrarCalendario && (
             <Link href="/dashboard/calendario" className="menu-cuenta-item" role="menuitem" onClick={() => setAbierto(false)}>
               Calendario
             </Link>
@@ -230,7 +238,8 @@ export default function BarraPanel({
   // solo se muestra. Sin ninguna, el botón directamente no aparece.
   interfaces: { key: string; label: string; href: string }[];
 }) {
-  const esVendedor = rol === "vendedor";
+  const rolBloqueado = rolRestringido(rol);
+  const mostrarCalendario = esVendedor(rol); // mozo no agenda citas, ver comentario en MenuMovil
   const modulosSubmenu = [
     ...modulos.map((m) => ({ href: `/dashboard/${m.id}`, texto: m.nombre })),
     ...extras,
@@ -277,7 +286,7 @@ export default function BarraPanel({
       <div className="contenedor barra-fila">
         <Logo href="/dashboard" />
         <nav className="nav-panel" aria-label="Panel">
-          {enlaces.filter((e) => !esVendedor || e.href !== "/dashboard/upload").map((e) => (
+          {enlaces.filter((e) => !rolBloqueado || e.href !== "/dashboard/upload").map((e) => (
             <Link key={e.href} href={e.href} className="nav-link" aria-current={activo(e.href) ? "page" : undefined}>
               {e.texto}
             </Link>
@@ -285,29 +294,30 @@ export default function BarraPanel({
           {interfacesSubmenu.length > 0 && (
             <BotonSubmenu texto="Interfaces" items={interfacesSubmenu} activo={activoInterfaces} />
           )}
-          {!esVendedor && hayAlgo && (
+          {!rolBloqueado && hayAlgo && (
             <BotonSubmenu texto="Módulos" items={modulosSubmenu} activo={activoModulos} />
           )}
-          {!esVendedor && !hayAlgo && (
+          {!rolBloqueado && !hayAlgo && (
             <span className="nav-link" aria-disabled="true" title="Sube tu primer Excel para ver tus módulos aquí" style={{ opacity: 0.4, cursor: "not-allowed" }}>
               Módulos
             </span>
           )}
-          {!esVendedor && <BotonSubmenu texto="Resumen" items={resumenSubmenu} activo={activoResumen} />}
-          {!esVendedor && <BotonSubmenu texto="Seguimiento" items={seguimientoSubmenu} activo={activoSeguimiento} />}
-          {!esVendedor && <BotonSubmenu texto="Configuración" items={reglasSubmenu} activo={activoReglas} />}
-          {esVendedor && (
+          {!rolBloqueado && <BotonSubmenu texto="Resumen" items={resumenSubmenu} activo={activoResumen} />}
+          {!rolBloqueado && <BotonSubmenu texto="Seguimiento" items={seguimientoSubmenu} activo={activoSeguimiento} />}
+          {!rolBloqueado && <BotonSubmenu texto="Configuración" items={reglasSubmenu} activo={activoReglas} />}
+          {mostrarCalendario && (
             <Link href="/dashboard/calendario" className="nav-link" aria-current={activo("/dashboard/calendario") ? "page" : undefined}>
               Calendario
             </Link>
           )}
         </nav>
         <MenuMovil
-          enlacesVisibles={enlaces.filter((e) => !esVendedor || e.href !== "/dashboard/upload")}
+          enlacesVisibles={enlaces.filter((e) => !rolBloqueado || e.href !== "/dashboard/upload")}
           modulosSubmenu={modulosSubmenu}
           hayAlgo={hayAlgo}
           interfaces={interfacesSubmenu}
-          esVendedor={esVendedor}
+          rolBloqueado={rolBloqueado}
+          mostrarCalendario={mostrarCalendario}
         />
         <div className="menu-cuenta" ref={menuRef}>
           <button
@@ -321,7 +331,7 @@ export default function BarraPanel({
           </button>
           {menuAbierto && (
             <div className="menu-cuenta-lista" role="menu">
-              {itemsMenu.filter((item) => !esVendedor || item.href !== "/dashboard/team").map((item) => (
+              {itemsMenu.filter((item) => !rolBloqueado || item.href !== "/dashboard/team").map((item) => (
                 <Link key={item.href} href={item.href} className="menu-cuenta-item" role="menuitem" onClick={() => setMenuAbierto(false)}>
                   {item.texto}
                 </Link>

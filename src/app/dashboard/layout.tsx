@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { crearClienteServidor } from "@/lib/supabase/server";
 import { empresaDelUsuarioServidor } from "@/lib/sesionServidor";
-import { rolEnEmpresa } from "@/lib/permisos";
+import { rolEnEmpresa, rolRestringido } from "@/lib/permisos";
 import { tipoModulo } from "@/lib/roles";
 import { interfacesVisibles } from "@/lib/interfaces";
 import BarraPanel from "@/components/BarraPanel";
@@ -26,7 +26,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
   let modulos: { id: string; nombre: string }[] = [];
   let extras: { href: string; texto: string }[] = [];
   let interfaces: { key: string; label: string; href: string }[] = [];
-  const esVendedor = rol === "vendedor";
+  const rolBloqueado = rolRestringido(rol);
   if (sesion.ok) {
     const { data: datasetsCrudos } = await supabase
       .from("datasets")
@@ -35,7 +35,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
       .order("created_at", { ascending: false });
     const datasets = (datasetsCrudos ?? []).map((d) => ({ id: d.id, nombre: d.nombre, columnas: d.columnas as Columna[] }));
     modulos = datasets
-      .filter((d) => !esVendedor || tipoModulo(d.columnas.map((c) => c.rol), d.nombre) !== "compras")
+      .filter((d) => !rolBloqueado || tipoModulo(d.columnas.map((c) => c.rol), d.nombre) !== "compras")
       .map((d) => ({ id: d.id, nombre: d.nombre }));
 
     const { data: empresaInterfaces } = await supabase
@@ -68,9 +68,9 @@ export default async function DashboardLayout({ children }: { children: React.Re
     }
     const [hayClientes, hayProveedores, hayCotizaciones, hayOrdenes] = await Promise.all([
       hayValorReal("cliente"),
-      esVendedor ? Promise.resolve(false) : hayValorReal("proveedor"),
+      rolBloqueado ? Promise.resolve(false) : hayValorReal("proveedor"),
       supabase.from("cotizaciones").select("id").eq("empresa_id", sesion.empresaId).limit(1).then((r) => (r.data?.length ?? 0) > 0),
-      esVendedor ? Promise.resolve(false) : supabase.from("ordenes_compra").select("id").eq("empresa_id", sesion.empresaId).limit(1).then((r) => (r.data?.length ?? 0) > 0),
+      rolBloqueado ? Promise.resolve(false) : supabase.from("ordenes_compra").select("id").eq("empresa_id", sesion.empresaId).limit(1).then((r) => (r.data?.length ?? 0) > 0),
     ]);
     extras = [
       hayClientes && { href: "/dashboard/clientes", texto: "Clientes" },

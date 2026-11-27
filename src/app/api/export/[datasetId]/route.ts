@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import * as XLSX from "xlsx";
 import { crearClienteServidor } from "@/lib/supabase/server";
 import { empresaDelUsuarioServidor } from "@/lib/sesionServidor";
-import { esVendedor, rolEnEmpresa } from "@/lib/permisos";
+import { rolRestringido, rolEnEmpresa } from "@/lib/permisos";
 import { tipoModulo } from "@/lib/roles";
 import { claveValida } from "@/lib/enlaces";
 import type { Columna } from "@/lib/excel-parser";
@@ -38,7 +38,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ data
   const supabase = await crearClienteServidor();
   const sesion = await empresaDelUsuarioServidor(supabase);
   if (!sesion.ok) return NextResponse.json({ error: sesion.error }, { status: 401 });
-  if (esVendedor(rolEnEmpresa(sesion.empresas, sesion.empresaId))) {
+  if (rolRestringido(rolEnEmpresa(sesion.empresas, sesion.empresaId))) {
     return NextResponse.json({ error: "Tu rol no tiene acceso a esto" }, { status: 403 });
   }
 

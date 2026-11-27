@@ -5,6 +5,7 @@ import { agruparHojas, type Columna, type GrupoHojas } from "@/lib/excel-parser"
 import { insertarRegistros, deshacerTabla, MAX_FILAS_IMPORTACION } from "@/lib/insertar";
 import { limiteModulos } from "@/lib/limites";
 import { tipoModulo, validarCamposRegistro } from "@/lib/roles";
+import { rolRestringido } from "@/lib/permisos";
 import {
   dividirVentasYCompras,
   preciosDeCompra,
@@ -247,7 +248,7 @@ export async function POST(request: NextRequest) {
   // Subir/crear módulos es tarea de dueño/admin/miembro -- un vendedor no
   // puede crear ni reestructurar módulos, solo registrar ventas.
   const { data: miMembresia } = await supabase.from("miembros").select("rol").eq("empresa_id", empresaId).eq("user_id", user.id).single();
-  if (miMembresia?.rol === "vendedor") {
+  if (rolRestringido(miMembresia?.rol)) {
     return NextResponse.json({ error: "Tu rol no tiene acceso a esto" }, { status: 403 });
   }
 

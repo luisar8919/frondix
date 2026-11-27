@@ -6,6 +6,7 @@ import { aplicarReglasDesdeRegistro } from "@/lib/reglasAplicar";
 import type { Regla } from "@/lib/reglas";
 import { validarCamposRegistro, tipoModulo } from "@/lib/roles";
 import { datasetBloqueado } from "@/lib/limites";
+import { rolRestringido } from "@/lib/permisos";
 import { encontrarChoqueAgenda } from "@/lib/agenda";
 import type { Columna } from "@/lib/excel-parser";
 
@@ -35,7 +36,7 @@ async function cargar(ctx: Ctx) {
   }
   if (dsPermiso && tipoModulo((dsPermiso.columnas as Columna[]).map((c) => c.rol), dsPermiso.nombre) === "compras") {
     const { data: miMembresia } = await supabase.from("miembros").select("rol").eq("empresa_id", dsPermiso.empresa_id).eq("user_id", user.id).single();
-    if (miMembresia?.rol === "vendedor") {
+    if (rolRestringido(miMembresia?.rol)) {
       return { error: NextResponse.json({ error: "Tu rol no tiene acceso a este módulo" }, { status: 403 }) };
     }
   }

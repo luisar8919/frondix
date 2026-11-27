@@ -9,6 +9,7 @@ import type { Regla } from "@/lib/reglas";
 import { validarCamposRegistro, tipoModulo } from "@/lib/roles";
 import { encontrarChoqueAgenda } from "@/lib/agenda";
 import { datasetBloqueado } from "@/lib/limites";
+import { rolRestringido } from "@/lib/permisos";
 import type { Columna } from "@/lib/excel-parser";
 
 // Si el valor de una columna de Cliente/Proveedor enlazada no existe todavía en
@@ -74,7 +75,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ data
         return NextResponse.json({ error: "Este módulo es parte de la prueba gratis o el plan pago. Actívalo para seguir usándolo.", bloqueado: true }, { status: 402 });
       }
       const { data: miMembresia } = await supabase.from("miembros").select("rol").eq("empresa_id", dsPermiso.empresa_id).eq("user_id", user.id).single();
-      if (miMembresia?.rol === "vendedor" && tipoModulo((dsPermiso.columnas as Columna[]).map((c) => c.rol), dsPermiso.nombre) === "compras") {
+      if (rolRestringido(miMembresia?.rol) && tipoModulo((dsPermiso.columnas as Columna[]).map((c) => c.rol), dsPermiso.nombre) === "compras") {
         return NextResponse.json({ error: "Tu rol no tiene acceso a este módulo" }, { status: 403 });
       }
     }
@@ -142,7 +143,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ dat
 
   if (user && tipoModulo(columnas.map((c) => c.rol), dataset.nombre) === "compras") {
     const { data: miMembresia } = await supabase.from("miembros").select("rol").eq("empresa_id", dataset.empresa_id).eq("user_id", user.id).single();
-    if (miMembresia?.rol === "vendedor") return NextResponse.json({ error: "Tu rol no tiene acceso a este módulo" }, { status: 403 });
+    if (rolRestringido(miMembresia?.rol)) return NextResponse.json({ error: "Tu rol no tiene acceso a este módulo" }, { status: 403 });
   }
 
   const faltaCampo = validarCamposRegistro(columnas, body, dataset.nombre);

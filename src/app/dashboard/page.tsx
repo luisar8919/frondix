@@ -5,7 +5,7 @@ import { empresaDelUsuarioServidor } from "@/lib/sesionServidor";
 import CuentasPorCobrar from "@/components/CuentasPorCobrar";
 import CuentasPorPagar from "@/components/CuentasPorPagar";
 import ConsejosInicio from "@/components/ConsejosInicio";
-import { rolEnEmpresa } from "@/lib/permisos";
+import { rolEnEmpresa, rolRestringido } from "@/lib/permisos";
 import { tipoModulo, type RolColumna } from "@/lib/roles";
 import { tieneSuscripcionActiva } from "@/lib/suscripcion";
 import { calcularModulosReporte } from "@/lib/datosReportes";
@@ -38,11 +38,11 @@ export default async function DashboardPage() {
 
   const planActivo = await tieneSuscripcionActiva(supabase, sesion.empresaId);
   const empresa = sesion.empresas.find((e) => e.empresaId === sesion.empresaId)?.nombre ?? "tu negocio";
-  const esVendedor = rolEnEmpresa(sesion.empresas, sesion.empresaId) === "vendedor";
+  const rolBloqueado = rolRestringido(rolEnEmpresa(sesion.empresas, sesion.empresaId));
   // Un vendedor no ve módulos de Compras (costos, proveedores) -- solo registra
   // ventas y consulta stock, ver src/lib/permisos.ts.
   const datasets = (datasetsCrudos ?? []).filter(
-    (d) => !esVendedor || tipoModulo((d.columnas as Columna[]).map((c) => c.rol as RolColumna | null), d.nombre) !== "compras"
+    (d) => !rolBloqueado || tipoModulo((d.columnas as Columna[]).map((c) => c.rol as RolColumna | null), d.nombre) !== "compras"
   );
   const hayModulos = datasets.length > 0;
 
@@ -51,7 +51,7 @@ export default async function DashboardPage() {
   // real, qué se vende más -- es lo que distingue al plan pago, reusando el
   // mismo cálculo de /api/reportes (ver src/lib/datosReportes.ts) sin duplicar
   // lógica. Oculto para vendedor, mismo criterio que Cuentas por cobrar/pagar.
-  const modulosReporte = hayModulos && !esVendedor && planActivo ? await calcularModulosReporte(supabase, sesion.empresaId) : null;
+  const modulosReporte = hayModulos && !rolBloqueado && planActivo ? await calcularModulosReporte(supabase, sesion.empresaId) : null;
   // Total de un módulo: sumaTotal y totalesPorMes nunca coexisten (son excluyentes en
   // datosReportes.ts, según tenga o no columna Fecha) -- sumar ambos es seguro.
   const totalModulo = (m: NonNullable<typeof modulosReporte>[number]) =>
@@ -132,14 +132,14 @@ export default async function DashboardPage() {
             {hayModulos ? `${datasets.length} ${datasets.length === 1 ? "módulo" : "módulos"} en tu panel` : "Empecemos por tu primer Excel"}
           </p>
         </div>
-        {!esVendedor && (
+        {!rolBloqueado && (
           <div className="acciones">
             <Link href="/dashboard/upload" className="btn btn-primario">Subir Excel</Link>
           </div>
         )}
       </div>
 
-      {!hayModulos && !esVendedor && (
+      {!hayModulos && !rolBloqueado && (
         <div className="tarjeta tarjeta-elevada vacio">
           <h2 style={{ fontSize: 24 }}>Todavía no hay módulos</h2>
           <p style={{ maxWidth: 46 + "ch", margin: "0 auto 20px" }}>
@@ -149,7 +149,7 @@ export default async function DashboardPage() {
         </div>
       )}
 
-      {hayModulos && !esVendedor && planActivo && hayDashboard && (
+      {hayModulos && !rolBloqueado && planActivo && hayDashboard && (
         <div className="tarjeta tarjeta-elevada" style={{ marginBottom: 20 }}>
           <h3 style={{ margin: 0 }}>Tu negocio en números</h3>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 14, marginTop: 14 }}>
@@ -240,7 +240,7 @@ export default async function DashboardPage() {
         </div>
       )}
 
-      {hayModulos && !esVendedor && !planActivo && (
+      {hayModulos && !rolBloqueado && !planActivo && (
         <div className="tarjeta" style={{ marginBottom: 20 }}>
           <h3 style={{ margin: 0 }}>Tu negocio en números</h3>
           <p className="suave pequeno" style={{ marginTop: 10 }}>
@@ -277,8 +277,8 @@ export default async function DashboardPage() {
 
       {hayModulos && <ConsejosInicio />}
 
-      {hayModulos && !esVendedor && <CuentasPorCobrar />}
-      {hayModulos && !esVendedor && <CuentasPorPagar />}
+      {hayModulos && !rolBloqueado && <CuentasPorCobrar />}
+      {hayModulos && !rolBloqueado && <CuentasPorPagar />}
     </>
   );
 }

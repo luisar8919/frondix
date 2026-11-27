@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { crearClienteServidor } from "@/lib/supabase/server";
 import { empresaDelUsuarioServidor } from "@/lib/sesionServidor";
-import { esVendedor, rolEnEmpresa } from "@/lib/permisos";
+import { rolRestringido, rolEnEmpresa } from "@/lib/permisos";
 import { ETAPAS } from "@/lib/pipeline";
 
 // Cambia la etapa de un cliente/prospecto. Si es la primera vez que se le toca
@@ -12,7 +12,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ cl
   const supabase = await crearClienteServidor();
   const sesion = await empresaDelUsuarioServidor(supabase);
   if (!sesion.ok) return NextResponse.json({ error: sesion.error }, { status: 401 });
-  if (esVendedor(rolEnEmpresa(sesion.empresas, sesion.empresaId))) {
+  if (rolRestringido(rolEnEmpresa(sesion.empresas, sesion.empresaId))) {
     return NextResponse.json({ error: "Tu rol no tiene acceso a esto" }, { status: 403 });
   }
 
