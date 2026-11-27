@@ -3,6 +3,7 @@ import { crearClienteServidor } from "@/lib/supabase/server";
 import { empresaDelUsuarioServidor } from "@/lib/sesionServidor";
 import { rolEnEmpresa } from "@/lib/permisos";
 import { tipoModulo } from "@/lib/roles";
+import { interfacesVisibles } from "@/lib/interfaces";
 import BarraPanel from "@/components/BarraPanel";
 import RegistrarPush from "@/components/RegistrarPush";
 import type { Columna } from "@/lib/excel-parser";
@@ -24,6 +25,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
   // vendedor no ve Compras, mismo criterio que Inicio.
   let modulos: { id: string; nombre: string }[] = [];
   let extras: { href: string; texto: string }[] = [];
+  let interfaces: { key: string; label: string; href: string }[] = [];
   const esVendedor = rol === "vendedor";
   if (sesion.ok) {
     const { data: datasetsCrudos } = await supabase
@@ -35,6 +37,13 @@ export default async function DashboardLayout({ children }: { children: React.Re
     modulos = datasets
       .filter((d) => !esVendedor || tipoModulo(d.columnas.map((c) => c.rol), d.nombre) !== "compras")
       .map((d) => ({ id: d.id, nombre: d.nombre }));
+
+    const { data: empresaInterfaces } = await supabase
+      .from("empresas")
+      .select("interfaces_desactivadas")
+      .eq("id", sesion.empresaId)
+      .single();
+    interfaces = interfacesVisibles(datasets, (empresaInterfaces?.interfaces_desactivadas as string[] | null) ?? []);
 
     // Clientes/Proveedores/Cotizaciones/Órdenes de compra no son un módulo propio
     // (no tienen tarjeta en Inicio) -- solo se ofrecen en el desplegable una vez
@@ -74,7 +83,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
   return (
     <>
       <RegistrarPush />
-      <BarraPanel rol={rol} modulos={modulos} extras={extras} />
+      <BarraPanel rol={rol} modulos={modulos} extras={extras} interfaces={interfaces} />
       <main className="contenedor panel">{children}</main>
     </>
   );

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { crearClienteServidor } from "@/lib/supabase/server";
 import { empresaDelUsuarioServidor } from "@/lib/sesionServidor";
-import { tipoModulo, type TipoModulo } from "@/lib/roles";
+import { tipoModulo, esInterfazAtencion, type TipoModulo } from "@/lib/roles";
 import { esStock } from "@/lib/stock";
 import { esVendedor, rolEnEmpresa } from "@/lib/permisos";
 import type { Columna } from "@/lib/excel-parser";
@@ -40,12 +40,7 @@ export async function GET(req: NextRequest) {
     if (vendedor && tipoModulo(columnas.map((c) => c.rol), d.nombre) === "compras") return false;
     if (!tipoParam) return true;
     if (tipoParam === "stock") return esStock(columnas);
-    if (tipoParam === "atencion") {
-      return (
-        columnas.some((c) => c.rol === "estado" && (c.opcionesFijas?.length ?? 0) > 0) &&
-        columnas.some((c) => c.rol === "cliente" || c.rol === "telefono")
-      );
-    }
+    if (tipoParam === "atencion") return esInterfazAtencion(columnas);
     return tipoModulo(columnas.map((c) => c.rol), d.nombre) === tipoParam;
   });
 

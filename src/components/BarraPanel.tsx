@@ -9,8 +9,6 @@ import { COOKIE_EMPRESA_ACTIVA } from "@/lib/sesion";
 
 const enlaces = [
   { href: "/dashboard", texto: "Inicio" },
-  { href: "/dashboard/pos", texto: "Punto de Venta" },
-  { href: "/dashboard/ventanilla", texto: "Atención" },
   { href: "/dashboard/upload", texto: "Subir Excel" },
 ];
 
@@ -33,6 +31,7 @@ const reglasSubmenu = [
   { href: "/dashboard/reglas", texto: "Condicionales" },
   { href: "/dashboard/notificaciones", texto: "Notificaciones" },
   { href: "/dashboard/enlaces", texto: "Enlaces" },
+  { href: "/dashboard/interfaces", texto: "Interfaces" },
 ];
 
 const itemsMenu = [
@@ -113,11 +112,13 @@ function MenuMovil({
   enlacesVisibles,
   modulosSubmenu,
   hayAlgo,
+  interfaces,
   esVendedor,
 }: {
   enlacesVisibles: { href: string; texto: string }[];
   modulosSubmenu: { href: string; texto: string }[];
   hayAlgo: boolean;
+  interfaces: { href: string; texto: string }[];
   esVendedor: boolean;
 }) {
   const [abierto, setAbierto] = useState(false);
@@ -164,6 +165,16 @@ function MenuMovil({
               ))}
             </>
           )}
+          {interfaces.length > 0 && (
+            <>
+              <Separador texto="Interfaces" />
+              {interfaces.map((s) => (
+                <Link key={s.href} href={s.href} className="menu-cuenta-item" role="menuitem" onClick={() => setAbierto(false)}>
+                  {s.texto}
+                </Link>
+              ))}
+            </>
+          )}
           {!esVendedor && (
             <>
               <Separador texto="Resumen" />
@@ -201,6 +212,7 @@ export default function BarraPanel({
   rol,
   modulos,
   extras,
+  interfaces,
 }: {
   rol?: string;
   // Los módulos reales de la empresa (mismos que la tarjeta de Inicio, ver
@@ -212,6 +224,11 @@ export default function BarraPanel({
   // Inicio, pero el layout ya los filtró para mandar solo los que tienen al
   // menos un dato real (ver dashboard/layout.tsx).
   extras: { href: string; texto: string }[];
+  // Punto de Venta / Atención: ya vienen filtradas por el layout (aplican
+  // estructuralmente Y no están apagadas a mano en Configuración >
+  // Interfaces, ver lib/interfaces.ts) -- acá no se vuelve a decidir nada,
+  // solo se muestra. Sin ninguna, el botón directamente no aparece.
+  interfaces: { key: string; label: string; href: string }[];
 }) {
   const esVendedor = rol === "vendedor";
   const modulosSubmenu = [
@@ -220,6 +237,7 @@ export default function BarraPanel({
     { href: "/dashboard/modulos/nuevo", texto: "+ Agregar módulo" },
   ];
   const hayAlgo = modulos.length > 0 || extras.length > 0;
+  const interfacesSubmenu = interfaces.map((i) => ({ href: i.href, texto: i.label }));
   const ruta = usePathname();
   const router = useRouter();
   const [menuAbierto, setMenuAbierto] = useState(false);
@@ -235,13 +253,14 @@ export default function BarraPanel({
   }, []);
 
   // "Inicio" también queda marcada dentro de un módulo concreto (/dashboard/<id>).
-  const fijas = [...enlaces.map((e) => e.href), ...modulosSubmenu.map((e) => e.href), ...resumenSubmenu.map((e) => e.href), ...seguimientoSubmenu.map((e) => e.href), ...reglasSubmenu.map((e) => e.href)];
+  const fijas = [...enlaces.map((e) => e.href), ...modulosSubmenu.map((e) => e.href), ...resumenSubmenu.map((e) => e.href), ...seguimientoSubmenu.map((e) => e.href), ...reglasSubmenu.map((e) => e.href), ...interfacesSubmenu.map((e) => e.href)];
   const activo = (href: string) =>
     href === "/dashboard" ? ruta === "/dashboard" || !fijas.some((f) => f !== "/dashboard" && ruta.startsWith(f)) : ruta === href;
   const activoModulos = modulosSubmenu.some((s) => s.href === ruta) || /^\/dashboard\/[0-9a-f-]{36}$/.test(ruta);
   const activoResumen = resumenSubmenu.some((s) => s.href === ruta);
   const activoSeguimiento = seguimientoSubmenu.some((s) => s.href === ruta);
   const activoReglas = reglasSubmenu.some((s) => s.href === ruta);
+  const activoInterfaces = interfacesSubmenu.some((s) => s.href === ruta);
 
   async function salir() {
     await crearClienteBrowser().auth.signOut();
@@ -263,6 +282,9 @@ export default function BarraPanel({
               {e.texto}
             </Link>
           ))}
+          {interfacesSubmenu.length > 0 && (
+            <BotonSubmenu texto="Interfaces" items={interfacesSubmenu} activo={activoInterfaces} />
+          )}
           {!esVendedor && hayAlgo && (
             <BotonSubmenu texto="Módulos" items={modulosSubmenu} activo={activoModulos} />
           )}
@@ -284,6 +306,7 @@ export default function BarraPanel({
           enlacesVisibles={enlaces.filter((e) => !esVendedor || e.href !== "/dashboard/upload")}
           modulosSubmenu={modulosSubmenu}
           hayAlgo={hayAlgo}
+          interfaces={interfacesSubmenu}
           esVendedor={esVendedor}
         />
         <div className="menu-cuenta" ref={menuRef}>

@@ -128,6 +128,17 @@ export function tipoModulo(roles: (RolColumna | null | "")[], nombreTabla?: stri
   return "otro";
 }
 
+// Un dataset "sirve" para la Ventanilla de Atención (ver VentanillaAtencion.tsx
+// y la interfaz "Interfaces" de BarraPanel) cuando trae un Estado de lista
+// cerrada Y un contacto real -- por estructura, nunca por el nombre del
+// módulo, así que Reservas/Delivery/Alquileres/etc. entran solos.
+export function esInterfazAtencion(columnas: { rol: RolColumna | null; opcionesFijas?: string[] | null }[]): boolean {
+  return (
+    columnas.some((c) => c.rol === "estado" && (c.opcionesFijas?.length ?? 0) > 0) &&
+    columnas.some((c) => c.rol === "cliente" || c.rol === "telefono")
+  );
+}
+
 // Roles que, SI la tabla tiene una columna marcada así, no se puede dejar en blanco
 // al registrar (a mano o editando) -- sin esto se guardaban ventas/compras sin
 // monto ni producto ni contraparte, que después ni Reportes ni Seguimiento pueden
