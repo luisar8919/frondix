@@ -50,6 +50,16 @@ export default function PuntoDeVenta() {
   const [mesaActual, setMesaActual] = useState(MESA_UNICA);
   const [carritoPorMesa, setCarritoPorMesa] = useState<Record<string, LineaCarrito[]>>({});
   const [clientePorMesa, setClientePorMesa] = useState<Record<string, string>>({});
+  // Mesas persistentes (migración 46, /api/mesas): id real en el servidor por
+  // nombre de mesa -- sin id (falló la migración, o es MESA_UNICA) todo sigue
+  // funcionando solo en memoria como antes, "mejor esfuerzo". mozoPorMesa es
+  // quién la abrió (apertura de mesa = mozo asignado), solo informativo.
+  const [mesaIdPorNombre, setMesaIdPorNombre] = useState<Record<string, string>>({});
+  const [mozoPorMesa, setMozoPorMesa] = useState<Record<string, string>>({});
+  // Separación de cuentas: elegir un subconjunto de líneas y cobrarlas aparte,
+  // dejando el resto del carrito abierto (ver botón "Cobrar seleccionadas").
+  const [modoDividir, setModoDividir] = useState(false);
+  const [lineasSeleccionadas, setLineasSeleccionadas] = useState<Set<string>>(new Set());
   const [cobrando, setCobrando] = useState(false);
   const [mensaje, setMensaje] = useState<{ tipo: "ok" | "error"; texto: string } | null>(null);
   // Ambientes: agrupa visualmente las mesas (Salón, Terraza, Barra...) -- solo
@@ -132,6 +142,10 @@ export default function PuntoDeVenta() {
     setMesasUnidas({});
     setAccionMesas(null);
     setMesaDestino("");
+    setMesaIdPorNombre({});
+    setMozoPorMesa({});
+    setModoDividir(false);
+    setLineasSeleccionadas(new Set());
     (async () => {
       // Mismo truco que la Papelera: pedir 1 registro trae igual `dataset.columnas` completo.
       const res = await fetch(`/api/records/${ventasDatasetId}?limite=1`);
@@ -157,6 +171,30 @@ export default function PuntoDeVenta() {
     })();
   }, [ventasDatasetId]);
 
+  // Trae las mesas ya abiertas en el servidor para este módulo -- "mejor
+  // esfuerzo": si falla (ej. falta correr la migración 46) simplemente se
+  // sigue solo en memoria, como funcionaba antes de persistir mesas.
+  useEffect(() => {
+    if (!usarMesas || !ventasDatasetId) return;
+    (async () => {
+      const res = await fetch(`/api/mesas?datasetId=${ventasDatasetId}`);
+      if (!res.ok) return;
+      const body = await res.json().catch(() => ({}));
+      const filas = (body.mesas ?? []) as {
+        id: string; nombre: string; ambiente: string; cliente: string | null; carrito: LineaCarrito[]; mozo_email: string | null;
+      }[];
+      if (filas.length === 0) return;
+      setMesas((m) => Array.from(new Set([...m, ...filas.map((f) => f.nombre)])));
+      setMesaIdPorNombre((ids) => ({ ...ids, ...Object.fromEntries(filas.map((f) => [f.nombre, f.id])) }));
+      setMozoPorMesa((mz) => ({ ...mz, ...Object.fromEntries(filas.filter((f) => f.mozo_email).map((f) => [f.nombre, f.mozo_email as string])) }));
+      setCarritoPorMesa((c) => ({ ...c, ...Object.fromEntries(filas.map((f) => [f.nombre, f.carrito ?? []])) }));
+      setClientePorMesa((c) => ({ ...c, ...Object.fromEntries(filas.filter((f) => f.cliente).map((f) => [f.nombre, f.cliente as string])) }));
+      setAmbientePorMesa((a) => ({ ...a, ...Object.fromEntries(filas.map((f) => [f.nombre, f.ambiente])) }));
+      setAmbientes((amb) => Array.from(new Set([...amb, ...filas.map((f) => f.ambiente)])));
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [usarMesas, ventasDatasetId]);
+
   const cMonto = useMemo(() => columnas.find((c) => c.rol === "monto"), [columnas]);
   const cProductoCol = useMemo(() => columnas.find((c) => c.rol === "producto"), [columnas]);
   const cCliente = useMemo(() => columnas.find((c) => c.rol === "cliente"), [columnas]);
@@ -170,18 +208,50 @@ export default function PuntoDeVenta() {
 
   const carrito = carritoPorMesa[mesaActual] ?? [];
   const cliente = clientePorMesa[mesaActual] ?? (usarMesas && mesaActual !== MESA_UNICA ? mesaActual : "Cliente mostrador");
-  function setCliente(valor: string) {
-    setClientePorMesa((cs) => ({ ...cs, [mesaActual]: valor }));
-  }
-  function actualizarCarritoActual(fn: (c: LineaCarrito[]) => LineaCarrito[]) {
-    setCarritoPorMesa((cs) => ({ ...cs, [mesaActual]: fn(cs[mesaActual] ?? []) }));
+
+  // Mejor esfuerzo: si la mesa no tiene id (no se pudo persistir, o es
+  // MESA_UNICA) no hay nada que sincronizar -- el carrito sigue funcionando
+  // normal, solo en memoria, igual que antes de esta función existir.
+  function sincronizarMesa(nombre: string, cambios: { carrito?: LineaCarrito[]; cliente?: string }) {
+    const id = mesaIdPorNombre[nombre];
+    if (!id) return;
+    fetch(`/api/mesas/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(cambios),
+    }).catch(() => {});
   }
 
-  function agregarMesa() {
+  function setCliente(valor: string) {
+    setClientePorMesa((cs) => ({ ...cs, [mesaActual]: valor }));
+    sincronizarMesa(mesaActual, { cliente: valor });
+  }
+  function actualizarCarritoActual(fn: (c: LineaCarrito[]) => LineaCarrito[]) {
+    setCarritoPorMesa((cs) => {
+      const nuevo = fn(cs[mesaActual] ?? []);
+      sincronizarMesa(mesaActual, { carrito: nuevo });
+      return { ...cs, [mesaActual]: nuevo };
+    });
+  }
+
+  // Apertura de mesa: el servidor asigna el mozo (la sesión actual) -- ver
+  // POST /api/mesas. Si falla (ej. falta la migración 46), la mesa igual se
+  // crea en memoria como antes, solo que sin persistir ni mozo asignado.
+  async function agregarMesa() {
     const nombre = `Mesa ${mesas.length}`;
     setMesas((m) => [...m, nombre]);
     setAmbientePorMesa((a) => ({ ...a, [nombre]: ambienteActual }));
     setMesaActual(nombre);
+    const res = await fetch("/api/mesas", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ datasetId: ventasDatasetId, nombre, ambiente: ambienteActual }),
+    });
+    const body = await res.json().catch(() => ({}));
+    if (res.ok && body.mesa) {
+      setMesaIdPorNombre((ids) => ({ ...ids, [nombre]: body.mesa.id }));
+      if (body.mesa.mozo_email) setMozoPorMesa((mz) => ({ ...mz, [nombre]: body.mesa.mozo_email }));
+    }
   }
 
   // Junta el carrito de la mesa ACTUAL en el de `destino` y la marca "unida"
@@ -189,11 +259,12 @@ export default function PuntoDeVenta() {
   // puede deshacer -- ver quitarUnion). Pensado para cuando 2 mesas se juntan
   // en el local y conviene cobrar todo junto.
   function unirMesa(destino: string) {
-    setCarritoPorMesa((cs) => ({
-      ...cs,
-      [destino]: [...(cs[destino] ?? []), ...(cs[mesaActual] ?? [])],
-      [mesaActual]: [],
-    }));
+    setCarritoPorMesa((cs) => {
+      const combinado = [...(cs[destino] ?? []), ...(cs[mesaActual] ?? [])];
+      sincronizarMesa(destino, { carrito: combinado });
+      sincronizarMesa(mesaActual, { carrito: [] });
+      return { ...cs, [destino]: combinado, [mesaActual]: [] };
+    });
     setMesasUnidas((u) => ({ ...u, [mesaActual]: destino }));
     setMesaActual(destino);
     setAccionMesas(null);
@@ -210,8 +281,17 @@ export default function PuntoDeVenta() {
   // Mueve el carrito/cliente de la mesa actual a otra (vacía) y deja la
   // original libre -- para cuando el cliente se cambia de mesa físicamente.
   function moverMesa(destino: string) {
-    setCarritoPorMesa((cs) => ({ ...cs, [destino]: cs[mesaActual] ?? [], [mesaActual]: [] }));
-    setClientePorMesa((cs) => ({ ...cs, [destino]: cs[mesaActual] ?? "" }));
+    setCarritoPorMesa((cs) => {
+      const movido = cs[mesaActual] ?? [];
+      sincronizarMesa(destino, { carrito: movido });
+      sincronizarMesa(mesaActual, { carrito: [] });
+      return { ...cs, [destino]: movido, [mesaActual]: [] };
+    });
+    setClientePorMesa((cs) => {
+      const movido = cs[mesaActual] ?? "";
+      sincronizarMesa(destino, { cliente: movido });
+      return { ...cs, [destino]: movido };
+    });
     setMesaActual(destino);
     setAccionMesas(null);
     setMesaDestino("");
@@ -286,6 +366,10 @@ export default function PuntoDeVenta() {
       : Math.max(0, (totalBruto - descuentoValor) / totalBruto);
   const total = totalBruto * factorDescuento;
   const descuentoMonto = totalBruto - total;
+  // Mismo factor aplicado a cualquier subconjunto de líneas (ver "Cobrar
+  // seleccionadas", separación de cuentas) -- el descuento reparte igual
+  // haya o no división de cuenta.
+  const totalDe = (lineas: LineaCarrito[]) => lineas.reduce((s, l) => s + l.cantidad * l.precioUnitario, 0) * factorDescuento;
 
   // Escanea un código de barras (requiere que Stock tenga una columna con rol
   // "codigo", ver el mapa `codigos` armado en /api/records/[datasetId]/valores)
@@ -315,19 +399,23 @@ export default function PuntoDeVenta() {
     }
   }
 
-  async function cobrar() {
-    if (!cProductoCol || !cMonto || carrito.length === 0) return;
+  // `subset`: ausente = cobra TODO el carrito (flujo de siempre); presente =
+  // "Cobrar seleccionadas" (separación de cuentas), cobra solo esas líneas y
+  // deja el resto del carrito abierto en la misma mesa.
+  async function cobrar(subset?: LineaCarrito[]) {
+    const base = subset ?? carrito;
+    if (!cProductoCol || !cMonto || base.length === 0) return;
     if (descuentoMonto > 0 && !descuentoSustento.trim()) {
       setMensaje({ tipo: "error", texto: "Con descuento aplicado, hay que escribir el motivo antes de cobrar." });
       return;
     }
     setCobrando(true);
     setMensaje(null);
-    const cantidadInicial = carrito.length;
+    const cantidadInicial = base.length;
     // Una línea = un POST, secuencial (no en paralelo): así una línea que
-    // falla deja el resto del carrito intacto para reintentar, en vez de
+    // falla deja el resto del lote intacto para reintentar, en vez de
     // arriesgarse a registrar algunas sí y otras no en cualquier orden.
-    const pendientes = [...carrito];
+    const pendientes = [...base];
     while (pendientes.length > 0) {
       const linea = pendientes[0];
       const datos: Record<string, unknown> = {
@@ -347,17 +435,30 @@ export default function PuntoDeVenta() {
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
         setCobrando(false);
-        actualizarCarritoActual(() => pendientes);
-        setMensaje({ tipo: "error", texto: `Falló "${linea.producto}": ${body.error ?? "error desconocido"}. El resto del carrito sigue acá para reintentar.` });
+        // Lo ya cobrado de este lote (si algo falló a mitad de camino) sí sale
+        // del carrito; el resto (lo que falló + lo que ni se intentó) se queda.
+        const yaCobradas = new Set(base.filter((l) => !pendientes.includes(l)).map((l) => l.id));
+        if (yaCobradas.size > 0) actualizarCarritoActual((c) => c.filter((l) => !yaCobradas.has(l.id)));
+        setMensaje({ tipo: "error", texto: `Falló "${linea.producto}": ${body.error ?? "error desconocido"}. El resto sigue en el carrito para reintentar.` });
         return;
       }
       pendientes.shift();
     }
     setCobrando(false);
-    setMensaje({ tipo: "ok", texto: `Venta registrada: ${cantidadInicial} producto(s), total ${formatearMonto(total, "PEN")}.` });
-    actualizarCarritoActual(() => []);
-    setDescuentoValor(0);
-    setDescuentoSustento("");
+    setMensaje({ tipo: "ok", texto: `Venta registrada: ${cantidadInicial} producto(s), total ${formatearMonto(totalDe(base), "PEN")}.` });
+    const idsBase = new Set(base.map((l) => l.id));
+    const quedan = carrito.filter((l) => !idsBase.has(l.id));
+    actualizarCarritoActual(() => quedan);
+    setLineasSeleccionadas(new Set());
+    if (quedan.length === 0) {
+      setDescuentoValor(0);
+      setDescuentoSustento("");
+      setModoDividir(false);
+      // Mesa cobrada del todo: se cierra (se borra la fila -- el histórico
+      // real de la venta ya quedó en Ventas, acá no hace falta guardarlo).
+      const id = mesaIdPorNombre[mesaActual];
+      if (id) fetch(`/api/mesas/${id}`, { method: "DELETE" }).catch(() => {});
+    }
   }
 
   useEffect(() => {
@@ -440,6 +541,12 @@ export default function PuntoDeVenta() {
                     >
                       {m}{unidaA ? ` → ${unidaA}` : ""}
                       {ocupada && m !== mesaActual && !unidaA && <span style={{ marginLeft: 6 }}>●</span>}
+                      {mozoPorMesa[m] && (
+                        <>
+                          <br />
+                          <span style={{ fontSize: 10, opacity: 0.8, fontWeight: 400 }}>{mozoPorMesa[m]}</span>
+                        </>
+                      )}
                     </button>
                   );
                 })}
@@ -565,7 +672,23 @@ export default function PuntoDeVenta() {
             {carrito.map((l) => (
               <div key={l.id} style={{ borderBottom: "1px solid var(--linea)", padding: "8px 0" }}>
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 52px 68px 72px auto", gap: 6, alignItems: "center" }}>
-                  <span className="pequeno" style={{ gridColumn: "1 / -1" }}>{l.producto}{l.nota ? ` (${l.nota})` : ""}</span>
+                  <span className="pequeno" style={{ gridColumn: "1 / -1", display: "flex", alignItems: "center", gap: 6 }}>
+                    {modoDividir && (
+                      <input
+                        type="checkbox"
+                        checked={lineasSeleccionadas.has(l.id)}
+                        onChange={(e) =>
+                          setLineasSeleccionadas((s) => {
+                            const n = new Set(s);
+                            if (e.target.checked) n.add(l.id); else n.delete(l.id);
+                            return n;
+                          })
+                        }
+                        aria-label={`Incluir ${l.producto} en la cuenta separada`}
+                      />
+                    )}
+                    {l.producto}{l.nota ? ` (${l.nota})` : ""}
+                  </span>
                   <input
                     type="number"
                     min={0}
@@ -600,6 +723,28 @@ export default function PuntoDeVenta() {
                 )}
               </div>
             ))}
+
+            {carrito.length > 1 && (
+              <button
+                type="button"
+                className="btn btn-fantasma"
+                style={{ marginTop: 10 }}
+                onClick={() => { setModoDividir((v) => !v); setLineasSeleccionadas(new Set()); }}
+              >
+                {modoDividir ? "Cancelar separación de cuenta" : "Separar cuenta"}
+              </button>
+            )}
+            {modoDividir && (
+              <button
+                type="button"
+                className="btn btn-secundario"
+                style={{ width: "100%", marginTop: 6 }}
+                disabled={cobrando || lineasSeleccionadas.size === 0}
+                onClick={() => cobrar(carrito.filter((l) => lineasSeleccionadas.has(l.id)))}
+              >
+                Cobrar seleccionadas ({lineasSeleccionadas.size}) -- {formatearMonto(totalDe(carrito.filter((l) => lineasSeleccionadas.has(l.id))), "PEN")}
+              </button>
+            )}
 
             {carrito.length > 0 && (extraAbierto ? (
               <div style={{ display: "flex", gap: 6, marginTop: 10, flexWrap: "wrap" }}>
@@ -678,7 +823,7 @@ export default function PuntoDeVenta() {
                   className="btn btn-primario"
                   style={{ width: "100%", marginTop: 6 }}
                   disabled={cobrando || (descuentoMonto > 0 && !descuentoSustento.trim())}
-                  onClick={cobrar}
+                  onClick={() => cobrar()}
                 >
                   {cobrando ? "Cobrando..." : "Cobrar"}
                 </button>

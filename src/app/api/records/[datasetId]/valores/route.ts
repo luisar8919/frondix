@@ -60,8 +60,12 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ data
   const seleccionCompleta = hayPrecios || hayCodigo || esStockDataset;
   let filas: ({ data: Record<string, unknown> } | { v: string | null })[];
   try {
+    // Bug real encontrado probando el Punto de Venta: sin este filtro, un
+    // producto borrado (papelera, eliminado_en != null) seguía apareciendo
+    // en la grilla y en el mapa de cantidades -- el GET normal de /records sí
+    // excluye la papelera por defecto, acá faltaba el mismo filtro.
     filas = await leerTodasLasFilas((desde, hasta) =>
-      supabase.from("records").select(seleccionCompleta ? "data" : `v:data->>${columna}`).eq("dataset_id", datasetId).order("id").range(desde, hasta)
+      supabase.from("records").select(seleccionCompleta ? "data" : `v:data->>${columna}`).eq("dataset_id", datasetId).is("eliminado_en", null).order("id").range(desde, hasta)
     );
   } catch (e) {
     return NextResponse.json({ error: e instanceof Error ? e.message : "No se pudo leer el módulo" }, { status: 500 });

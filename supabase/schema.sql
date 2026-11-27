@@ -449,6 +449,27 @@ create policy "crear abonos en mi empresa" on abonos for insert
 create policy "borrar abonos de mi empresa" on abonos for delete
   using (empresa_id in (select public.mis_empresas()));
 
+-- Mesas persistentes del Punto de Venta -- ver migracion-46-mesas.sql.
+create table mesas (
+  id uuid primary key default gen_random_uuid(),
+  empresa_id uuid not null references empresas(id) on delete cascade,
+  dataset_id uuid not null references datasets(id) on delete cascade,
+  nombre text not null,
+  ambiente text not null default 'General',
+  cliente text,
+  mozo_user_id uuid references auth.users(id),
+  mozo_email text,
+  carrito jsonb not null default '[]',
+  creada_en timestamptz not null default now()
+);
+alter table mesas enable row level security;
+create policy "ver mesas de mi empresa" on mesas for select
+  using (empresa_id in (select public.mis_empresas()));
+create policy "gestionar mesas de mi empresa" on mesas for all
+  using (empresa_id in (select public.mis_empresas()))
+  with check (empresa_id in (select public.mis_empresas()));
+create index mesas_dataset_id_idx on mesas(dataset_id);
+
 -- Desde el 30/10/2026 Supabase ya no otorga acceso a la Data API por
 -- defecto a tablas nuevas de "public" -- hay que otorgarlo a mano o la API
 -- (supabase-js/PostgREST) responde "permission denied". RLS sigue siendo
@@ -465,7 +486,7 @@ begin
     'empresas', 'miembros', 'datasets', 'records', 'suscripciones', 'contactos',
     'metas', 'ia_llamadas', 'highlights', 'recomendacion_usos', 'movimientos_stock',
     'push_tokens', 'seguimiento_clientes', 'notas_cliente', 'ordenes_compra',
-    'orden_compra_items', 'etapas_cliente', 'logros', 'proveedores_manual', 'cotizaciones', 'abonos'
+    'orden_compra_items', 'etapas_cliente', 'logros', 'proveedores_manual', 'cotizaciones', 'abonos', 'mesas'
   ])
   loop
     execute format('grant select on public.%I to anon', t);
