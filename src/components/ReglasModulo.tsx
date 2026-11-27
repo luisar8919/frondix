@@ -16,7 +16,11 @@ import { enviarConfirmando } from "@/lib/confirmar";
 // con el operador que corresponda a su tipo (igual/distinto para texto,
 // también mayor/menor para número) -- mismo "umbral" que en el juego.
 interface AjustarStockInfo {
-  tipoModulo: "ventas" | "compras";
+  // "otro": módulo que no cuenta como venta/compra en Reportes (ej. Órdenes
+  // de servicio) pero su Producto está enlazado a un Menú -- un
+  // trabajo/servicio realizado también consume insumos, ver infoAjustarStock
+  // en /api/reglas/route.ts.
+  tipoModulo: "ventas" | "compras" | "otro";
   stockNombre: string;
   cantidadLabel: string | null;
 }
@@ -138,7 +142,8 @@ export default function ReglasModulo({
 
   function textoCondicion(r: Regla): string {
     if (r.accion.tipo === "ajustar_stock" && ajustarStockInfo) {
-      return `Si registra ${ajustarStockInfo.tipoModulo === "ventas" ? "una venta" : "una compra"}`;
+      const sujeto = ajustarStockInfo.tipoModulo === "ventas" ? "una venta" : ajustarStockInfo.tipoModulo === "compras" ? "una compra" : "un registro";
+      return `Si registra ${sujeto}`;
     }
     const c = datosCondicion(r);
     if (!c.key) return "Siempre";
@@ -156,7 +161,7 @@ export default function ReglasModulo({
     if (a.tipo === "ajustar_stock") {
       if (!ajustarStockInfo) return "Ajustar Stock automáticamente";
       const cant = ajustarStockInfo.cantidadLabel ? `"${ajustarStockInfo.cantidadLabel}"` : "1";
-      return `${ajustarStockInfo.tipoModulo === "ventas" ? "Restar" : "Sumar"} ${cant} de Cantidad en "${ajustarStockInfo.stockNombre}"`;
+      return `${ajustarStockInfo.tipoModulo === "compras" ? "Sumar" : "Restar"} ${cant} de Cantidad en "${ajustarStockInfo.stockNombre}"`;
     }
     if (a.tipo === "enviar_correo_cliente") return `Enviar correo al cliente${a.mensaje ? `: "${a.mensaje.slice(0, 40)}${a.mensaje.length > 40 ? "..." : ""}"` : ""}`;
     if (a.tipo === "descontar_insumos") return `Descontar insumos de la receta${a.receta ? `: "${a.receta.slice(0, 40)}${a.receta.length > 40 ? "..." : ""}"` : ""}`;
@@ -313,7 +318,7 @@ export default function ReglasModulo({
                   <select disabled aria-label="Campo de la condición (fijo)"><option>Este módulo registra</option></select>
                   <select disabled aria-label="Operador (fijo)"><option>es</option></select>
                   <select disabled aria-label="Valor (fijo)">
-                    <option>{ajustarStockInfo.tipoModulo === "ventas" ? "una Venta" : "una Compra"}</option>
+                    <option>{ajustarStockInfo.tipoModulo === "ventas" ? "una Venta" : ajustarStockInfo.tipoModulo === "compras" ? "una Compra" : "un Registro"}</option>
                   </select>
                 </>
               ) : (
@@ -559,7 +564,7 @@ export default function ReglasModulo({
               {r.accion.tipo === "ajustar_stock" && ajustarStockInfo && (
                 <>
                   <select disabled aria-label="Acción (fija)">
-                    <option>{ajustarStockInfo.tipoModulo === "ventas" ? "Restar de" : "Sumar a"}</option>
+                    <option>{ajustarStockInfo.tipoModulo === "compras" ? "Sumar a" : "Restar de"}</option>
                   </select>
                   <select disabled aria-label="Campo destino (fijo)"><option>Cantidad en "{ajustarStockInfo.stockNombre}"</option></select>
                   <select disabled aria-label="Cuánto (fijo)">

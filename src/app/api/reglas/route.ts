@@ -3,7 +3,7 @@ import { crearClienteServidor } from "@/lib/supabase/server";
 import { empresaDelUsuarioServidor } from "@/lib/sesionServidor";
 import { rolRestringido, rolEnEmpresa } from "@/lib/permisos";
 import { tipoModulo } from "@/lib/roles";
-import { esStock } from "@/lib/stock";
+import { esStock, esMenu } from "@/lib/stock";
 import { claveValida } from "@/lib/enlaces";
 import type { Columna } from "@/lib/excel-parser";
 import type { Regla } from "@/lib/reglas";
@@ -40,13 +40,27 @@ export async function GET() {
   // que la UI lo muestre armado con su propia estructura, no solo un título.
   function infoAjustarStock(columnas: Columna[], nombre: string) {
     const tipo = tipoModulo(columnas.map((c) => c.rol), nombre);
-    if (tipo === "otro") return null;
     const cProducto = columnas.find((c) => c.rol === "producto" && c.enlace && claveValida(c.enlace.columnaKey));
     if (!cProducto?.enlace) return null;
-    const stockDs = todos.find((d) => d.id === cProducto.enlace!.datasetId);
-    if (!stockDs || !esStock(stockDs.columnas)) return null;
+    const destinoDs = todos.find((d) => d.id === cProducto.enlace!.datasetId);
+    if (!destinoDs) return null;
     const cCantidad = columnas.find((c) => c.rol === "cantidad");
-    return { tipoModulo: tipo as "ventas" | "compras", stockNombre: stockDs.nombre, cantidadLabel: cCantidad?.label ?? null };
+
+    if (tipo === "ventas" || tipo === "compras") {
+      // Producto enlazado a un Stock real (de siempre), o a un Menú con
+      // composición (ver esMenu en stock.ts) -- ambos pasan por
+      // ajustarStockDesdeRegistro, solo cambia qué descuenta por debajo.
+      if (!esStock(destinoDs.columnas) && !esMenu(destinoDs.columnas)) return null;
+      return { tipoModulo: tipo, stockNombre: destinoDs.nombre, cantidadLabel: cCantidad?.label ?? null };
+    }
+
+    // Módulo "otro" (ej. Órdenes de servicio): solo aplica si el Producto
+    // está enlazado específicamente a un MENÚ -- un trabajo/servicio
+    // realizado consume insumos igual que una venta, aunque el módulo no
+    // cuente como ingreso en Reportes. Nunca para un Stock directo (ese caso
+    // ya lo cubre Traslados con su propio mecanismo, sin pasar por acá).
+    if (!esMenu(destinoDs.columnas)) return null;
+    return { tipoModulo: "otro" as const, stockNombre: destinoDs.nombre, cantidadLabel: cCantidad?.label ?? null };
   }
 
   // Candidatos para "Sumar/fijar un campo enlazado" (generaliza ajustar_stock

@@ -204,7 +204,13 @@ export async function ajustarStockDesdeRegistro(
   userId: string | null = null
 ): Promise<void> {
   const tipoDelModulo = tipoModulo(columnas.map((c) => c.rol));
-  if (tipoDelModulo !== "compras" && tipoDelModulo !== "ventas") return;
+  // Un módulo "otro" (ej. Órdenes de servicio) también entra -- SOLO llega a
+  // descontar algo si, más abajo, su Producto está enlazado específicamente
+  // a un Menú (ver dispatchDescontarInsumosMenu -> datasetMenuDe). Para
+  // cualquier otro "otro" (ej. Traslados, enlazado a un Stock real) esto es
+  // un no-op seguro: datasetMenuDe exige que el destino tenga columna
+  // "composicion", que un Stock normal nunca tiene.
+  if (tipoDelModulo !== "compras" && tipoDelModulo !== "ventas" && tipoDelModulo !== "otro") return;
 
   const cProducto = columnas.find((c) => c.rol === "producto");
   if (!cProducto) return;
@@ -215,21 +221,30 @@ export async function ajustarStockDesdeRegistro(
   const cantidadCruda = cCantidad ? Number(datos[cCantidad.key]) : NaN;
   const cantidad = Number.isFinite(cantidadCruda) && cantidadCruda > 0 ? cantidadCruda : 1;
 
-  const stock = await datasetStockDe(supabase, empresaId, columnas);
-  if (stock) {
-    const tipo: TipoMovimientoStock = tipoDelModulo === "compras" ? "compra" : "venta";
-    await ajustarStock(supabase, stock.id, stock.claveProducto, producto, signo * (tipoDelModulo === "compras" ? cantidad : -cantidad), {
-      empresaId,
-      tipo,
-      userId,
-    });
-    return;
+  // El camino de Stock DIRECTO (descontar la columna "cantidad" de un Stock
+  // de verdad) sigue exclusivo de Ventas/Compras -- nunca para un módulo
+  // "otro" (ej. Traslados, que YA tiene su propio mecanismo con un Producto
+  // enlazado a Stock real, ver transferirStock: si "otro" entrara acá
+  // también, un Traslados con esta automatización activada descontaría
+  // Stock DOS VECES).
+  if (tipoDelModulo === "ventas" || tipoDelModulo === "compras") {
+    const stock = await datasetStockDe(supabase, empresaId, columnas);
+    if (stock) {
+      const tipo: TipoMovimientoStock = tipoDelModulo === "compras" ? "compra" : "venta";
+      await ajustarStock(supabase, stock.id, stock.claveProducto, producto, signo * (tipoDelModulo === "compras" ? cantidad : -cantidad), {
+        empresaId,
+        tipo,
+        userId,
+      });
+      return;
+    }
+    if (tipoDelModulo === "compras") return; // comprar insumos sigue siendo directo a Stock, nunca "comprando" un ítem del Menú
   }
 
-  // Producto enlazado a un Menú (no a un Stock directo): descuenta CADA
-  // insumo de su composición, multiplicado por la cantidad vendida -- solo
-  // tiene sentido en Ventas (comprar insumos se sigue registrando directo en
-  // Compras -> Stock, nunca "comprando" un ítem del Menú).
+  // Producto enlazado a un Menú (ventas sin Stock directo, o cualquier
+  // módulo "otro" como Órdenes de servicio -- un trabajo/servicio realizado
+  // también consume insumos): descuenta CADA insumo de su composición,
+  // multiplicado por la cantidad.
   //
   // OJO (encontrado probando en vivo): esto solo corre si la regla activa es
   // literalmente `{accion:{tipo:"ajustar_stock"}}` -- un módulo cuyo "Ajustar
@@ -242,9 +257,7 @@ export async function ajustarStockDesdeRegistro(
   // Desactivar y volver a Activar "Ajustar Stock automáticamente" en
   // Automatizaciones -- `aplicarPlantilla` reconstruye la regla en su forma
   // canónica `ajustar_stock`, que sí pasa por acá.
-  if (tipoDelModulo === "ventas") {
-    await dispatchDescontarInsumosMenu(supabase, empresaId, columnas, producto, signo * cantidad, userId);
-  }
+  await dispatchDescontarInsumosMenu(supabase, empresaId, columnas, producto, signo * cantidad, userId);
 }
 
 // Busca la fila del Menú para `producto`, lee su columna "composicion" (texto

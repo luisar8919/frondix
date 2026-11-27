@@ -74,6 +74,21 @@ export function plantillaMenu(): Columna[] {
   ];
 }
 
+// Mismos roles/estructura que plantillaMenu (mismo motor de composición de
+// stock.ts, ver esMenu/dispatchDescontarInsumosMenu) con etiquetas genéricas
+// en vez de "Plato o bebida" -- para peluquerías, talleres, spas: un servicio
+// que descuenta insumos de Stock al realizarse. Se enlaza desde Producto en
+// Ventas, o en un módulo "otro" como Órdenes de servicio (ver
+// ajustarStockDesdeRegistro, que ya acepta ambos casos).
+export function plantillaServiciosInsumos(): Columna[] {
+  return [
+    { key: "producto", label: "Servicio", tipo: "texto", rol: "producto", sospechosa: false },
+    { key: "categoria", label: "Categoría", tipo: "texto", rol: "categoria", sospechosa: false },
+    { key: "precio", label: "Precio", tipo: "numero", rol: "precio", sospechosa: false },
+    { key: "composicion", label: "Insumos que consume (opcional)", tipo: "texto", rol: "composicion", sospechosa: false },
+  ];
+}
+
 // Plantillas extra (más allá de Ventas/Compras) para negocios que ya pasaron
 // el estadio básico. Regla seguida en TODAS: nunca combinar "producto" con
 // "monto" en el mismo módulo (tipoModulo las clasificaría como "ventas" y
@@ -366,4 +381,5 @@ export const PLANTILLAS_EXTRA = [
   { clave: "hitos_proyecto", nombre: "Hitos de proyecto", descripcion: "Lista de tareas/hitos por proyecto -- enlázala a tu módulo de Obras para verla junto a cada proyecto.", categoria: "proyectos", columnas: plantillaHitosProyecto, reglasSugeridas: undefined },
   { clave: "eventos", nombre: "Eventos", descripcion: "Fiestas, catering, eventos corporativos: un cobro por cada evento.", categoria: "proyectos", columnas: plantillaEventos, reglasSugeridas: () => reglaExcluirCancelado("Cancelado") },
   { clave: "menu", nombre: "Menú (restaurante)", descripcion: "Platos y bebidas que vendes, con precio -- enlázalo desde Producto en Ventas para que el Punto de Venta lo use como catálogo.", categoria: "servicios", columnas: plantillaMenu, reglasSugeridas: undefined },
+  { clave: "servicios_insumos", nombre: "Servicios con insumos", descripcion: "Peluquerías, talleres, spas: un servicio que descuenta productos de tu Stock al realizarse. Enlázalo desde Producto en Ventas o en Órdenes de servicio.", categoria: "servicios", columnas: plantillaServiciosInsumos, reglasSugeridas: undefined },
 ] as const;

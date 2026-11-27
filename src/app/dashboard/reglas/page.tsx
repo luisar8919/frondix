@@ -7,7 +7,7 @@ import type { Columna } from "@/lib/excel-parser";
 import type { Regla } from "@/lib/reglas";
 
 interface AjustarStockInfo {
-  tipoModulo: "ventas" | "compras";
+  tipoModulo: "ventas" | "compras" | "otro";
   stockNombre: string;
   cantidadLabel: string | null;
 }

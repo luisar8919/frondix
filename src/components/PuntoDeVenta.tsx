@@ -47,6 +47,12 @@ export default function PuntoDeVenta() {
   const [escaneando, setEscaneando] = useState(false);
   const [error, setError] = useState("");
   const [usarMesas, setUsarMesas] = useState(false);
+  // Qué palabra usar para una sesión en paralelo -- "Mesa" sirve para
+  // restaurantes/bares, pero el mismo mecanismo (carrito propio, mozo
+  // asignado, separar cuenta) sirve igual para una peluquería ("Silla"),
+  // un spa ("Cabina") o una cancha/mesa de billar ("Cancha"). Solo cambia
+  // el texto que se muestra y con el que se nombra cada una.
+  const [prefijoMesa, setPrefijoMesa] = useState("Mesa");
   const [mesas, setMesas] = useState<string[]>([MESA_UNICA]);
   const [mesaActual, setMesaActual] = useState(MESA_UNICA);
   const [carritoPorMesa, setCarritoPorMesa] = useState<Record<string, LineaCarrito[]>>({});
@@ -259,7 +265,7 @@ export default function PuntoDeVenta() {
   // POST /api/mesas. Si falla (ej. falta la migración 46), la mesa igual se
   // crea en memoria como antes, solo que sin persistir ni mozo asignado.
   async function agregarMesa() {
-    const nombre = `Mesa ${mesas.length}`;
+    const nombre = `${prefijoMesa} ${mesas.length}`;
     setMesas((m) => [...m, nombre]);
     setAmbientePorMesa((a) => ({ ...a, [nombre]: ambienteActual }));
     setMesaActual(nombre);
@@ -596,6 +602,14 @@ export default function PuntoDeVenta() {
             />
             Usar mesas
           </label>
+          {usarMesas && (
+            <select value={prefijoMesa} onChange={(e) => setPrefijoMesa(e.target.value)} aria-label="Cómo llamar a cada sesión en paralelo">
+              <option value="Mesa">Mesa</option>
+              <option value="Silla">Silla</option>
+              <option value="Cabina">Cabina</option>
+              <option value="Cancha">Cancha</option>
+            </select>
+          )}
           {modulosVentas.length > 1 && (
             <select value={ventasDatasetId} onChange={(e) => setVentasDatasetId(e.target.value)}>
               <option value="" disabled>Elige un módulo de Ventas...</option>
@@ -656,7 +670,7 @@ export default function PuntoDeVenta() {
                 {ambientes.map((a) => <option key={a} value={a}>{a}</option>)}
               </select>
             )}
-            <button type="button" className="btn btn-fantasma" onClick={agregarMesa}>+ Nueva mesa ({ambienteActual})</button>
+            <button type="button" className="btn btn-fantasma" onClick={agregarMesa}>+ Nueva {prefijoMesa.toLowerCase()} ({ambienteActual})</button>
             {nuevoAmbiente === null ? (
               <button type="button" className="btn btn-fantasma" onClick={() => setNuevoAmbiente("")}>+ Nuevo ambiente</button>
             ) : (
