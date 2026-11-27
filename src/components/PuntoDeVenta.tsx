@@ -73,6 +73,11 @@ export default function PuntoDeVenta() {
   // es el que de verdad se cobró, no el de lista.
   const [descuentoTipo, setDescuentoTipo] = useState<"%" | "monto">("%");
   const [descuentoValor, setDescuentoValor] = useState(0);
+  // Sustento obligatorio para poder cobrar CON descuento (auditoría de por
+  // qué se bajó el precio) -- viaja como `sustento` top-level del registro,
+  // mismo campo que ya existe para adjuntar respaldo a cualquier fila (ver
+  // DynamicTable), ahora también seteable desde la creación misma.
+  const [descuentoSustento, setDescuentoSustento] = useState("");
   // id de la línea cuyo input de nota está abierto (null = ninguna).
   const [notaAbierta, setNotaAbierta] = useState<string | null>(null);
   const [extraAbierto, setExtraAbierto] = useState(false);
@@ -119,6 +124,7 @@ export default function PuntoDeVenta() {
     setListaPrecio("general");
     setDescuentoTipo("%");
     setDescuentoValor(0);
+    setDescuentoSustento("");
     setNotaAbierta(null);
     setExtraAbierto(false);
     setExtraNombre("");
@@ -311,6 +317,10 @@ export default function PuntoDeVenta() {
 
   async function cobrar() {
     if (!cProductoCol || !cMonto || carrito.length === 0) return;
+    if (descuentoMonto > 0 && !descuentoSustento.trim()) {
+      setMensaje({ tipo: "error", texto: "Con descuento aplicado, hay que escribir el motivo antes de cobrar." });
+      return;
+    }
     setCobrando(true);
     setMensaje(null);
     const cantidadInicial = carrito.length;
@@ -327,6 +337,7 @@ export default function PuntoDeVenta() {
       if (cCliente) datos[cCliente.key] = cliente.trim() || "Cliente mostrador";
       if (cCantidad) datos[cCantidad.key] = linea.cantidad;
       if (cFecha) datos[cFecha.key] = new Date().toISOString();
+      if (descuentoMonto > 0) datos.sustento = `Descuento: ${descuentoSustento.trim()}`;
 
       const res = await fetch(`/api/records/${ventasDatasetId}`, {
         method: "POST",
@@ -345,6 +356,8 @@ export default function PuntoDeVenta() {
     setCobrando(false);
     setMensaje({ tipo: "ok", texto: `Venta registrada: ${cantidadInicial} producto(s), total ${formatearMonto(total, "PEN")}.` });
     actualizarCarritoActual(() => []);
+    setDescuentoValor(0);
+    setDescuentoSustento("");
   }
 
   useEffect(() => {
@@ -636,9 +649,18 @@ export default function PuntoDeVenta() {
                 </div>
 
                 {descuentoMonto > 0 && (
-                  <p className="suave pequeno" style={{ textAlign: "right", margin: "4px 0 0" }}>
-                    Subtotal {formatearMonto(totalBruto, "PEN")} - Descuento {formatearMonto(descuentoMonto, "PEN")}
-                  </p>
+                  <>
+                    <p className="suave pequeno" style={{ textAlign: "right", margin: "4px 0 0" }}>
+                      Subtotal {formatearMonto(totalBruto, "PEN")} - Descuento {formatearMonto(descuentoMonto, "PEN")}
+                    </p>
+                    <input
+                      value={descuentoSustento}
+                      onChange={(e) => setDescuentoSustento(e.target.value)}
+                      placeholder="Motivo del descuento (obligatorio para cobrar)"
+                      aria-label="Motivo del descuento"
+                      style={{ width: "100%", marginTop: 6 }}
+                    />
+                  </>
                 )}
                 <p style={{ marginTop: 10, fontSize: 18, fontWeight: 700, textAlign: "right" }}>
                   Total: {formatearMonto(total, "PEN")}
@@ -651,7 +673,13 @@ export default function PuntoDeVenta() {
                     🧾 Pre-cuenta
                   </button>
                 </div>
-                <button type="button" className="btn btn-primario" style={{ width: "100%", marginTop: 6 }} disabled={cobrando} onClick={cobrar}>
+                <button
+                  type="button"
+                  className="btn btn-primario"
+                  style={{ width: "100%", marginTop: 6 }}
+                  disabled={cobrando || (descuentoMonto > 0 && !descuentoSustento.trim())}
+                  onClick={cobrar}
+                >
                   {cobrando ? "Cobrando..." : "Cobrar"}
                 </button>
               </>

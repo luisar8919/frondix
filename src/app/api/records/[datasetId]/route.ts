@@ -120,11 +120,16 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ dat
   const { datasetId } = await params;
   const supabase = await crearClienteServidor();
   const { data: { user } } = await supabase.auth.getUser();
-  const body = await req.json();
+  const cuerpoCompleto = await req.json();
 
-  if (!body || typeof body !== "object") {
+  if (!cuerpoCompleto || typeof cuerpoCompleto !== "object") {
     return NextResponse.json({ error: "Body inválido" }, { status: 400 });
   }
+  // `sustento` es un campo top-level aparte, igual que ya lo es en el PATCH de
+  // [recordId] -- así el Punto de Venta puede justificar un descuento (o
+  // cualquier otro dato de respaldo) desde la creación misma, sin un segundo
+  // viaje al servidor solo para eso.
+  const { sustento, ...body } = cuerpoCompleto as { sustento?: unknown; [k: string]: unknown };
 
   // Si una columna está enlazada a otra tabla, el valor debe existir allí.
   const { data: dataset, error: errorDataset } = await supabase.from("datasets").select("empresa_id, columnas, nombre, plantilla, reglas").eq("id", datasetId).single();
@@ -160,7 +165,12 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ dat
 
   const { data, error } = await supabase
     .from("records")
-    .insert({ dataset_id: datasetId, data: body, updated_by: user?.email ?? null })
+    .insert({
+      dataset_id: datasetId,
+      data: body,
+      updated_by: user?.email ?? null,
+      sustento: typeof sustento === "string" ? sustento.trim().slice(0, 2000) || null : null,
+    })
     .select()
     .single();
 
